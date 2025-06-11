@@ -151,8 +151,123 @@ export async function POST(req: NextRequest) {
       authenticatedUser.email
     )
 
-    // Usage tracking and limit checking
+    // 🚀 NEW: Admin bypass check - Check if user is admin/owner first
     const serviceSupabase = createServiceRoleClient()
+    const { data: isAdmin, error: adminError } = await serviceSupabase.rpc(
+      'is_admin',
+      {
+        user_uuid: authenticatedUser.id,
+      }
+    )
+
+    if (isAdmin) {
+      console.log('6. 👑 ADMIN/OWNER DETECTED - Bypassing all usage limits')
+
+      // Skip usage tracking for admins, go directly to content generation
+      console.log('7. Admin privilege: Unlimited generations enabled')
+
+      // Enhanced prompt creation with voice integration
+      const prompt = createPrompt(
+        productName,
+        features,
+        platform,
+        imageAnalysis,
+        hasImages,
+        hasProcessedImages,
+        voiceTranscription,
+        existingContent
+      )
+
+      // Determine if this is voice enhancement or new generation
+      const isVoiceEnhancement = !!existingContent && !!voiceTranscription
+      console.log(
+        '8. Generating content with OpenAI... (ADMIN MODE)',
+        isVoiceEnhancement ? '(Voice Enhancement Mode)' : '(New Generation)',
+        isBackgroundJob ? '[BACKGROUND JOB]' : '[FOREGROUND JOB]'
+      )
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: isVoiceEnhancement
+              ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. You take existing content generated from voice input and refine it for professional use while preserving the original intent and key details. You understand both text descriptions and image analysis to create compelling product content.'
+              : 'You are an expert copywriter specializing in e-commerce content optimization for different platforms. You analyze both text descriptions and image analysis to create compelling product content. You understand when images have been professionally processed with background removal for enhanced presentation.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        max_tokens: 1200,
+        temperature: isVoiceEnhancement ? 0.6 : 0.7,
+      })
+
+      const generatedContent =
+        completion.choices[0]?.message?.content ||
+        'Content generated successfully!'
+      console.log('9. Content generated successfully (ADMIN MODE)')
+
+      // Enhanced database save with voice metadata (Admin mode)
+      const { data: savedContent, error: saveError } = await serviceSupabase
+        .from('product_contents')
+        .insert({
+          user_id: authenticatedUser.id,
+          product_name: productName,
+          platform: platform,
+          features: features,
+          generated_content: generatedContent,
+          has_images: hasImages || false,
+          has_processed_images: hasProcessedImages || false,
+          image_analysis: imageAnalysis || null,
+          voice_transcription: voiceTranscription || null,
+          is_voice_enhanced: isVoiceEnhancement,
+          is_background_job: isBackgroundJob || false,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (saveError) {
+        console.log('10. Warning: Failed to save content:', saveError)
+      } else {
+        console.log('10. Content saved to database (ADMIN MODE)')
+      }
+
+      // Admin response with unlimited status
+      return NextResponse.json({
+        result: generatedContent,
+        contentId: savedContent?.id || null,
+        usage: {
+          used: 'unlimited',
+          limit: 'unlimited',
+          isAdmin: true,
+        },
+        imageInfo: {
+          hasImages,
+          hasProcessedImages,
+          imageAnalysis: imageAnalysis ? 'included' : 'none',
+        },
+        voiceInfo: {
+          hasVoiceInput: !!voiceTranscription,
+          isEnhancement: isVoiceEnhancement,
+          transcriptionLength: voiceTranscription?.length || 0,
+        },
+        jobInfo: {
+          isBackgroundJob: !!isBackgroundJob,
+          processedBy: isBackgroundJob
+            ? 'background-processor'
+            : 'admin-request',
+        },
+        adminInfo: {
+          isAdmin: true,
+          hasUnlimitedAccess: true,
+        },
+      })
+    }
+
+    // Regular user flow (existing logic continues here)
     const currentMonth = new Date().toISOString().slice(0, 7)
     console.log('6. Checking usage for month:', currentMonth)
 

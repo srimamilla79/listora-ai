@@ -1,4 +1,4 @@
-// src/components/ProductForm.tsx - COMPLETE FINAL VERSION WITH IMAGE FIX
+// Enhanced ProductForm.tsx with Amazon Integration - COMPLETE FINAL VERSION
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -28,7 +28,13 @@ import {
   TrendingUp,
   FileSpreadsheet,
   Clock,
+  AlertTriangle,
+  Rocket,
 } from 'lucide-react'
+
+// 🚀 NEW: Import Amazon Components
+import AmazonConnection from '@/components/AmazonConnection'
+import AmazonPublisher from '@/components/AmazonPublisher'
 
 interface ProcessedImage {
   original: File
@@ -61,7 +67,18 @@ interface ToastNotification {
   type: 'success' | 'error' | 'info'
 }
 
-export default function ProductForm() {
+// 🚀 NEW: Enhanced Props Interface
+interface ProductFormProps {
+  onGenerationSuccess?: () => void // NEW: Success callback
+  currentUsage?: number // NEW: Current usage count
+  monthlyLimit?: number // NEW: Monthly limit
+}
+
+export default function ProductForm({
+  onGenerationSuccess,
+  currentUsage, // ✅ No default
+  monthlyLimit, // ✅ No default
+}: ProductFormProps) {
   // Basic state
   const [productName, setProductName] = useState('')
   const [features, setFeatures] = useState('')
@@ -102,6 +119,32 @@ export default function ProductForm() {
   const [hasGeneratedFinalContent, setHasGeneratedFinalContent] =
     useState(false)
 
+  // 🚀 NEW: Usage validation state
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showUsageLimitWarning, setShowUsageLimitWarning] = useState(false)
+
+  // 🚀 NEW: Amazon integration state
+  const [amazonConnected, setAmazonConnected] = useState(false)
+  // 🚀 FIXED: Local fallback state
+  const [localUsage, setLocalUsage] = useState(0)
+  const [localLimit, setLocalLimit] = useState(10)
+
+  // 🚀 FIXED: Use passed props or fallback to local state
+  const actualCurrentUsage =
+    currentUsage !== undefined ? currentUsage : localUsage
+  const actualMonthlyLimit =
+    monthlyLimit !== undefined ? monthlyLimit : localLimit
+
+  // 🚀 FIXED: Update local state when props change
+  useEffect(() => {
+    if (currentUsage !== undefined) {
+      setLocalUsage(currentUsage)
+    }
+    if (monthlyLimit !== undefined) {
+      setLocalLimit(monthlyLimit)
+    }
+  }, [currentUsage, monthlyLimit])
+
   // Voice recording refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -110,6 +153,63 @@ export default function ProductForm() {
 
   const supabase = createClient()
   const router = useRouter()
+
+  // 🚀 NEW: Check if user can generate (usage validation)
+  const canGenerate = () => {
+    console.log('🔍 Usage Check:', {
+      isAdmin,
+      actualCurrentUsage,
+      actualMonthlyLimit,
+      passedCurrentUsage: currentUsage,
+      passedMonthlyLimit: monthlyLimit,
+      canGenerate: isAdmin || actualCurrentUsage < actualMonthlyLimit,
+    })
+
+    if (isAdmin) {
+      console.log('👑 Admin bypass enabled')
+      return true
+    }
+
+    const canGen = actualCurrentUsage < actualMonthlyLimit
+    if (!canGen) {
+      console.log(
+        '❌ Usage limit reached:',
+        actualCurrentUsage,
+        '>=',
+        actualMonthlyLimit
+      )
+    } else {
+      console.log('✅ Usage OK:', actualCurrentUsage, '<', actualMonthlyLimit)
+    }
+
+    return canGen
+  }
+
+  const remainingGenerations = actualMonthlyLimit - actualCurrentUsage
+  const usagePercentage = (actualCurrentUsage / actualMonthlyLimit) * 100
+
+  // 🚀 NEW: Amazon publish success handler
+  const handleAmazonPublishSuccess = (listingId: string) => {
+    addNotification(
+      `🎉 Product successfully published to Amazon! Listing ID: ${listingId}`,
+      'success'
+    )
+  }
+
+  // 🚀 NEW: Check admin status
+  const checkAdminStatus = async () => {
+    if (!user) return
+
+    try {
+      const { data: adminCheck } = await supabase.rpc('is_admin', {
+        user_uuid: user.id,
+      })
+      setIsAdmin(adminCheck || false)
+    } catch (error) {
+      console.error('Error checking admin status:', error)
+      setIsAdmin(false)
+    }
+  }
 
   // Fetch user's generation count
   const fetchUserGenerationCount = async () => {
@@ -154,6 +254,8 @@ export default function ProductForm() {
       setShowPostGenerationPrompt(false)
     } else if (promptType === 'smart-promotion') {
       setShowSmartPromotion(false)
+    } else if (promptType === 'usage-limit') {
+      setShowUsageLimitWarning(false)
     }
   }
 
@@ -209,6 +311,7 @@ export default function ProductForm() {
       const timer = setTimeout(() => {
         if (componentMounted) {
           fetchUserGenerationCount()
+          checkAdminStatus() // 🚀 NEW: Check admin status
         }
       }, 100)
 
@@ -218,8 +321,22 @@ export default function ProductForm() {
       setShowSmartPromotion(false)
       setShowPostGenerationPrompt(false)
       setDataLoaded(false)
+      setIsAdmin(false)
     }
   }, [user, componentMounted])
+
+  // 🚀 NEW: Show usage warning when approaching limit
+  useEffect(() => {
+    if (
+      !isAdmin &&
+      actualCurrentUsage >= actualMonthlyLimit - 2 &&
+      actualCurrentUsage < actualMonthlyLimit
+    ) {
+      setShowUsageLimitWarning(true)
+    } else {
+      setShowUsageLimitWarning(false)
+    }
+  }, [actualCurrentUsage, actualMonthlyLimit, isAdmin])
 
   // Voice recording functions
   const formatTime = (seconds: number): string => {
@@ -789,7 +906,9 @@ export default function ProductForm() {
     return analysis
   }
 
+  // 🚀 ENHANCED: Handle generate with usage validation
   const handleGenerate = async () => {
+    // 🚀 NEW: Pre-validation checks
     if (!productName.trim() || !features.trim()) {
       addNotification('Please fill in both product name and features', 'error')
       return
@@ -797,6 +916,26 @@ export default function ProductForm() {
 
     if (!user) {
       addNotification('Please log in to generate content', 'error')
+      return
+    }
+
+    // 🚀 NEW: Usage limit validation (unless admin)
+    const canUserGenerate = canGenerate()
+    console.log('🔍 Final usage validation:', {
+      canUserGenerate,
+      isAdmin,
+      actualCurrentUsage,
+      actualMonthlyLimit,
+      hasGeneratedFinalContent,
+    })
+
+    if (!canUserGenerate) {
+      console.log('❌ BLOCKED: Usage limit reached')
+      addNotification(
+        `Monthly generation limit reached (${actualCurrentUsage}/${actualMonthlyLimit}). Please upgrade your plan to continue.`,
+        'error'
+      )
+      router.push('/pricing')
       return
     }
 
@@ -864,6 +1003,12 @@ export default function ProductForm() {
         setLastGeneratedContentId(data.contentId)
         setHasGeneratedFinalContent(true)
 
+        // 🚀 NEW: Call success callback to update usage display
+        if (onGenerationSuccess) {
+          console.log('🎉 Calling generation success callback...')
+          onGenerationSuccess()
+        }
+
         if (!dismissedPrompts.includes('post-generation') && componentMounted) {
           setShowPostGenerationPrompt(true)
         }
@@ -894,7 +1039,7 @@ export default function ProductForm() {
       addNotification(
         isVoiceContentAvailable
           ? '🎤 Voice content enhanced and saved to dashboard!'
-          : 'Content generated and saved to dashboard!',
+          : '🎉 Content generated successfully and saved to dashboard!',
         'success'
       )
     } catch (error) {
@@ -997,6 +1142,48 @@ export default function ProductForm() {
           </div>
         ))}
       </div>
+
+      {/* 🚀 NEW: Usage Limit Warning */}
+      {showUsageLimitWarning && !isAdmin && (
+        <div className="mb-6 p-4 bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-orange-100 p-2 rounded-full">
+                <AlertTriangle className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <h4 className="font-bold text-orange-900">
+                  Almost at your limit!
+                </h4>
+                <p className="text-orange-700 text-sm">
+                  Only {remainingGenerations} generations left this month.
+                  Consider upgrading to continue.
+                </p>
+                <div className="flex items-center space-x-4 mt-1 text-xs text-orange-600">
+                  <span>⚡ 10x more generations</span>
+                  <span>🎨 Advanced features</span>
+                  <span>🚀 Priority processing</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => router.push('/pricing')}
+                className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg"
+              >
+                <Rocket className="h-4 w-4" />
+                <span>Upgrade</span>
+              </button>
+              <button
+                onClick={() => dismissPrompt('usage-limit')}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Smart Bulk Upload Promotion - Priority-based display */}
       {shouldShowPromotions &&
@@ -1507,7 +1694,7 @@ export default function ProductForm() {
                   </label>
                 </div>
 
-                {/* FIXED: Complete Image Processing Display */}
+                {/* Complete Image Processing Display */}
                 {processedImages.length > 0 && (
                   <div className="mt-6 space-y-4">
                     {processedImages.map((image, index) => (
@@ -1537,32 +1724,34 @@ export default function ProductForm() {
                           </h4>
                           <div className="flex space-x-2">
                             {!image.isProcessing && (
-                              <button
-                                onClick={() => reprocessImage(index)}
-                                className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-                                title="Reprocess image"
-                              >
-                                <RefreshCw className="h-4 w-4" />
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => reprocessImage(index)}
+                                  className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                                  title="Reprocess image"
+                                >
+                                  <RefreshCw className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setShowBeforeAfter(
+                                      showBeforeAfter === index ? null : index
+                                    )
+                                  }
+                                  className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                                  title="Toggle before/after view"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => removeImage(index)}
+                                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                  title="Remove image"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </>
                             )}
-                            <button
-                              onClick={() =>
-                                setShowBeforeAfter(
-                                  showBeforeAfter === index ? null : index
-                                )
-                              }
-                              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-                              title="Toggle before/after view"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => removeImage(index)}
-                              className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                              title="Remove image"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
                           </div>
                         </div>
 
@@ -1827,13 +2016,21 @@ export default function ProductForm() {
             </div>
           </div>
 
-          {/* Generate button */}
+          {/* 🚀 ENHANCED: Generate button with usage validation */}
           <div className="mt-8 flex flex-col items-center space-y-4">
             <button
               onClick={handleGenerate}
-              disabled={loading || !user || hasGeneratedFinalContent}
+              disabled={
+                loading ||
+                !user ||
+                hasGeneratedFinalContent ||
+                (!isAdmin && !canGenerate())
+              }
               className={`flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
-                loading || !user || hasGeneratedFinalContent
+                loading ||
+                !user ||
+                hasGeneratedFinalContent ||
+                (!isAdmin && !canGenerate())
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-slate-600 to-gray-700 hover:from-slate-700 hover:to-gray-800 transform hover:scale-105 shadow-lg hover:shadow-xl'
               }`}
@@ -1850,6 +2047,12 @@ export default function ProductForm() {
                   <CheckCircle className="mr-3 h-5 w-5" />
                   Content Generated! Check Dashboard
                 </>
+              ) : !isAdmin && !canGenerate() ? (
+                <>
+                  <AlertTriangle className="mr-3 h-5 w-5" />
+                  Monthly Limit Reached ({actualCurrentUsage}/
+                  {actualMonthlyLimit}) - Upgrade to Continue
+                </>
               ) : (
                 <>
                   <Wand2 className="mr-3 h-5 w-5" />
@@ -1859,6 +2062,21 @@ export default function ProductForm() {
                 </>
               )}
             </button>
+
+            {/* 🚀 NEW: Usage status display */}
+            {!isAdmin && (
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  {actualCurrentUsage}/{actualMonthlyLimit} generations used
+                  this month
+                </p>
+                {remainingGenerations <= 3 && remainingGenerations > 0 && (
+                  <p className="text-xs text-orange-600 mt-1">
+                    Only {remainingGenerations} generations remaining
+                  </p>
+                )}
+              </div>
+            )}
 
             {hasGeneratedFinalContent && (
               <button
@@ -1877,6 +2095,90 @@ export default function ProductForm() {
               </button>
             )}
           </div>
+
+          {/* 🚀 NEW: Amazon Integration Section */}
+          {generatedContent && user && (
+            <div className="mt-8 space-y-6">
+              <div className="border-t border-gray-200 pt-8">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    🚀 Publish Your Content
+                  </h2>
+                  <p className="text-gray-600">
+                    Take your generated content live on Amazon marketplace
+                  </p>
+                </div>
+
+                {/* Amazon Connection Component */}
+                <AmazonConnection
+                  userId={user.id}
+                  onConnectionChange={setAmazonConnected}
+                />
+                {/* Temporary Debug Info */}
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm font-bold">Debug Info:</p>
+                  <p className="text-xs">
+                    lastGeneratedContentId:{' '}
+                    {lastGeneratedContentId || 'MISSING'}
+                  </p>
+                  <p className="text-xs">
+                    productName: {productName || 'MISSING'}
+                  </p>
+                  <p className="text-xs">
+                    generatedContent exists: {generatedContent ? 'YES' : 'NO'}
+                  </p>
+                </div>
+                {/* Amazon Publisher Component - Only show if content exists */}
+                {lastGeneratedContentId && (
+                  <AmazonPublisher
+                    productContent={{
+                      id: lastGeneratedContentId,
+                      product_name: productName,
+                      features: features,
+                      platform: platform,
+                      content: generatedContent,
+                    }}
+                    images={processedImages
+                      .filter((img) => img.platforms.amazon)
+                      .map((img) => img.platforms.amazon)}
+                    isConnected={amazonConnected}
+                    onPublishSuccess={handleAmazonPublishSuccess}
+                  />
+                )}
+
+                {/* Integration Benefits */}
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
+                  <h3 className="font-bold text-blue-900 mb-3 flex items-center">
+                    <span className="mr-2">⚡</span>
+                    Why Use Direct Publishing?
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-800">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-green-600 mt-1">✓</span>
+                      <div>
+                        <div className="font-medium">Save Time</div>
+                        <div>No manual copy-pasting to Amazon</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-green-600 mt-1">✓</span>
+                      <div>
+                        <div className="font-medium">Reduce Errors</div>
+                        <div>Automated formatting and validation</div>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-green-600 mt-1">✓</span>
+                      <div>
+                        <div className="font-medium">Track Status</div>
+                        <div>Real-time publishing updates</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

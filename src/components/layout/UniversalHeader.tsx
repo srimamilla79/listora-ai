@@ -1,8 +1,10 @@
-// src/components/layout/UniversalHeader.tsx
+// src/components/layout/UniversalHeader.tsx - UPDATED
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Sparkles } from 'lucide-react'
+import { createClient } from '@/lib/supabase'
 import AvatarHeader from '@/components/AvatarHeader'
 
 interface UniversalHeaderProps {
@@ -16,12 +18,41 @@ export default function UniversalHeader({
 }: UniversalHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const supabase = createClient()
+  const [isAdmin, setIsAdmin] = useState(false)
 
-  // Navigation items with proper cursor pointers and active states
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user?.id) {
+        try {
+          const { data: adminCheck } = await supabase.rpc('is_admin', {
+            user_uuid: user.id,
+          })
+          setIsAdmin(adminCheck || false)
+        } catch (error) {
+          console.error('Error checking admin status:', error)
+          setIsAdmin(false)
+        }
+      }
+    }
+
+    checkAdminStatus()
+  }, [user, supabase])
+
+  // Navigation items with conditional admin link and new Published Products link
   const navigationItems = [
     { path: '/generate', label: 'Generate', cursor: 'cursor-pointer' },
-    { path: '/dashboard', label: 'Dashboard', cursor: 'cursor-pointer' },
+    { path: '/dashboard', label: 'Content Library', cursor: 'cursor-pointer' },
+    {
+      path: '/published-products',
+      label: 'Published Products',
+      cursor: 'cursor-pointer',
+    }, // 🚀 NEW
     { path: '/pricing', label: 'Pricing', cursor: 'cursor-pointer' },
+    ...(isAdmin
+      ? [{ path: '/admin', label: 'Admin', cursor: 'cursor-pointer' }]
+      : []),
   ]
 
   const isActive = (path: string) => pathname === path
@@ -67,9 +98,27 @@ export default function UniversalHeader({
                       isActive(item.path)
                         ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50'
                         : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100'
+                    } ${
+                      item.path === '/admin'
+                        ? 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 hover:from-purple-200 hover:to-indigo-200 border border-purple-200'
+                        : ''
+                    } ${
+                      item.path === '/published-products'
+                        ? 'bg-gradient-to-r from-orange-50 to-red-50 text-orange-700 hover:from-orange-100 hover:to-red-100 border border-orange-200'
+                        : ''
                     }`}
                   >
                     {item.label}
+                    {item.path === '/admin' && (
+                      <span className="ml-1 text-xs bg-purple-500 text-white px-1.5 py-0.5 rounded-full">
+                        🛡️
+                      </span>
+                    )}
+                    {item.path === '/published-products' && (
+                      <span className="ml-1 text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded-full">
+                        📦
+                      </span>
+                    )}
                   </button>
                 ))}
               </nav>
@@ -103,9 +152,27 @@ export default function UniversalHeader({
                 isActive(item.path)
                   ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50'
                   : 'text-gray-600 hover:text-indigo-600 hover:bg-gray-100'
+              } ${
+                item.path === '/admin'
+                  ? 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border border-purple-200'
+                  : ''
+              } ${
+                item.path === '/published-products'
+                  ? 'bg-gradient-to-r from-orange-50 to-red-50 text-orange-700 border border-orange-200'
+                  : ''
               }`}
             >
               {item.label}
+              {item.path === '/admin' && (
+                <span className="ml-1 text-xs bg-purple-500 text-white px-1 py-0.5 rounded-full">
+                  🛡️
+                </span>
+              )}
+              {item.path === '/published-products' && (
+                <span className="ml-1 text-xs bg-orange-500 text-white px-1 py-0.5 rounded-full">
+                  📦
+                </span>
+              )}
             </button>
           ))}
         </div>

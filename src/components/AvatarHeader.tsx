@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronDown,
   Crown,
+  Sparkles,
 } from 'lucide-react'
 
 interface UserSubscription {
@@ -31,6 +32,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
     null
   )
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -52,30 +54,62 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
 
   const initials = getInitials(userName)
 
-  // Load subscription data
+  // 🚀 NEW: Check admin status
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user?.id) return
+
+      try {
+        const { data: adminCheck } = await supabase.rpc('is_admin', {
+          user_uuid: user.id,
+        })
+        setIsAdmin(adminCheck || false)
+      } catch (error) {
+        console.error('Error checking admin status:', error)
+        setIsAdmin(false)
+      }
+    }
+
+    checkAdminStatus()
+  }, [user?.id, supabase])
+
+  // 🚀 FIXED: Load subscription data from user_plans table
   useEffect(() => {
     const loadSubscription = async () => {
       if (!user?.id) return
 
       try {
+        console.log('🔍 AvatarHeader - Loading plan for user:', user.id)
+
+        // 🚀 FIXED: Read from user_plans table instead of user_subscriptions
         const { data, error } = await supabase
-          .from('user_subscriptions')
-          .select('plan_name, status, current_period_end')
+          .from('user_plans')
+          .select('plan_type, is_active, created_at')
           .eq('user_id', user.id)
+          .eq('is_active', true)
           .single()
 
+        console.log('🔍 AvatarHeader - Plan query result:', { data, error })
+
         if (error) {
-          console.log('No subscription found:', error)
+          console.log('No plan found, defaulting to starter:', error)
           setSubscription({
             plan_name: 'Starter',
             status: 'active',
             current_period_end: '',
           })
         } else {
-          setSubscription(data)
+          console.log('✅ AvatarHeader - Plan loaded:', data.plan_type)
+          // 🚀 FIXED: Map plan_type to plan_name format
+          setSubscription({
+            plan_name:
+              data.plan_type.charAt(0).toUpperCase() + data.plan_type.slice(1), // business -> Business
+            status: 'active',
+            current_period_end: '',
+          })
         }
       } catch (error) {
-        console.error('Error loading subscription:', error)
+        console.error('Error loading plan:', error)
         setSubscription({
           plan_name: 'Starter',
           status: 'active',
@@ -124,7 +158,10 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
     onSignOut()
   }
 
+  // 🚀 ENHANCED: Admin-aware plan icon
   const getPlanIcon = (planName: string) => {
+    if (isAdmin) return <Crown className="h-4 w-4 text-purple-600" />
+
     const plan = planName?.toLowerCase()
     if (plan?.includes('enterprise'))
       return <Crown className="h-4 w-4 text-purple-600" />
@@ -135,12 +172,22 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
     return <Crown className="h-4 w-4 text-gray-400" />
   }
 
+  // 🚀 ENHANCED: Admin-aware plan color
   const getPlanColor = (planName: string) => {
+    if (isAdmin)
+      return 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-800 border border-purple-200'
+
     const plan = planName?.toLowerCase()
     if (plan?.includes('enterprise')) return 'bg-purple-100 text-purple-800'
     if (plan?.includes('premium')) return 'bg-yellow-100 text-yellow-800'
     if (plan?.includes('business')) return 'bg-blue-100 text-blue-800'
     return 'bg-gray-100 text-gray-600'
+  }
+
+  // 🚀 NEW: Get display plan name
+  const getDisplayPlanName = () => {
+    if (isAdmin) return 'Owner'
+    return subscription?.plan_name || 'Starter'
   }
 
   return (
@@ -150,8 +197,14 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-3 text-gray-700 hover:text-gray-900 transition-colors group cursor-pointer"
       >
-        {/* Avatar Circle */}
-        <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm group-hover:shadow-md transition-shadow">
+        {/* Avatar Circle - 🚀 ENHANCED: Admin styling */}
+        <div
+          className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm group-hover:shadow-md transition-shadow ${
+            isAdmin
+              ? 'bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600'
+              : 'bg-gradient-to-r from-indigo-500 to-purple-600'
+          }`}
+        >
           {initials}
         </div>
 
@@ -159,8 +212,11 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
         <div className="hidden md:block text-left">
           <div className="text-sm font-medium">{userName}</div>
           {!loading && subscription && (
-            <div className="text-xs text-gray-500">
-              {subscription.plan_name} Plan
+            <div
+              className={`text-xs ${isAdmin ? 'text-purple-600 font-medium' : 'text-gray-500'}`}
+            >
+              {isAdmin && <span className="mr-1">👑</span>}
+              {getDisplayPlanName()} Plan
             </div>
           )}
         </div>
@@ -176,15 +232,26 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
       {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 animate-in slide-in-from-top-1 duration-200">
-          {/* User Info Header */}
-          <div className="px-4 py-3 border-b border-gray-100">
+          {/* User Info Header - 🚀 ENHANCED: Admin styling */}
+          <div
+            className={`px-4 py-3 border-b border-gray-100 ${isAdmin ? 'bg-gradient-to-r from-purple-50 to-indigo-50' : ''}`}
+          >
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm ${
+                  isAdmin
+                    ? 'bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-600'
+                    : 'bg-gradient-to-r from-indigo-500 to-purple-600'
+                }`}
+              >
                 {initials}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-gray-900 truncate">
                   {userName}
+                  {isAdmin && (
+                    <Crown className="inline h-4 w-4 ml-1 text-purple-600" />
+                  )}
                 </div>
                 <div className="text-sm text-gray-500 truncate">
                   {user?.email}
@@ -197,11 +264,18 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
                         subscription.plan_name
                       )}`}
                     >
-                      {subscription.plan_name} Plan
+                      {isAdmin && <Sparkles className="h-3 w-3 mr-1" />}
+                      {getDisplayPlanName()} Plan
+                      {isAdmin && <span className="ml-1">∞</span>}
                     </span>
-                    {subscription.status !== 'active' && (
+                    {subscription.status !== 'active' && !isAdmin && (
                       <span className="ml-2 text-xs text-red-600">
                         ({subscription.status})
+                      </span>
+                    )}
+                    {isAdmin && (
+                      <span className="ml-2 text-xs text-purple-600 font-medium">
+                        Unlimited Access
                       </span>
                     )}
                   </div>
@@ -209,6 +283,36 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
               </div>
             </div>
           </div>
+
+          {/* 🚀 NEW: Admin privileges section */}
+          {isAdmin && (
+            <div className="px-4 py-2 bg-purple-50 border-b border-purple-100">
+              <div className="flex items-center space-x-2 text-xs">
+                <Shield className="h-3 w-3 text-purple-600" />
+                <span className="text-purple-700 font-medium">
+                  Owner Privileges Active
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-1 text-xs text-purple-600">
+                <div className="flex items-center space-x-1">
+                  <span>✓</span>
+                  <span>Unlimited generations</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span>✓</span>
+                  <span>All features</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span>✓</span>
+                  <span>Admin dashboard</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <span>✓</span>
+                  <span>Priority support</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Menu Items - FIXED: Added cursor-pointer to all buttons */}
           <div className="py-2">
@@ -225,15 +329,20 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
               </div>
             </button>
 
+            {/* 🚀 ENHANCED: Show billing for non-admin users, or admin management for admins */}
             <button
               onClick={handleBillingClick}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors group cursor-pointer"
             >
               <CreditCard className="h-4 w-4 mr-3 text-gray-400 group-hover:text-green-600" />
               <div className="text-left">
-                <div className="font-medium">Billing & Plans</div>
+                <div className="font-medium">
+                  {isAdmin ? 'Business Management' : 'Billing & Plans'}
+                </div>
                 <div className="text-xs text-gray-500">
-                  Manage subscription & billing
+                  {isAdmin
+                    ? 'Manage business settings'
+                    : 'Manage subscription & billing'}
                 </div>
               </div>
             </button>
@@ -252,26 +361,37 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
             </button>
           </div>
 
-          {/* Subscription Status */}
-          {!loading && subscription && subscription.current_period_end && (
+          {/* Subscription Status - 🚀 ENHANCED: Admin vs regular user */}
+          {!loading && subscription && (
             <div className="px-4 py-2 border-t border-gray-100">
-              <div className="text-xs text-gray-500">
-                {subscription.status === 'active' ? (
-                  <>
-                    Next billing:{' '}
-                    {new Date(
-                      subscription.current_period_end
-                    ).toLocaleDateString()}
-                  </>
-                ) : (
-                  <>
-                    Plan expires:{' '}
-                    {new Date(
-                      subscription.current_period_end
-                    ).toLocaleDateString()}
-                  </>
-                )}
-              </div>
+              {isAdmin ? (
+                <div className="text-xs text-purple-600">
+                  <div className="flex items-center space-x-1">
+                    <Crown className="h-3 w-3" />
+                    <span className="font-medium">
+                      Owner account - No restrictions
+                    </span>
+                  </div>
+                </div>
+              ) : subscription.current_period_end ? (
+                <div className="text-xs text-gray-500">
+                  {subscription.status === 'active' ? (
+                    <>
+                      Next billing:{' '}
+                      {new Date(
+                        subscription.current_period_end
+                      ).toLocaleDateString()}
+                    </>
+                  ) : (
+                    <>
+                      Plan expires:{' '}
+                      {new Date(
+                        subscription.current_period_end
+                      ).toLocaleDateString()}
+                    </>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
 

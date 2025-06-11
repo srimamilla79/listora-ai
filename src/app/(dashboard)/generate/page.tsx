@@ -11,6 +11,12 @@ export default function GeneratePage() {
   const [userPlan, setUserPlan] = useState<string>('starter')
   const [loading, setLoading] = useState(true)
   const [redirecting, setRedirecting] = useState(false)
+
+  // 🚀 NEW: Smart usage management
+  const [usageRefreshKey, setUsageRefreshKey] = useState(0)
+  const [currentUsage, setCurrentUsage] = useState(0)
+  const [monthlyLimit, setMonthlyLimit] = useState(10)
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -31,8 +37,9 @@ export default function GeneratePage() {
             setRedirecting(true)
             router.push('/login')
           } else {
-            // Fetch user plan when user is authenticated
+            // Fetch user plan and current usage when user is authenticated
             await fetchUserPlan(session.user.id)
+            await fetchCurrentUsage(session.user.id)
           }
         }
       } catch (error) {
@@ -55,6 +62,7 @@ export default function GeneratePage() {
           router.push('/login')
         } else if (session?.user) {
           await fetchUserPlan(session.user.id)
+          await fetchCurrentUsage(session.user.id)
         }
       }
     })
@@ -77,13 +85,111 @@ export default function GeneratePage() {
       if (data && !error) {
         setUserPlan(data.plan_type)
         console.log('✅ User plan loaded:', data.plan_type)
+
+        // Set monthly limits based on plan
+        const planLimits = {
+          starter: 10,
+          business: 250,
+          premium: 1000,
+          enterprise: 999999,
+        }
+
+        setMonthlyLimit(
+          planLimits[data.plan_type as keyof typeof planLimits] || 10
+        )
       } else {
-        console.log('⚠️ No plan found, defaulting to starter:', error)
         setUserPlan('starter')
+        setMonthlyLimit(10)
       }
     } catch (error) {
       console.error('Error fetching user plan:', error)
       setUserPlan('starter')
+      setMonthlyLimit(10)
+    }
+  }
+
+  // 🚀 NEW: Fetch current usage from database
+  const fetchCurrentUsage = async (userId: string) => {
+    try {
+      const currentMonth = new Date().toISOString().slice(0, 7) // '2025-06'
+
+      // First, try to get from usage_tracking table
+      const { data: usageData, error: usageError } = await supabase
+        .from('user_usage_tracking')
+        .select('usage_count')
+        .eq('user_id', userId)
+        .eq('month_year', currentMonth)
+        .single()
+
+      let usage = 0
+
+      if (usageData && !usageError) {
+        usage = usageData.usage_count || 0
+      } else {
+        // Fallback: Count existing records
+        const startOfMonth = `${currentMonth}-01T00:00:00.000Z`
+
+        let { count, error } = await supabase
+          .from('product_contents')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('created_at', startOfMonth)
+
+        if (error) {
+          const result = await supabase
+            .from('user_content')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', startOfMonth)
+
+          count = result.count
+        }
+
+        usage = count || 0
+      }
+
+      setCurrentUsage(usage)
+      console.log('✅ Current usage loaded:', usage)
+    } catch (error) {
+      console.error('Error fetching current usage:', error)
+      setCurrentUsage(0)
+    }
+  }
+
+  // 🚀 UPDATED: Handle successful generation
+  // 🚀 UPDATED: Handle successful generation with better sync
+  const handleGenerationSuccess = () => {
+    console.log('🎉 Generation successful! Refreshing usage...')
+
+    // Calculate the new usage count
+    const newUsage = currentUsage + 1
+
+    // Update both local state AND trigger UsageDisplay refresh
+    setCurrentUsage(newUsage)
+    setUsageRefreshKey((prev) => prev + 1)
+
+    // 🚀 FIXED: Force immediate sync - update UsageDisplay's state too
+    // This ensures both components show the same number immediately
+    setTimeout(() => {
+      setUsageRefreshKey((prev) => prev + 1)
+    }, 100)
+
+    // Also refresh from database after a short delay to confirm
+    if (user?.id) {
+      setTimeout(() => {
+        fetchCurrentUsage(user.id)
+      }, 500)
+    }
+  }
+
+  // 🚀 UPDATED: Handle usage data updates from UsageDisplay
+  const handleUsageUpdate = (usage: number, limit: number) => {
+    // Only update if the values are different to avoid loops
+    if (usage !== currentUsage) {
+      setCurrentUsage(usage)
+    }
+    if (limit !== monthlyLimit) {
+      setMonthlyLimit(limit)
     }
   }
 
@@ -128,11 +234,18 @@ export default function GeneratePage() {
             </p>
           </div>
 
-          {/* Usage Display Component - Shows monthly usage */}
-          <UsageDisplay userId={user?.id} planType={userPlan} />
-
-          {/* Product Form */}
-          <ProductForm />
+          {/* 🚀 UPDATED: Usage Display with smart refresh */}
+          <UsageDisplay
+            userId={user?.id}
+            planType={userPlan}
+            refreshKey={usageRefreshKey}
+            onUsageUpdate={handleUsageUpdate}
+          />
+          <ProductForm
+            onGenerationSuccess={handleGenerationSuccess}
+            currentUsage={currentUsage}
+            monthlyLimit={monthlyLimit}
+          />
         </div>
       </main>
     </div>
