@@ -67,9 +67,20 @@ export function useUserPlan() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const supabase = createClient()
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   const fetchUserPlan = async () => {
+    if (!supabase) return
+
     try {
       setLoading(true)
       setError(null)
@@ -113,6 +124,8 @@ export function useUserPlan() {
   }
 
   const updateUserPlan = async (newPlan: PlanType) => {
+    if (!supabase) return { success: false, error: 'Supabase not initialized' }
+
     try {
       const {
         data: { session },
@@ -207,9 +220,12 @@ export function useUserPlan() {
     return diffDays
   }
 
+  // ✅ Only fetch plan when Supabase is ready
   useEffect(() => {
-    fetchUserPlan()
-  }, [])
+    if (supabase && mounted) {
+      fetchUserPlan()
+    }
+  }, [supabase, mounted])
 
   return {
     userPlan,

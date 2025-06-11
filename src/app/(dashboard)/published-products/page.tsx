@@ -72,29 +72,40 @@ export default function PublishedProductsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [user, setUser] = useState<any>(null)
 
-  const supabase = createClient()
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   // Get current user
   useEffect(() => {
     const getCurrentUser = async () => {
+      if (!supabase) return
+
       const {
         data: { session },
       } = await supabase.auth.getSession()
       setUser(session?.user || null)
     }
     getCurrentUser()
-  }, [])
+  }, [supabase])
 
   // Load products on mount
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && supabase) {
       loadProducts()
     }
-  }, [user])
+  }, [user, supabase])
 
   // Load published products
   const loadProducts = async () => {
-    if (!user?.id) return
+    if (!user?.id || !supabase) return
 
     try {
       setLoading(true)
@@ -145,7 +156,7 @@ export default function PublishedProductsPage() {
 
   // Refresh from Amazon
   const refreshFromAmazon = async () => {
-    if (!user?.id) return
+    if (!user?.id || !supabase) return
 
     try {
       setRefreshing(true)
@@ -227,7 +238,8 @@ export default function PublishedProductsPage() {
       return aValue < bValue ? 1 : -1
     })
 
-  if (loading) {
+  // ✅ Wait for SSR safety before rendering
+  if (loading || !mounted || !supabase) {
     return (
       <div className="p-8">
         <div className="max-w-7xl mx-auto">

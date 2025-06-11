@@ -1,7 +1,4 @@
-// =============================================================================
-// FILE 5: src/components/AmazonOAuthButton.tsx - OAuth Connection UI
-// =============================================================================
-
+// src/components/AmazonOAuthButton.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -22,14 +19,27 @@ export default function AmazonOAuthButton({
   const [error, setError] = useState<string | null>(null)
   const [connectionData, setConnectionData] = useState<any>(null)
 
-  const supabase = createClient()
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   // Check connection status on mount
   useEffect(() => {
-    checkConnectionStatus()
-  }, [userId])
+    if (userId && supabase) {
+      checkConnectionStatus()
+    }
+  }, [userId, supabase])
 
   const checkConnectionStatus = async () => {
+    if (!supabase) return
+
     try {
       const response = await fetch(`/api/amazon/status?user_id=${userId}`)
       const data = await response.json()
@@ -57,6 +67,8 @@ export default function AmazonOAuthButton({
   }
 
   const handleDisconnect = async () => {
+    if (!supabase) return
+
     try {
       setIsLoading(true)
       setError(null)
@@ -80,6 +92,17 @@ export default function AmazonOAuthButton({
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // ✅ Wait for SSR safety before rendering
+  if (!mounted || !supabase) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    )
   }
 
   if (isConnected) {

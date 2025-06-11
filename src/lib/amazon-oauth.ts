@@ -1,8 +1,5 @@
-// =============================================================================
-// FILE 1: src/lib/amazon-oauth.ts - OAuth Helper Functions
-// =============================================================================
-
-import { createClient } from '@/lib/supabase'
+// src/lib/amazon-oauth.ts - Fixed for Server-side Usage
+import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
 // Encryption helpers for storing tokens securely
@@ -127,7 +124,11 @@ export async function refreshAccessToken(refreshToken: string) {
 
 // Get user's Amazon tokens from database
 export async function getUserAmazonTokens(userId: string) {
-  const supabase = createClient()
+  // ✅ Fixed: Use server-side Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 
   const { data: connection, error } = await supabase
     .from('amazon_connections')

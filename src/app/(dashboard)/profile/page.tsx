@@ -38,7 +38,8 @@ interface ToastNotification {
 }
 
 export default function ProfilePage() {
-  const supabase = createClient()
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const activeTab = searchParams.get('tab') || 'account'
@@ -69,6 +70,12 @@ export default function ProfilePage() {
   // Notifications
   const [notifications, setNotifications] = useState<ToastNotification[]>([])
 
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
+
   // Add notification function
   const addNotification = (
     message: string,
@@ -88,6 +95,8 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
+    if (!supabase) return
+
     const loadUserData = async () => {
       try {
         const {
@@ -117,6 +126,8 @@ export default function ProfilePage() {
   }, [router, supabase])
 
   const loadSubscription = async (userId: string) => {
+    if (!supabase) return
+
     try {
       const { data, error } = await supabase
         .from('user_subscriptions')
@@ -142,7 +153,7 @@ export default function ProfilePage() {
   }
 
   const handleUpdateProfile = async () => {
-    if (!user) return
+    if (!user || !supabase) return
 
     setSavingProfile(true)
     try {
@@ -163,6 +174,8 @@ export default function ProfilePage() {
   }
 
   const handleChangePassword = async () => {
+    if (!supabase) return
+
     if (!currentPassword || !newPassword || !confirmPassword) {
       addNotification('Please fill in all password fields', 'error')
       return
@@ -199,7 +212,7 @@ export default function ProfilePage() {
   }
 
   const handleBillingPortal = async () => {
-    if (!subscription?.stripe_customer_id) {
+    if (!subscription?.stripe_customer_id || !supabase) {
       addNotification('No billing information found', 'error')
       return
     }
@@ -236,7 +249,7 @@ export default function ProfilePage() {
   }
 
   const handleCancelSubscription = async () => {
-    if (!subscription?.stripe_subscription_id) {
+    if (!subscription?.stripe_subscription_id || !supabase) {
       addNotification('No active subscription found', 'error')
       return
     }
@@ -310,7 +323,7 @@ export default function ProfilePage() {
     return 'Free'
   }
 
-  if (loading) {
+  if (loading || !mounted || !supabase) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">

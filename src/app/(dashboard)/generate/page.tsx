@@ -11,6 +11,8 @@ export default function GeneratePage() {
   const [userPlan, setUserPlan] = useState<string>('starter')
   const [loading, setLoading] = useState(true)
   const [redirecting, setRedirecting] = useState(false)
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
 
   // 🚀 NEW: Smart usage management
   const [usageRefreshKey, setUsageRefreshKey] = useState(0)
@@ -18,9 +20,16 @@ export default function GeneratePage() {
   const [monthlyLimit, setMonthlyLimit] = useState(10)
 
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
+
+  useEffect(() => {
+    if (!supabase) return
+
     let isMounted = true
 
     async function checkAuth() {
@@ -71,9 +80,11 @@ export default function GeneratePage() {
       isMounted = false
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase, router])
 
   const fetchUserPlan = async (userId: string) => {
+    if (!supabase) return
+
     try {
       const { data, error } = await supabase
         .from('user_plans')
@@ -110,6 +121,8 @@ export default function GeneratePage() {
 
   // 🚀 NEW: Fetch current usage from database
   const fetchCurrentUsage = async (userId: string) => {
+    if (!supabase) return
+
     try {
       const currentMonth = new Date().toISOString().slice(0, 7) // '2025-06'
 
@@ -194,7 +207,7 @@ export default function GeneratePage() {
   }
 
   // Show loading during redirect or initial load
-  if (loading || redirecting) {
+  if (loading || redirecting || !mounted || !supabase) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">

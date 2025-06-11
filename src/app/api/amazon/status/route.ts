@@ -1,7 +1,6 @@
 // File 1: src/app/api/amazon/status/route.ts - FIXED
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
-
+import { createClient } from '@supabase/supabase-js'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -25,8 +24,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createClient()
-
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     // Check if user has Amazon connection
     const { data: connection, error } = await supabase
       .from('amazon_connections')

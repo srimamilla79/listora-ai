@@ -1,6 +1,6 @@
 // src/app/api/amazon/refresh/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,8 +29,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createClient()
-
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     // Get user's published products
     const { data: products, error: fetchError } = await supabase
       .from('amazon_listings')
@@ -172,7 +174,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
 
-    const supabase = createClient()
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     // Get last refresh timestamp for user's products
     const { data, error } = await supabase

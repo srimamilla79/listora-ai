@@ -11,9 +11,20 @@ export function useUserSession() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const supabase = createClient()
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   useEffect(() => {
+    if (!supabase || !mounted) return
+
     const getSession = async () => {
       const {
         data: { session },
@@ -41,7 +52,7 @@ export function useUserSession() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase.auth])
+  }, [supabase, mounted])
 
   return { user, loading }
 }

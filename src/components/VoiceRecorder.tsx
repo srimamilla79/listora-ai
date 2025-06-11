@@ -35,11 +35,21 @@ export default function VoiceRecorder({
   const [error, setError] = useState('')
   const [contentType, setContentType] = useState('product')
 
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const supabase = createClient()
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -139,6 +149,11 @@ export default function VoiceRecorder({
       return
     }
 
+    if (!supabase) {
+      setError('Please wait for the component to load')
+      return
+    }
+
     setIsProcessing(true)
     setError('')
 
@@ -198,6 +213,17 @@ export default function VoiceRecorder({
     setGeneratedContent('')
     setError('')
     chunksRef.current = []
+  }
+
+  // ✅ Wait for SSR safety before rendering
+  if (!mounted || !supabase) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-2xl mx-auto">
+        <div className="flex items-center justify-center h-32">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        </div>
+      </div>
+    )
   }
 
   return (

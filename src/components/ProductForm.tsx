@@ -1,4 +1,4 @@
-// Enhanced ProductForm.tsx with Amazon Integration - COMPLETE FINAL VERSION
+// src/components/ProductForm.tsx - Enhanced with SSR Safety (COMPLETE)
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -32,7 +32,7 @@ import {
   Rocket,
 } from 'lucide-react'
 
-// 🚀 NEW: Import Amazon Components
+// Import Amazon Components
 import AmazonConnection from '@/components/AmazonConnection'
 import AmazonPublisher from '@/components/AmazonPublisher'
 
@@ -67,17 +67,17 @@ interface ToastNotification {
   type: 'success' | 'error' | 'info'
 }
 
-// 🚀 NEW: Enhanced Props Interface
+// Enhanced Props Interface
 interface ProductFormProps {
-  onGenerationSuccess?: () => void // NEW: Success callback
-  currentUsage?: number // NEW: Current usage count
-  monthlyLimit?: number // NEW: Monthly limit
+  onGenerationSuccess?: () => void
+  currentUsage?: number
+  monthlyLimit?: number
 }
 
 export default function ProductForm({
   onGenerationSuccess,
-  currentUsage, // ✅ No default
-  monthlyLimit, // ✅ No default
+  currentUsage,
+  monthlyLimit,
 }: ProductFormProps) {
   // Basic state
   const [productName, setProductName] = useState('')
@@ -119,23 +119,43 @@ export default function ProductForm({
   const [hasGeneratedFinalContent, setHasGeneratedFinalContent] =
     useState(false)
 
-  // 🚀 NEW: Usage validation state
+  // Usage validation state
   const [isAdmin, setIsAdmin] = useState(false)
   const [showUsageLimitWarning, setShowUsageLimitWarning] = useState(false)
 
-  // 🚀 NEW: Amazon integration state
+  // Amazon integration state
   const [amazonConnected, setAmazonConnected] = useState(false)
-  // 🚀 FIXED: Local fallback state
+  // Local fallback state
   const [localUsage, setLocalUsage] = useState(0)
   const [localLimit, setLocalLimit] = useState(10)
 
-  // 🚀 FIXED: Use passed props or fallback to local state
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Use passed props or fallback to local state
   const actualCurrentUsage =
     currentUsage !== undefined ? currentUsage : localUsage
   const actualMonthlyLimit =
     monthlyLimit !== undefined ? monthlyLimit : localLimit
 
-  // 🚀 FIXED: Update local state when props change
+  // Voice recording refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+
+  const router = useRouter()
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    setComponentMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
+
+  // Update local state when props change
   useEffect(() => {
     if (currentUsage !== undefined) {
       setLocalUsage(currentUsage)
@@ -145,16 +165,7 @@ export default function ProductForm({
     }
   }, [currentUsage, monthlyLimit])
 
-  // Voice recording refs
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-
-  const supabase = createClient()
-  const router = useRouter()
-
-  // 🚀 NEW: Check if user can generate (usage validation)
+  // Check if user can generate (usage validation)
   const canGenerate = () => {
     console.log('🔍 Usage Check:', {
       isAdmin,
@@ -188,7 +199,7 @@ export default function ProductForm({
   const remainingGenerations = actualMonthlyLimit - actualCurrentUsage
   const usagePercentage = (actualCurrentUsage / actualMonthlyLimit) * 100
 
-  // 🚀 NEW: Amazon publish success handler
+  // Amazon publish success handler
   const handleAmazonPublishSuccess = (listingId: string) => {
     addNotification(
       `🎉 Product successfully published to Amazon! Listing ID: ${listingId}`,
@@ -196,9 +207,9 @@ export default function ProductForm({
     )
   }
 
-  // 🚀 NEW: Check admin status
+  // Check admin status
   const checkAdminStatus = async () => {
-    if (!user) return
+    if (!user || !supabase) return
 
     try {
       const { data: adminCheck } = await supabase.rpc('is_admin', {
@@ -213,7 +224,7 @@ export default function ProductForm({
 
   // Fetch user's generation count
   const fetchUserGenerationCount = async () => {
-    if (!user || !componentMounted) return
+    if (!user || !componentMounted || !supabase) return
 
     try {
       const { data, error } = await supabase
@@ -276,26 +287,33 @@ export default function ProductForm({
     setNotifications((prev) => prev.filter((n) => n.id !== id))
   }
 
+  // Get user on mount
   useEffect(() => {
-    setComponentMounted(true)
+    if (supabase) {
+      const getUser = async () => {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        setUser(user)
+      }
+      getUser()
 
-    const getUser = async () => {
       const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((event: any, session: any) => {
+        setUser(session?.user || null)
+      })
+
+      return () => {
+        subscription.unsubscribe()
+      }
     }
-    getUser()
+  }, [supabase])
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: any, session: any) => {
-      setUser(session?.user || null)
-    })
-
+  // Cleanup effects
+  useEffect(() => {
     return () => {
       setComponentMounted(false)
-      subscription.unsubscribe()
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
@@ -307,11 +325,11 @@ export default function ProductForm({
 
   // Fetch generation count when user changes
   useEffect(() => {
-    if (user && componentMounted) {
+    if (user && componentMounted && supabase) {
       const timer = setTimeout(() => {
         if (componentMounted) {
           fetchUserGenerationCount()
-          checkAdminStatus() // 🚀 NEW: Check admin status
+          checkAdminStatus()
         }
       }, 100)
 
@@ -323,9 +341,9 @@ export default function ProductForm({
       setDataLoaded(false)
       setIsAdmin(false)
     }
-  }, [user, componentMounted])
+  }, [user, componentMounted, supabase])
 
-  // 🚀 NEW: Show usage warning when approaching limit
+  // Show usage warning when approaching limit
   useEffect(() => {
     if (
       !isAdmin &&
@@ -470,6 +488,11 @@ export default function ProductForm({
   const processVoiceToContent = async () => {
     if (!audioBlob) {
       addNotification('No audio recorded', 'error')
+      return
+    }
+
+    if (!supabase) {
+      addNotification('Please wait for the component to load', 'error')
       return
     }
 
@@ -673,7 +696,12 @@ export default function ProductForm({
   const storeImagesToSupabase = async (contentId?: string) => {
     const productContentId = contentId || lastGeneratedContentId
 
-    if (!user || processedImages.length === 0 || !productName.trim()) {
+    if (
+      !user ||
+      processedImages.length === 0 ||
+      !productName.trim() ||
+      !supabase
+    ) {
       return
     }
 
@@ -906,9 +934,9 @@ export default function ProductForm({
     return analysis
   }
 
-  // 🚀 ENHANCED: Handle generate with usage validation
+  // Handle generate with usage validation
   const handleGenerate = async () => {
-    // 🚀 NEW: Pre-validation checks
+    // Pre-validation checks
     if (!productName.trim() || !features.trim()) {
       addNotification('Please fill in both product name and features', 'error')
       return
@@ -919,7 +947,12 @@ export default function ProductForm({
       return
     }
 
-    // 🚀 NEW: Usage limit validation (unless admin)
+    if (!supabase) {
+      addNotification('Please wait for the component to load', 'error')
+      return
+    }
+
+    // Usage limit validation (unless admin)
     const canUserGenerate = canGenerate()
     console.log('🔍 Final usage validation:', {
       canUserGenerate,
@@ -1003,7 +1036,7 @@ export default function ProductForm({
         setLastGeneratedContentId(data.contentId)
         setHasGeneratedFinalContent(true)
 
-        // 🚀 NEW: Call success callback to update usage display
+        // Call success callback to update usage display
         if (onGenerationSuccess) {
           console.log('🎉 Calling generation success callback...')
           onGenerationSuccess()
@@ -1102,6 +1135,21 @@ export default function ProductForm({
 
   const shouldShowPromotions = componentMounted && dataLoaded
 
+  // ✅ Wait for SSR safety before rendering
+  if (!mounted || !supabase) {
+    return (
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+          <div className="bg-gradient-to-r from-slate-600 via-gray-700 to-slate-800 px-8 py-8">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* Toast Notifications */}
@@ -1143,7 +1191,7 @@ export default function ProductForm({
         ))}
       </div>
 
-      {/* 🚀 NEW: Usage Limit Warning */}
+      {/* Usage Limit Warning */}
       {showUsageLimitWarning && !isAdmin && (
         <div className="mb-6 p-4 bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl">
           <div className="flex items-center justify-between">
@@ -2016,7 +2064,7 @@ export default function ProductForm({
             </div>
           </div>
 
-          {/* 🚀 ENHANCED: Generate button with usage validation */}
+          {/* Generate button with usage validation */}
           <div className="mt-8 flex flex-col items-center space-y-4">
             <button
               onClick={handleGenerate}
@@ -2063,7 +2111,7 @@ export default function ProductForm({
               )}
             </button>
 
-            {/* 🚀 NEW: Usage status display */}
+            {/* Usage status display */}
             {!isAdmin && (
               <div className="text-center">
                 <p className="text-sm text-gray-600">
@@ -2096,7 +2144,7 @@ export default function ProductForm({
             )}
           </div>
 
-          {/* 🚀 NEW: Amazon Integration Section */}
+          {/* Amazon Integration Section */}
           {generatedContent && user && (
             <div className="mt-8 space-y-6">
               <div className="border-t border-gray-200 pt-8">
@@ -2114,6 +2162,7 @@ export default function ProductForm({
                   userId={user.id}
                   onConnectionChange={setAmazonConnected}
                 />
+
                 {/* Temporary Debug Info */}
                 <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm font-bold">Debug Info:</p>
@@ -2128,6 +2177,7 @@ export default function ProductForm({
                     generatedContent exists: {generatedContent ? 'YES' : 'NO'}
                   </p>
                 </div>
+
                 {/* Amazon Publisher Component - Only show if content exists */}
                 {lastGeneratedContentId && (
                   <AmazonPublisher

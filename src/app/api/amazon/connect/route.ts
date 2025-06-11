@@ -1,6 +1,6 @@
 // File 2: src/app/api/amazon/connect/route.ts - FIXED (Handle Duplicates)
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 // Amazon SP-API connection test
 async function testAmazonConnection() {
@@ -85,7 +85,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createClient()
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     // Generate unique seller ID to avoid duplicates
     const uniqueSellerId = `${userId.substring(0, 8)}-${Date.now()}`

@@ -28,8 +28,8 @@ export default function PricingPage() {
   const [currentUsage, setCurrentUsage] = useState(0)
   const [currentLimit, setCurrentLimit] = useState(10)
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null)
-
-  const supabase = createClient()
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
 
   const PLAN_LIMITS = {
     starter: { generations: 10, bulkProducts: 0 },
@@ -55,6 +55,14 @@ export default function PricingPage() {
   }
 
   useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
+
+  useEffect(() => {
+    if (!supabase) return
+
     let mounted = true
 
     const checkAuth = async () => {
@@ -101,9 +109,11 @@ export default function PricingPage() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase])
 
   const fetchUserPlanAndUsage = async (userId: string) => {
+    if (!supabase) return
+
     try {
       // Get current plan
       const { data: planData, error: planError } = await supabase
@@ -215,7 +225,7 @@ export default function PricingPage() {
     }
   }
 
-  if (!authChecked) {
+  if (!authChecked || !mounted || !supabase) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">

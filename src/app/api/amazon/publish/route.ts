@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { getUserAmazonTokens } from '@/lib/amazon-oauth'
 
 export async function POST(request: NextRequest) {
@@ -22,8 +22,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
 
-    const supabase = createClient()
-
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     // Get user's Amazon tokens
     // Get user's Amazon tokens (OAuth)
     let userTokens

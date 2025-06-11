@@ -35,7 +35,17 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
   const [isAdmin, setIsAdmin] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-  const supabase = createClient()
+
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   // Get user's name from metadata or email
   const userName =
@@ -54,10 +64,10 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
 
   const initials = getInitials(userName)
 
-  // 🚀 NEW: Check admin status
+  // Check admin status
   useEffect(() => {
     const checkAdminStatus = async () => {
-      if (!user?.id) return
+      if (!user?.id || !supabase) return
 
       try {
         const { data: adminCheck } = await supabase.rpc('is_admin', {
@@ -70,18 +80,20 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
       }
     }
 
-    checkAdminStatus()
+    if (user?.id && supabase) {
+      checkAdminStatus()
+    }
   }, [user?.id, supabase])
 
-  // 🚀 FIXED: Load subscription data from user_plans table
+  // Load subscription data from user_plans table
   useEffect(() => {
     const loadSubscription = async () => {
-      if (!user?.id) return
+      if (!user?.id || !supabase) return
 
       try {
         console.log('🔍 AvatarHeader - Loading plan for user:', user.id)
 
-        // 🚀 FIXED: Read from user_plans table instead of user_subscriptions
+        // Read from user_plans table instead of user_subscriptions
         const { data, error } = await supabase
           .from('user_plans')
           .select('plan_type, is_active, created_at')
@@ -100,7 +112,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
           })
         } else {
           console.log('✅ AvatarHeader - Plan loaded:', data.plan_type)
-          // 🚀 FIXED: Map plan_type to plan_name format
+          // Map plan_type to plan_name format
           setSubscription({
             plan_name:
               data.plan_type.charAt(0).toUpperCase() + data.plan_type.slice(1), // business -> Business
@@ -120,7 +132,9 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
       }
     }
 
-    loadSubscription()
+    if (user?.id && supabase) {
+      loadSubscription()
+    }
   }, [user?.id, supabase])
 
   // Close dropdown when clicking outside
@@ -158,7 +172,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
     onSignOut()
   }
 
-  // 🚀 ENHANCED: Admin-aware plan icon
+  // Admin-aware plan icon
   const getPlanIcon = (planName: string) => {
     if (isAdmin) return <Crown className="h-4 w-4 text-purple-600" />
 
@@ -172,7 +186,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
     return <Crown className="h-4 w-4 text-gray-400" />
   }
 
-  // 🚀 ENHANCED: Admin-aware plan color
+  // Admin-aware plan color
   const getPlanColor = (planName: string) => {
     if (isAdmin)
       return 'bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-800 border border-purple-200'
@@ -184,20 +198,32 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
     return 'bg-gray-100 text-gray-600'
   }
 
-  // 🚀 NEW: Get display plan name
+  // Get display plan name
   const getDisplayPlanName = () => {
     if (isAdmin) return 'Owner'
     return subscription?.plan_name || 'Starter'
   }
 
+  // ✅ Wait for SSR safety before rendering
+  if (!mounted || !supabase) {
+    return (
+      <div className="flex items-center space-x-3">
+        <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse"></div>
+        <div className="hidden md:block">
+          <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Avatar Button - FIXED: Added cursor-pointer */}
+      {/* Avatar Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-3 text-gray-700 hover:text-gray-900 transition-colors group cursor-pointer"
       >
-        {/* Avatar Circle - 🚀 ENHANCED: Admin styling */}
+        {/* Avatar Circle - Enhanced: Admin styling */}
         <div
           className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-sm group-hover:shadow-md transition-shadow ${
             isAdmin
@@ -232,7 +258,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
       {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 animate-in slide-in-from-top-1 duration-200">
-          {/* User Info Header - 🚀 ENHANCED: Admin styling */}
+          {/* User Info Header - Enhanced: Admin styling */}
           <div
             className={`px-4 py-3 border-b border-gray-100 ${isAdmin ? 'bg-gradient-to-r from-purple-50 to-indigo-50' : ''}`}
           >
@@ -284,7 +310,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
             </div>
           </div>
 
-          {/* 🚀 NEW: Admin privileges section */}
+          {/* Admin privileges section */}
           {isAdmin && (
             <div className="px-4 py-2 bg-purple-50 border-b border-purple-100">
               <div className="flex items-center space-x-2 text-xs">
@@ -314,7 +340,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
             </div>
           )}
 
-          {/* Menu Items - FIXED: Added cursor-pointer to all buttons */}
+          {/* Menu Items */}
           <div className="py-2">
             <button
               onClick={handleProfileClick}
@@ -329,7 +355,6 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
               </div>
             </button>
 
-            {/* 🚀 ENHANCED: Show billing for non-admin users, or admin management for admins */}
             <button
               onClick={handleBillingClick}
               className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors group cursor-pointer"
@@ -361,7 +386,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
             </button>
           </div>
 
-          {/* Subscription Status - 🚀 ENHANCED: Admin vs regular user */}
+          {/* Subscription Status */}
           {!loading && subscription && (
             <div className="px-4 py-2 border-t border-gray-100">
               {isAdmin ? (
@@ -395,7 +420,7 @@ export default function AvatarHeader({ user, onSignOut }: AvatarHeaderProps) {
             </div>
           )}
 
-          {/* Sign Out - FIXED: Added cursor-pointer */}
+          {/* Sign Out */}
           <div className="border-t border-gray-100 pt-2">
             <button
               onClick={handleSignOutClick}

@@ -1,4 +1,4 @@
-// src/components/AmazonConnection.tsx - REPLACED with OAuth version
+// src/components/AmazonConnection.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -28,11 +28,20 @@ export default function AmazonConnection({
     userId || null
   )
 
-  const supabase = createClient()
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   // Get current user if not provided as prop
   useEffect(() => {
-    if (!currentUserId) {
+    if (!currentUserId && supabase) {
       const getCurrentUser = async () => {
         const {
           data: { session },
@@ -43,17 +52,17 @@ export default function AmazonConnection({
       }
       getCurrentUser()
     }
-  }, [currentUserId])
+  }, [currentUserId, supabase])
 
   // Check OAuth connection status
   useEffect(() => {
-    if (currentUserId) {
+    if (currentUserId && supabase) {
       checkConnectionStatus()
     }
-  }, [currentUserId])
+  }, [currentUserId, supabase])
 
   const checkConnectionStatus = async () => {
-    if (!currentUserId) return
+    if (!currentUserId || !supabase) return
 
     try {
       console.log('🔍 Checking OAuth Amazon status for user:', currentUserId)
@@ -105,7 +114,7 @@ export default function AmazonConnection({
   }
 
   const handleDisconnect = async () => {
-    if (!currentUserId) return
+    if (!currentUserId || !supabase) return
 
     try {
       setIsLoading(true)
@@ -130,6 +139,20 @@ export default function AmazonConnection({
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // ✅ Wait for SSR safety before rendering
+  if (!mounted || !supabase) {
+    return (
+      <div className="space-y-4 p-6 border border-gray-200 rounded-lg">
+        <div className="flex items-center space-x-2">
+          <Loader className="w-4 h-4 animate-spin text-blue-500" />
+          <span className="text-sm text-gray-600">
+            Loading connection status...
+          </span>
+        </div>
+      </div>
+    )
   }
 
   // Loading state while getting user ID

@@ -1,7 +1,7 @@
 // src/components/AuthForm.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Mail, Lock, User, Building, Sparkles } from 'lucide-react'
@@ -22,10 +22,19 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const router = useRouter()
-  const supabase = createClient()
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
 
+  const router = useRouter()
   const isSignup = mode === 'signup'
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   const validatePassword = (password: string) => {
     const minLength = password.length >= 8
@@ -49,6 +58,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!supabase) {
+      setError('Please wait for the component to load')
+      return
+    }
+
     setLoading(true)
     setError('')
 
@@ -112,6 +127,11 @@ export default function AuthForm({ mode }: AuthFormProps) {
   }
 
   const handleGoogleSignIn = async () => {
+    if (!supabase) {
+      setError('Please wait for the component to load')
+      return
+    }
+
     try {
       setLoading(true)
       setError('')
@@ -129,6 +149,17 @@ export default function AuthForm({ mode }: AuthFormProps) {
       setError(error.message || 'Failed to sign in with Google')
       setLoading(false)
     }
+  }
+
+  // ✅ Wait for SSR safety before rendering
+  if (!mounted || !supabase) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        </div>
+      </div>
+    )
   }
 
   return (

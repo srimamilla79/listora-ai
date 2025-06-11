@@ -13,10 +13,19 @@ export default function DashboardLayout({
 }) {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
+
+  useEffect(() => {
+    if (!supabase) return
+
     let mounted = true
 
     const checkAuth = async () => {
@@ -59,9 +68,11 @@ export default function DashboardLayout({
       mounted = false
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [router, supabase])
 
   const handleSignOut = async () => {
+    if (!supabase) return
+
     try {
       await supabase.auth.signOut()
       router.push('/login')
@@ -70,7 +81,7 @@ export default function DashboardLayout({
     }
   }
 
-  if (loading) {
+  if (loading || !mounted || !supabase) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">

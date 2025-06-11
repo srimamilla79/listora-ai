@@ -70,7 +70,6 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const supabase = createClient()
   const router = useRouter()
 
   const [user, setUser] = useState<any>(null)
@@ -99,6 +98,8 @@ export default function DashboardPage() {
   >(new Set())
   const [isDownloadingBulk, setIsDownloadingBulk] = useState(false)
   const [notifications, setNotifications] = useState<ToastNotification[]>([])
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
 
   const itemsPerPage = 10
 
@@ -254,8 +255,58 @@ export default function DashboardPage() {
     [safeJSONParse]
   )
 
+  // 🚀 OPTIMIZED: Streamlined product loading
+  const loadProducts = useCallback(
+    async (userId: string) => {
+      if (!supabase) return
+
+      try {
+        console.log('Loading products for user:', userId)
+
+        // Simple, fast query - only essential fields for list view
+        const { data, error } = await supabase
+          .from('product_contents')
+          .select(
+            `
+          id,
+          product_name,
+          platform,
+          features,
+          generated_content,
+          created_at,
+          has_images,
+          has_processed_images,
+          image_folder,
+          original_images,
+          processed_images
+        `
+          )
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1000) // Reasonable limit for performance
+
+        if (error) {
+          console.error('Error loading products:', error)
+          throw error
+        }
+
+        console.log('Loaded products:', data?.length || 0)
+        setProducts(data || [])
+      } catch (error) {
+        console.error('Error loading products:', error)
+        addNotification(
+          'Failed to load content. Please refresh the page.',
+          'error'
+        )
+      }
+    },
+    [supabase, addNotification]
+  )
+
   // 🚀 OPTIMIZED: Simplified auth check
   useEffect(() => {
+    if (!supabase) return
+
     let mounted = true
 
     const checkAuthAndLoadData = async () => {
@@ -301,53 +352,7 @@ export default function DashboardPage() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [router])
-
-  // 🚀 OPTIMIZED: Streamlined product loading
-  const loadProducts = useCallback(
-    async (userId: string) => {
-      try {
-        console.log('Loading products for user:', userId)
-
-        // Simple, fast query - only essential fields for list view
-        const { data, error } = await supabase
-          .from('product_contents')
-          .select(
-            `
-          id,
-          product_name,
-          platform,
-          features,
-          generated_content,
-          created_at,
-          has_images,
-          has_processed_images,
-          image_folder,
-          original_images,
-          processed_images
-        `
-          )
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1000) // Reasonable limit for performance
-
-        if (error) {
-          console.error('Error loading products:', error)
-          throw error
-        }
-
-        console.log('Loaded products:', data?.length || 0)
-        setProducts(data || [])
-      } catch (error) {
-        console.error('Error loading products:', error)
-        addNotification(
-          'Failed to load content. Please refresh the page.',
-          'error'
-        )
-      }
-    },
-    [supabase, addNotification]
-  )
+  }, [router, supabase, loadProducts])
 
   // Enhanced download function
   const downloadImage = useCallback(async (url: string, filename: string) => {
@@ -519,6 +524,12 @@ export default function DashboardPage() {
     setCurrentPage(1)
   }, [searchTerm, platformFilter, imageFilter])
 
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
+
   // 🚀 OPTIMIZED: Memoized view handler
   const handleView = useCallback(
     (product: ProductContent) => {
@@ -572,7 +583,7 @@ export default function DashboardPage() {
     )
   }, [])
 
-  if (loading) {
+  if (loading || !mounted || !supabase) {
     return (
       <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
         <div className="text-center">

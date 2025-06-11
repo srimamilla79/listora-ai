@@ -1,4 +1,4 @@
-// Complete AmazonPublisher.tsx - With OAuth User Authentication
+// src/components/AmazonPublisher.tsx
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
@@ -43,22 +43,33 @@ export default function AmazonPublisher({
     condition: 'new',
   })
   const [showOptions, setShowOptions] = useState(false)
-  const [user, setUser] = useState<any>(null) // 🚀 NEW: User state
+  const [user, setUser] = useState<any>(null)
 
-  const supabase = createClient()
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
 
-  // 🚀 NEW: Get current user
+  // ✅ Initialize Supabase client after component mounts
   useEffect(() => {
-    console.log('🔍 AmazonPublisher useEffect running...')
-    const getCurrentUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      console.log('🔍 AmazonPublisher session:', session)
-      setUser(session?.user || null)
-    }
-    getCurrentUser()
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
   }, [])
+
+  // Get current user
+  useEffect(() => {
+    if (supabase) {
+      console.log('🔍 AmazonPublisher useEffect running...')
+      const getCurrentUser = async () => {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        console.log('🔍 AmazonPublisher session:', session)
+        setUser(session?.user || null)
+      }
+      getCurrentUser()
+    }
+  }, [supabase])
 
   // Generate SKU automatically
   const generateSKU = () => {
@@ -87,8 +98,7 @@ export default function AmazonPublisher({
       return
     }
 
-    // 🚀 NEW: Check if user is available
-    if (!user?.id) {
+    if (!user?.id || !supabase) {
       setPublishError('Please log in to publish products')
       return
     }
@@ -103,12 +113,11 @@ export default function AmazonPublisher({
       console.log('📝 Product Name:', productContent.product_name)
       console.log('🖼️ Images Count:', images.length)
       console.log('💰 Price:', publishingOptions.price)
-      console.log('👤 User ID:', user.id) // 🚀 NEW: Log user ID
+      console.log('👤 User ID:', user.id)
 
-      // Prepare the request payload - FIXED to match API expectations
+      // Prepare the request payload
       const requestPayload = {
         productContent: {
-          // ✅ API expects "productContent"
           id: productContent.id,
           product_name: productContent.product_name,
           features: productContent.features,
@@ -122,19 +131,21 @@ export default function AmazonPublisher({
           quantity: parseInt(publishingOptions.quantity),
           sku: publishingOptions.sku || generateSKU(),
         },
-        userId: user.id, // 🚀 FIXED: Now using authenticated user ID
+        userId: user.id,
       }
 
       console.log(
         '📤 Request Payload:',
         JSON.stringify(requestPayload, null, 2)
       )
+
       // Simulate image upload if images exist
       if (images.length > 0) {
         console.log('🖼️ Uploading images...')
-        await new Promise((resolve) => setTimeout(resolve, 1500)) // 1.5 second delay
+        await new Promise((resolve) => setTimeout(resolve, 1500))
         console.log('✅ Images processed')
       }
+
       const response = await fetch('/api/amazon/publish', {
         method: 'POST',
         headers: {
@@ -180,6 +191,17 @@ export default function AmazonPublisher({
     }
   }
 
+  // ✅ Wait for SSR safety before rendering
+  if (!mounted || !supabase) {
+    return (
+      <div className="mt-6 p-6 border border-gray-200 rounded-lg">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    )
+  }
+
   // Don't show publisher if not connected
   if (!isConnected) {
     return (
@@ -220,8 +242,7 @@ export default function AmazonPublisher({
           <p>
             Connection Status: {isConnected ? 'Connected' : 'Not Connected'}
           </p>
-          <p>User ID: {user?.id || 'Not logged in'}</p>{' '}
-          {/* 🚀 NEW: Show user ID */}
+          <p>User ID: {user?.id || 'Not logged in'}</p>
         </div>
       </div>
 

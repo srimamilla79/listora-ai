@@ -1,4 +1,4 @@
-// Enhanced UsageDisplay.tsx with Smart Refresh & Upgrade Prompts - FINAL FIXED VERSION
+// src/components/UsageDisplay.tsx - Enhanced with Smart Refresh & SSR Safety
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -19,8 +19,8 @@ import {
 interface UsageDisplayProps {
   userId?: string
   planType?: string
-  refreshKey?: number // 🚀 NEW: Trigger refresh
-  onUsageUpdate?: (usage: number, limit: number) => void // 🚀 NEW: Report usage back to parent
+  refreshKey?: number
+  onUsageUpdate?: (usage: number, limit: number) => void
 }
 
 const PLAN_LIMITS = {
@@ -43,8 +43,18 @@ const UsageDisplay = ({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [hasLoadedRealPlan, setHasLoadedRealPlan] = useState(false)
 
-  const supabase = createClient()
+  // ✅ SSR-safe Supabase state management
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
   const router = useRouter()
+
+  // ✅ Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
 
   const currentPlan =
     PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.starter
@@ -52,7 +62,7 @@ const UsageDisplay = ({
   const remainingGenerations = monthlyLimit - monthlyUsage
   const usagePercentage = (monthlyUsage / monthlyLimit) * 100
 
-  // 🚀 NEW: Determine warning level
+  // Determine warning level
   const getWarningLevel = () => {
     if (usagePercentage >= 100) return 'limit-reached'
     if (usagePercentage >= 95) return 'critical'
@@ -63,7 +73,7 @@ const UsageDisplay = ({
 
   const warningLevel = getWarningLevel()
 
-  // 🚀 FIXED: Track when real plan loads
+  // Track when real plan loads
   useEffect(() => {
     if (planType !== 'starter') {
       setHasLoadedRealPlan(true)
@@ -71,15 +81,15 @@ const UsageDisplay = ({
   }, [planType])
 
   useEffect(() => {
-    if (userId) {
+    if (userId && supabase) {
       fetchUsage()
       checkAdminStatus()
     }
-  }, [userId, refreshKey]) // 🚀 NEW: Refresh when refreshKey changes
+  }, [userId, refreshKey, supabase])
 
-  // 🚀 NEW: Smart refresh with loading state
+  // Smart refresh with loading state
   const refreshUsage = async () => {
-    if (!userId) return
+    if (!userId || !supabase) return
 
     setIsRefreshing(true)
     try {
@@ -89,9 +99,9 @@ const UsageDisplay = ({
     }
   }
 
-  // 🚀 NEW: Check admin status
+  // Check admin status
   const checkAdminStatus = async () => {
-    if (!userId) return
+    if (!userId || !supabase) return
 
     try {
       const { data: adminCheck } = await supabase.rpc('is_admin', {
@@ -104,9 +114,9 @@ const UsageDisplay = ({
     }
   }
 
-  // 🚀 ENHANCED: Fetch usage with refresh capability
+  // Fetch usage with refresh capability
   const fetchUsage = async (forceRefresh = false) => {
-    if (!userId) return
+    if (!userId || !supabase) return
 
     try {
       const currentMonth = new Date().toISOString().slice(0, 7) // '2025-06'
@@ -148,7 +158,7 @@ const UsageDisplay = ({
 
       setMonthlyUsage(usage)
 
-      // 🚀 FIXED: Only call onUsageUpdate after real plan has loaded (not starter default)
+      // Only call onUsageUpdate after real plan has loaded (not starter default)
       if (
         onUsageUpdate &&
         currentPlan &&
@@ -163,7 +173,7 @@ const UsageDisplay = ({
         )
       }
 
-      // 🚀 NEW: Auto-show upgrade prompt when limit reached
+      // Auto-show upgrade prompt when limit reached
       if (
         usage >= currentPlan.monthlyGenerations &&
         !isAdmin &&
@@ -179,13 +189,24 @@ const UsageDisplay = ({
     }
   }
 
-  // 🚀 NEW: Upgrade button handlers
+  // Upgrade button handlers
   const handleUpgrade = () => {
     router.push('/pricing')
   }
 
   const dismissUpgradePrompt = () => {
     setShowUpgradePrompt(false)
+  }
+
+  // ✅ Wait for SSR safety before rendering
+  if (!mounted || !supabase) {
+    return (
+      <div className="bg-white rounded-lg border p-4 mb-6 animate-pulse">
+        <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
+        <div className="h-2 bg-gray-200 rounded w-full mb-2"></div>
+        <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -198,7 +219,7 @@ const UsageDisplay = ({
     )
   }
 
-  // 👑 ADMIN/OWNER DISPLAY (unchanged but enhanced)
+  // ADMIN/OWNER DISPLAY
   if (isAdmin) {
     return (
       <div className="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 rounded-xl border-2 border-purple-200 p-6 mb-6 shadow-sm relative overflow-hidden">
@@ -330,10 +351,10 @@ const UsageDisplay = ({
     )
   }
 
-  // 🚀 ENHANCED: Regular user display with upgrade prompts
+  // Regular user display with upgrade prompts
   return (
     <div className="space-y-4 mb-6">
-      {/* 🚀 NEW: Upgrade Prompt (Priority Display) */}
+      {/* Upgrade Prompt (Priority Display) */}
       {showUpgradePrompt && warningLevel === 'limit-reached' && (
         <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between">
@@ -480,7 +501,7 @@ const UsageDisplay = ({
           </span>
         </div>
 
-        {/* 🚀 NEW: Progressive Warning Messages */}
+        {/* Progressive Warning Messages */}
         {warningLevel === 'critical' && remainingGenerations > 0 && (
           <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
             <div className="flex items-center justify-between">
