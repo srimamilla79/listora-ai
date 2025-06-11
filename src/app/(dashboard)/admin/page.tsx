@@ -139,7 +139,7 @@ export default function EnhancedOwnerAdminDashboard() {
   }, [])
 
   // Don't render until mounted and supabase is initialized
-  if (!mounted || !supabase) {
+  if (loading || !mounted || !supabase) {
     return (
       <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -172,6 +172,7 @@ export default function EnhancedOwnerAdminDashboard() {
     let mounted = true
 
     const checkAdminAccess = async () => {
+      if (!supabase) return
       try {
         const {
           data: { session },
@@ -242,6 +243,7 @@ export default function EnhancedOwnerAdminDashboard() {
   }
 
   const loadEnhancedStats = async () => {
+    if (!supabase) return
     try {
       // User counts with real data
       const { count: totalUsers } = await supabase
@@ -320,6 +322,7 @@ export default function EnhancedOwnerAdminDashboard() {
   }
 
   const loadEnhancedPlatformStats = async () => {
+    if (!supabase) return
     try {
       const { data } = await supabase
         .from('product_contents')
@@ -369,6 +372,7 @@ export default function EnhancedOwnerAdminDashboard() {
   }
 
   const loadEnhancedTopUsers = async () => {
+    if (!supabase) return
     try {
       // Get users from auth.users
       const { data: users } = await supabase
