@@ -26,6 +26,7 @@ export default function SignupPage() {
   const [userEmail, setUserEmail] = useState('')
   const [message, setMessage] = useState('')
   const [mounted, setMounted] = useState(false)
+  const [supabase, setSupabase] = useState<any>(null)
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -33,15 +34,18 @@ export default function SignupPage() {
   })
 
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
 
+    // Initialize Supabase client after component mounts
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+
     // Clear any existing session data first
     const clearSession = async () => {
       try {
-        await supabase.auth.signOut()
+        await supabaseClient.auth.signOut()
       } catch (error) {
         console.log('No existing session to clear')
       }
@@ -55,7 +59,7 @@ export default function SignupPage() {
         const {
           data: { session },
           error,
-        } = await supabase.auth.getSession()
+        } = await supabaseClient.auth.getSession()
         if (session && !error) {
           router.push('/generate')
         }
@@ -69,19 +73,21 @@ export default function SignupPage() {
     // Set up auth state listener
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
-      if (event === 'SIGNED_IN' && session) {
-        router.push('/generate')
+    } = supabaseClient.auth.onAuthStateChange(
+      async (event: any, session: any) => {
+        if (event === 'SIGNED_IN' && session) {
+          router.push('/generate')
+        }
       }
-    })
+    )
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [router, supabase])
+  }, [router])
 
-  // Don't render until mounted to prevent hydration issues
-  if (!mounted) {
+  // Don't render until mounted and supabase is initialized to prevent hydration issues
+  if (!mounted || !supabase) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
