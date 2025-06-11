@@ -1,15 +1,12 @@
 // src/app/api/billing/cancel-subscription/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { getServerStripe } from '@/lib/supabase'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = createServiceRoleClient()
+
     // Get authorization header
     const authHeader = request.headers.get('Authorization')
     if (!authHeader) {
@@ -19,7 +16,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify the user
+    // Rest of your code stays the same...
     const token = authHeader.replace('Bearer ', '')
     const {
       data: { user },
@@ -79,7 +76,6 @@ export async function POST(request: NextRequest) {
       console.warn('Failed to send cancellation email:', emailError)
     }
 
-    // Simplified response to avoid type issues
     return NextResponse.json({
       success: true,
       message: 'Subscription canceled successfully',
