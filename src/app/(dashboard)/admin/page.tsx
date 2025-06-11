@@ -106,9 +106,10 @@ interface ToastNotification {
 let notificationCounter = 0
 
 export default function EnhancedOwnerAdminDashboard() {
-  const supabase = createClient()
   const router = useRouter()
 
+  const [mounted, setMounted] = useState(false)
+  const [supabase, setSupabase] = useState<any>(null)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -128,6 +129,26 @@ export default function EnhancedOwnerAdminDashboard() {
   const [userTypeFilter, setUserTypeFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 15
+
+  useEffect(() => {
+    setMounted(true)
+
+    // Initialize Supabase client after component mounts
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
+
+  // Don't render until mounted and supabase is initialized
+  if (!mounted || !supabase) {
+    return (
+      <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading owner dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   const addNotification = useCallback(
     (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -189,7 +210,9 @@ export default function EnhancedOwnerAdminDashboard() {
       }
     }
 
-    checkAdminAccess()
+    if (supabase) {
+      checkAdminAccess()
+    }
 
     return () => {
       mounted = false
