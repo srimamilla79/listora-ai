@@ -1,15 +1,12 @@
 // src/app/api/billing/portal/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { getServerStripe } from '@/lib/supabase'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = createServiceRoleClient()
+
     // Get authorization header
     const authHeader = request.headers.get('Authorization')
     if (!authHeader) {
