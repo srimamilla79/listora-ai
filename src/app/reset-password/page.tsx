@@ -13,14 +13,20 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState('')
   const [success, setSuccess] = useState(false)
   const [isReady, setIsReady] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [supabase, setSupabase] = useState<any>(null)
   const [formData, setFormData] = useState({
     password: '',
     confirmPassword: '',
   })
 
-  const supabase = createClient()
-
   useEffect(() => {
+    setMounted(true)
+
+    // Initialize Supabase client after component mounts
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+
     const handleAuthCallback = async () => {
       try {
         console.log('🔍 RESET: Page loaded, current URL:', window.location.href)
@@ -54,7 +60,7 @@ export default function ResetPasswordPage() {
         const {
           data: { session },
           error,
-        } = await supabase.auth.getSession()
+        } = await supabaseClient.auth.getSession()
 
         console.log('🔍 RESET: Current session:', {
           hasSession: !!session,
@@ -92,7 +98,7 @@ export default function ResetPasswordPage() {
     // Listen for auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(
+    } = supabaseClient.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
         console.log('🔄 RESET: Auth state changed:', event, !!session)
 
@@ -114,7 +120,16 @@ export default function ResetPasswordPage() {
     handleAuthCallback()
 
     return () => subscription?.unsubscribe()
-  }, [supabase.auth])
+  }, [])
+
+  // Don't render until mounted and supabase is initialized
+  if (!mounted || !supabase) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      </div>
+    )
+  }
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault()
