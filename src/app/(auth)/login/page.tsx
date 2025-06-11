@@ -23,24 +23,40 @@ export default function LoginPage() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('')
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false)
   const [forgotPasswordMessage, setForgotPasswordMessage] = useState('')
+  const [mounted, setMounted] = useState(false)
+  const [supabase, setSupabase] = useState<any>(null)
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   })
-  const supabase = createClient()
 
   useEffect(() => {
+    setMounted(true)
+
+    // Initialize Supabase client after component mounts
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+
     // Check if user is already logged in
     const checkUser = async () => {
       const {
         data: { session },
-      } = await supabase.auth.getSession()
+      } = await supabaseClient.auth.getSession()
       if (session) {
         window.location.href = '/generate'
       }
     }
     checkUser()
   }, [])
+
+  // Don't render until mounted and supabase is initialized
+  if (!mounted || !supabase) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      </div>
+    )
+  }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
