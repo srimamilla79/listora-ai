@@ -1,6 +1,6 @@
 // src/app/api/store-images/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,10 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Supabase admin client with service role key
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = createServiceRoleClient()
 
     // Get user from the request (assuming you have auth middleware)
     const authHeader = request.headers.get('authorization')
@@ -212,10 +209,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = createServiceRoleClient()
 
     // Get image metadata from database
     const { data, error } = await supabaseAdmin

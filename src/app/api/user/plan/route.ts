@@ -1,15 +1,12 @@
 // src/app/api/user/plan/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createServiceRoleClient } from '@/lib/supabase-server'
 
 // GET - Fetch user's current plan
 export async function GET(req: NextRequest) {
   try {
+    const supabase = createServiceRoleClient()
+
     const authHeader = req.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
@@ -63,6 +60,8 @@ export async function GET(req: NextRequest) {
 // POST - Update user's plan (for admin use or after payment)
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createServiceRoleClient()
+
     const { plan_type, user_id } = await req.json()
 
     if (!plan_type || !user_id) {
@@ -120,6 +119,8 @@ export async function POST(req: NextRequest) {
 // PATCH - Extend or modify existing plan
 export async function PATCH(req: NextRequest) {
   try {
+    const supabase = createServiceRoleClient()
+
     const authHeader = req.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(

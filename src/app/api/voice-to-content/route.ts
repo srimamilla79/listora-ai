@@ -1,14 +1,9 @@
 // src/app/api/voice-to-content/route.ts - OPTIMIZED VERSION
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import OpenAI from 'openai'
 
-// Initialize clients
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
+// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 })
@@ -100,6 +95,7 @@ async function getAuthUser(
     return { success: false, error: 'Authorization header required' }
   }
 
+  const supabaseAdmin = createServiceRoleClient()
   const token = authHeader.replace('Bearer ', '')
   const {
     data: { user },
