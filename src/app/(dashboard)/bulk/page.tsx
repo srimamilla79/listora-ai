@@ -180,6 +180,10 @@ const PLAN_LIMITS = {
 }
 
 export default function BulkCSVUploadPage() {
+  // Add Supabase state for SSR fix
+  const [supabase, setSupabase] = useState<any>(null)
+  const [mounted, setMounted] = useState(false)
+
   const [user, setUser] = useState<any>(null)
   const [userPlan, setUserPlan] = useState<keyof typeof PLAN_LIMITS>('starter')
   const [loading, setLoading] = useState(true)
@@ -222,16 +226,22 @@ export default function BulkCSVUploadPage() {
     null
   )
 
-  const supabase = createClient()
   const router = useRouter()
 
   // Session management for frontend mode
   const SESSION_KEY = 'listora_bulk_session'
   const PROCESSING_KEY = 'listora_processing_lock'
 
+  // Initialize Supabase client after component mounts
+  useEffect(() => {
+    setMounted(true)
+    const supabaseClient = createClient()
+    setSupabase(supabaseClient)
+  }, [])
+
   // 🚀 BACKGROUND JOB: Start processing on server
   const startBackgroundJob = async (products: any[]) => {
-    if (!user) {
+    if (!user || !supabase) {
       alert('Please log in to process bulk content')
       return
     }
@@ -280,6 +290,8 @@ export default function BulkCSVUploadPage() {
   // 🔄 POLLING: Check job status every 3 seconds
   const startJobPolling = useCallback(
     (jobId: string) => {
+      if (!supabase) return
+
       console.log('🔄 Starting job polling for:', jobId)
 
       const pollJob = async () => {
@@ -331,7 +343,7 @@ export default function BulkCSVUploadPage() {
 
   // 🔍 CHECK: Look for active jobs when user loads
   const checkForActiveJobs = useCallback(async () => {
-    if (!user || !useBackgroundProcessing) return
+    if (!user || !useBackgroundProcessing || !supabase) return
 
     try {
       const {
@@ -367,6 +379,8 @@ export default function BulkCSVUploadPage() {
     userId: string,
     incrementBy: number = 1
   ) => {
+    if (!supabase) return { error: 'Supabase not initialized' }
+
     try {
       const { data, error } = await supabase.rpc('increment_user_usage', {
         p_user_id: userId,
@@ -509,7 +523,9 @@ export default function BulkCSVUploadPage() {
 
   // Auth and plan loading
   useEffect(() => {
-    let mounted = true
+    if (!mounted || !supabase) return
+
+    let mountedLocal = true
 
     const checkAuth = async () => {
       try {
@@ -517,7 +533,7 @@ export default function BulkCSVUploadPage() {
           data: { session },
         } = await supabase.auth.getSession()
 
-        if (mounted) {
+        if (mountedLocal) {
           setUser(session?.user ?? null)
           setLoading(false)
 
@@ -529,7 +545,7 @@ export default function BulkCSVUploadPage() {
         }
       } catch (error) {
         console.error('Auth check error:', error)
-        if (mounted) {
+        if (mountedLocal) {
           setLoading(false)
           setPlanLoaded(true)
         }
@@ -541,7 +557,7 @@ export default function BulkCSVUploadPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: any, session: any) => {
-      if (mounted) {
+      if (mountedLocal) {
         setUser(session?.user ?? null)
         if (!session?.user && event !== 'INITIAL_SESSION') {
           router.push('/login')
@@ -552,10 +568,10 @@ export default function BulkCSVUploadPage() {
     })
 
     return () => {
-      mounted = false
+      mountedLocal = false
       subscription.unsubscribe()
     }
-  }, [router, supabase])
+  }, [router, supabase, mounted])
 
   // Check for active jobs or sessions when user loads
   useEffect(() => {
@@ -650,6 +666,8 @@ export default function BulkCSVUploadPage() {
   }, [processingJobs, useBackgroundProcessing])
 
   const fetchUserPlan = async (userId: string) => {
+    if (!supabase) return
+
     try {
       const { data, error } = await supabase
         .from('user_plans')
@@ -680,6 +698,8 @@ export default function BulkCSVUploadPage() {
   }
 
   const fetchMonthlyUsage = async (userId: string) => {
+    if (!supabase) return
+
     try {
       const currentMonth = new Date().toISOString().slice(0, 7)
       const { data: usageData, error: usageError } = await supabase
@@ -938,7 +958,7 @@ export default function BulkCSVUploadPage() {
 
   // Frontend processing function (existing logic)
   const startFrontendProcessing = async (products: any[]) => {
-    if (isProcessing) {
+    if (isProcessing || !supabase) {
       alert('⚠️ Processing is already in progress.')
       return
     }
@@ -1323,7 +1343,8 @@ export default function BulkCSVUploadPage() {
     )
   }
 
-  if (loading || !planLoaded) {
+  // Wait for both mounted and supabase to be ready
+  if (loading || !planLoaded || !mounted || !supabase) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
