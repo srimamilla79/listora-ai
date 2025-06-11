@@ -369,7 +369,7 @@ export default function ProductForm({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 44100,
+          sampleRate: { ideal: 22050, min: 16000, max: 44100 },
           channelCount: 1,
           autoGainControl: true,
         },
@@ -917,21 +917,115 @@ export default function ProductForm({
   }
 
   const analyzeImagesWithAI = async (images: ProcessedImage[]) => {
-    const hasProcessedImages = images.some((img) => img.processed)
-    const imageCount = images.length
-
-    let analysis = `${imageCount} high-quality product image${
-      imageCount > 1 ? 's' : ''
-    } available`
-
-    if (hasProcessedImages) {
-      analysis +=
-        ' with professional background removal and platform optimization'
+    if (!supabase || images.length === 0) {
+      return ''
     }
 
-    analysis +=
-      '. Images show key product features and details suitable for e-commerce listings.'
-    return analysis
+    console.log('🔍 Starting enhanced image analysis...', {
+      imageCount: images.length,
+      hasProcessedImages: images.some((img) => img.processed),
+    })
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        console.log('⚠️ No session for image analysis, using basic fallback')
+        // Fallback to original basic analysis
+        const hasProcessedImages = images.some((img) => img.processed)
+        const imageCount = images.length
+
+        let analysis = `${imageCount} high-quality product image${
+          imageCount > 1 ? 's' : ''
+        } available`
+
+        if (hasProcessedImages) {
+          analysis +=
+            ' with professional background removal and platform optimization'
+        }
+
+        analysis +=
+          '. Images show key product features and details suitable for e-commerce listings.'
+        return analysis
+      }
+
+      // Use the first processed image, or first original if no processed images
+      const imageToAnalyze =
+        images.find((img) => img.processedPreview) || images[0]
+      const imageUrl =
+        imageToAnalyze.processedPreview || imageToAnalyze.originalPreview
+
+      console.log('🖼️ Analyzing image with AI vision...', {
+        imageType: imageToAnalyze.processedPreview ? 'processed' : 'original',
+        imageUrl: imageUrl.substring(0, 50) + '...',
+      })
+
+      const response = await fetch('/api/analyze-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          imageUrl: imageUrl,
+          imageCount: images.length,
+          hasProcessedImages: images.some((img) => img.processed),
+          productName: productName || undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        console.log('⚠️ Image analysis API failed, using basic fallback')
+        throw new Error(`Image analysis failed: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.fallback) {
+        console.log('⚠️ Vision analysis used fallback:', result.reason)
+        addNotification(
+          'Using basic image analysis. Vision analysis temporarily unavailable.',
+          'info'
+        )
+      } else {
+        console.log('✅ AI vision analysis completed successfully')
+        addNotification(
+          '🎯 AI analyzed your images for enhanced content generation!',
+          'success'
+        )
+      }
+
+      return result.analysis
+    } catch (error) {
+      console.error('Image analysis error:', error)
+
+      // Graceful fallback to original basic analysis
+      console.log('🔄 Using basic image analysis fallback')
+
+      addNotification(
+        'Using basic image analysis. AI vision temporarily unavailable.',
+        'info'
+      )
+
+      const hasProcessedImages = images.some((img) => img.processed)
+      const imageCount = images.length
+
+      let analysis = `${imageCount} high-quality product image${
+        imageCount > 1 ? 's' : ''
+      } available`
+
+      if (hasProcessedImages) {
+        analysis +=
+          ' with professional background removal and platform optimization'
+      }
+
+      analysis +=
+        '. Images show key product features and details suitable for e-commerce listings.'
+
+      return analysis
+    }
   }
 
   // Handle generate with usage validation
@@ -1508,6 +1602,11 @@ export default function ProductForm({
                     <button
                       onClick={startRecording}
                       className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg"
+                      style={{
+                        minHeight: '48px',
+                        minWidth: '160px',
+                        touchAction: 'manipulation',
+                      }}
                     >
                       <Mic className="h-5 w-5" />
                       <span>Start Recording</span>
