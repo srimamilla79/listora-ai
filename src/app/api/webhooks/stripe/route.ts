@@ -4,19 +4,7 @@ import { getServerStripe } from '@/lib/supabase'
 import { createServerClient } from '@supabase/ssr'
 
 // Service role client for database operations
-function createServiceRoleClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        get: () => null,
-        set: () => {},
-        remove: () => {},
-      },
-    }
-  )
-}
+import { createServiceRoleClient } from '@/lib/supabase-server'
 
 export async function POST(req: NextRequest) {
   console.log('=== WEBHOOK RECEIVED ===')

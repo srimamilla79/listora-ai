@@ -8,19 +8,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-function createServiceRoleClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        get: () => null,
-        set: () => {},
-        remove: () => {},
-      },
-    }
-  )
-}
+import { createServiceRoleClient } from '@/lib/supabase-server'
 
 export async function POST(req: NextRequest) {
   console.log('=== GENERATE API START ===')

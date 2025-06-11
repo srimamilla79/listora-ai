@@ -1,23 +1,19 @@
 // src/app/api/bulk-generate/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import OpenAI from 'openai'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 })
 
-// Create admin client for server-side operations
-const supabaseAdmin = createServiceClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function POST(req: NextRequest) {
   console.log('=== BULK GENERATE API START ===')
 
   try {
+    const supabaseAdmin = createServiceRoleClient()
+
     const { products } = await req.json()
 
     if (!products || !Array.isArray(products)) {
