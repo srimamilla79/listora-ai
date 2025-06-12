@@ -1556,30 +1556,38 @@ export default function ProductForm({
                   </p>
                 </div>
               </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <select
+                    value={contentType}
+                    onChange={(e) => setContentType(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="product">Product Content</option>
+                    <option value="service">Service Content</option>
+                    <option value="listing">Marketplace Listing</option>
+                  </select>
+                </div>
 
-              <div className="flex items-center space-x-4">
-                <select
-                  value={contentType}
-                  onChange={(e) => setContentType(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
-                  <option value="product">Product Content</option>
-                  <option value="service">Service Content</option>
-                  <option value="listing">Marketplace Listing</option>
-                </select>
-
-                <button
-                  onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
-                  className={`px-4 py-2 rounded-lg transition-all transform hover:scale-105 ${
-                    showVoiceRecorder
-                      ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg'
-                  }`}
-                >
-                  {showVoiceRecorder
-                    ? 'Hide Voice Recorder'
-                    : 'Start Voice Input'}
-                </button>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
+                    className={`px-6 py-3 rounded-lg transition-all font-medium ${
+                      showVoiceRecorder
+                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg'
+                    }`}
+                    style={{
+                      minHeight: '48px',
+                      minWidth: '180px',
+                      touchAction: 'manipulation',
+                    }}
+                  >
+                    {showVoiceRecorder
+                      ? 'Hide Voice Recorder'
+                      : '🎤 Start Voice Input'}
+                  </button>
+                </div>
               </div>
             </div>
 
