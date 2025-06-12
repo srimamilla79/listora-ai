@@ -24,6 +24,15 @@ import {
   TrendingUp,
   Clock,
   Rocket,
+  MessageCircle,
+  Sparkles,
+  Heart,
+  ShoppingCart,
+  DollarSign,
+  Timer,
+  FileText,
+  Upload,
+  Volume2,
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
@@ -32,87 +41,306 @@ export default function HomePage() {
   const [isVoiceActive, setIsVoiceActive] = useState(false)
   const [contentPreview, setContentPreview] = useState('')
   const [typingIndex, setTypingIndex] = useState(0)
+  const [currentTestimonial, setCurrentTestimonial] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
 
-  // Animated typing effect
+  // Enhanced typing effect
   const sampleContent =
-    '**Premium Wireless Headphones** - Experience crystal-clear audio with our premium wireless headphones featuring noise cancellation, 30-hour battery life, and comfortable over-ear design perfect for music lovers and professionals.'
+    'Premium Wireless Headphones - Experience crystal-clear audio with our premium wireless headphones featuring noise cancellation, 30-hour battery life, and comfortable over-ear design perfect for music lovers and professionals.'
 
   useEffect(() => {
     if (activeFeature === 0 && typingIndex < sampleContent.length) {
       const timer = setTimeout(() => {
         setContentPreview(sampleContent.slice(0, typingIndex + 1))
         setTypingIndex(typingIndex + 1)
-      }, 50)
+      }, 30)
       return () => clearTimeout(timer)
     }
   }, [activeFeature, typingIndex])
 
-  // Voice animation effect
+  // Auto-rotate testimonials
   useEffect(() => {
-    if (isVoiceActive) {
-      const timer = setTimeout(() => setIsVoiceActive(false), 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [isVoiceActive])
+    const timer = setInterval(() => {
+      setCurrentTestimonial((prev) => (prev + 1) % testimonials.length)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [])
 
   const features = [
     {
       icon: Mic,
-      title: '🎤 Revolutionary Voice-to-Content Technology',
+      title: 'Voice-to-Content Magic',
       description:
-        'Simply speak naturally about your product features, and our advanced AI instantly transforms your words into professional, conversion-optimized content that sells.',
-      realBenefit:
-        '✨ Turn 30 seconds of speaking into $500 worth of professional copywriting',
-      preview: (
-        <div className="bg-white rounded-lg p-4 shadow-sm border h-32 overflow-hidden">
-          <div className="text-sm text-indigo-600 mb-2 font-medium">
-            🎤 You speak: "Wireless headphones with great sound and long
-            battery..."
-          </div>
-          <div className="text-xs text-gray-800 leading-relaxed">
-            <strong>AI creates:</strong> {contentPreview}
-            <span className="animate-pulse">|</span>
+        'Simply speak naturally about your product features, and our advanced AI instantly transforms your words into professional, conversion-optimized content.',
+      benefit:
+        'Turn 30 seconds of speaking into $500 worth of professional copywriting',
+      stats: '3x faster than traditional writing',
+      demo: (
+        <div className="relative">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 border border-blue-200">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                <Mic className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center space-x-1 mb-2">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className={`w-1 bg-blue-500 rounded-full animate-pulse ${
+                        i <= 3 ? 'h-4' : i === 4 ? 'h-6' : 'h-3'
+                      }`}
+                      style={{ animationDelay: `${i * 100}ms` }}
+                    />
+                  ))}
+                </div>
+                <p className="text-sm text-blue-700 font-medium">
+                  "Wireless headphones with great sound and long battery..."
+                </p>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-4 border border-blue-200">
+              <div className="text-xs text-green-600 font-semibold mb-2 flex items-center">
+                <Sparkles className="h-3 w-3 mr-1" />
+                AI Generated Content:
+              </div>
+              <div className="text-sm text-gray-800 leading-relaxed">
+                {contentPreview}
+                <span className="animate-pulse text-blue-500">|</span>
+              </div>
+            </div>
           </div>
         </div>
       ),
     },
     {
       icon: Camera,
-      title: '📸 Professional Image Processing Suite',
+      title: 'AI Vision Analysis + Image Suite',
       description:
-        'Upload one image and instantly get perfectly optimized versions for Amazon, Shopify, Etsy, eBay, and Instagram. Automatic background removal and platform-specific sizing included.',
-      realBenefit:
-        '🎨 Professional designer-quality results in seconds, not days',
-      preview: (
-        <div className="bg-white rounded-lg p-4 shadow-sm border h-32">
-          <div className="grid grid-cols-3 gap-2 h-full">
-            <div className="bg-gradient-to-br from-orange-100 to-orange-200 rounded flex flex-col items-center justify-center text-xs">
-              <span className="font-semibold">🛒 Amazon</span>
-              <span className="text-gray-600">1000×1000</span>
-              <span className="text-green-600 text-xs">✓ Optimized</span>
+        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions and keywords. Then automatically optimize for Amazon, Shopify, Etsy, eBay, and Instagram.',
+      benefit:
+        'AI sees your product and writes descriptions based on actual visual details',
+      stats: 'OpenAI Vision + 5 platform optimization',
+      demo: (
+        <div className="bg-gradient-to-br from-purple-50 to-pink-100 rounded-xl p-6 border border-purple-200">
+          <div className="text-center mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl mx-auto flex items-center justify-center mb-2">
+              <Camera className="h-6 w-6 text-white" />
             </div>
-            <div className="bg-gradient-to-br from-green-100 to-green-200 rounded flex flex-col items-center justify-center text-xs">
-              <span className="font-semibold">🏪 Shopify</span>
-              <span className="text-gray-600">1024×1024</span>
-              <span className="text-green-600 text-xs">✓ Optimized</span>
+            <p className="text-sm text-purple-700 font-medium">
+              AI Vision Analysis → Multi-Platform Optimization
+            </p>
+          </div>
+
+          {/* Vision Analysis Demo */}
+          <div className="bg-white rounded-lg p-4 mb-4 border border-purple-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs">👁️</span>
+              </div>
+              <span className="text-sm font-semibold text-gray-800">
+                OpenAI Vision Analysis
+              </span>
             </div>
-            <div className="bg-gradient-to-br from-orange-100 to-yellow-200 rounded flex flex-col items-center justify-center text-xs">
-              <span className="font-semibold">🎨 Etsy</span>
-              <span className="text-gray-600">2000×2000</span>
-              <span className="text-green-600 text-xs">✓ Optimized</span>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p>✓ Detects: Wireless headphones, over-ear design</p>
+              <p>✓ Colors: Matte black with metallic accents</p>
+              <p>✓ Features: Cushioned ear cups, adjustable headband</p>
+              <p>✓ Keywords: Premium, wireless, comfort, audio</p>
             </div>
-            <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded flex flex-col items-center justify-center text-xs">
-              <span className="font-semibold">💰 eBay</span>
-              <span className="text-gray-600">1600×1600</span>
-              <span className="text-green-600 text-xs">✓ Optimized</span>
+          </div>
+
+          <div className="grid grid-cols-5 gap-2">
+            {[
+              {
+                name: 'Amazon',
+                color: 'from-orange-400 to-orange-500',
+                emoji: '🛒',
+              },
+              {
+                name: 'Shopify',
+                color: 'from-green-400 to-green-500',
+                emoji: '🏪',
+              },
+              {
+                name: 'Etsy',
+                color: 'from-yellow-400 to-orange-400',
+                emoji: '🎨',
+              },
+              { name: 'eBay', color: 'from-blue-400 to-blue-500', emoji: '💰' },
+              {
+                name: 'Instagram',
+                color: 'from-pink-400 to-purple-500',
+                emoji: '📱',
+              },
+            ].map((platform, i) => (
+              <div
+                key={platform.name}
+                className={`bg-gradient-to-br ${platform.color} rounded-lg p-3 text-white text-center transform transition-all duration-300 hover:scale-105`}
+                style={{ animationDelay: `${i * 200}ms` }}
+              >
+                <div className="text-lg mb-1">{platform.emoji}</div>
+                <div className="text-xs font-semibold">{platform.name}</div>
+                <div className="w-full h-1 bg-white/30 rounded-full mt-2">
+                  <div
+                    className="h-full bg-white rounded-full transition-all duration-1000"
+                    style={{ width: activeFeature === 1 ? '100%' : '0%' }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+    {
+      icon: ShoppingCart,
+      title: 'Direct Amazon Publishing',
+      description:
+        'Skip the copy-paste hassle! Publish your AI-generated content directly to Amazon with one click. Our integration connects to your seller account for seamless product listing creation.',
+      benefit: 'From voice input to live Amazon listing in under 2 minutes',
+      stats: 'Direct API integration',
+      demo: (
+        <div className="bg-gradient-to-br from-orange-50 to-red-100 rounded-xl p-6 border border-orange-200">
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl mx-auto flex items-center justify-center mb-2">
+                <ShoppingCart className="h-6 w-6 text-white" />
+              </div>
+              <p className="text-sm text-orange-700 font-medium">
+                Voice → AI Content → Amazon Live
+              </p>
             </div>
-            <div className="bg-gradient-to-br from-pink-100 to-purple-200 rounded flex flex-col items-center justify-center text-xs">
-              <span className="font-semibold">📱 Instagram</span>
-              <span className="text-gray-600">1080×1080</span>
-              <span className="text-green-600 text-xs">✓ Optimized</span>
+
+            <div className="space-y-3">
+              {[
+                {
+                  step: '1. Voice Input Processed',
+                  status: 'complete',
+                  icon: '🎤',
+                },
+                {
+                  step: '2. AI Content Generated',
+                  status: 'complete',
+                  icon: '🤖',
+                },
+                {
+                  step: '3. Amazon API Connected',
+                  status: 'complete',
+                  icon: '🔗',
+                },
+                {
+                  step: '4. Publishing to Amazon...',
+                  status: 'processing',
+                  icon: '🚀',
+                },
+              ].map((item, i) => (
+                <div key={item.step} className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-orange-200">
+                    <span className="text-sm">{item.icon}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">
+                        {item.step}
+                      </span>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          item.status === 'complete'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        {item.status === 'complete' ? '✓' : '⚡'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded flex items-center justify-center text-xs">
-              <span className="text-green-600 font-semibold">🚀 Ready!</span>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+              <div className="text-sm font-semibold text-green-800">
+                🎉 Product live on Amazon in 90 seconds!
+              </div>
+              <div className="text-xs text-green-600 mt-1">
+                ASIN: B08XYZ123 • Status: Active
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      icon: Upload,
+      title: 'Bulk CSV Background Processing',
+      description:
+        'Upload a CSV with hundreds of products and let our servers generate professional content for all of them in the background. Navigate freely while your job keeps running - no waiting around!',
+      benefit:
+        'Process 500+ products while you sleep - background processing never stops',
+      stats: 'Background jobs + CSV automation',
+      demo: (
+        <div className="bg-gradient-to-br from-indigo-50 to-blue-100 rounded-xl p-6 border border-indigo-200">
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl mx-auto flex items-center justify-center mb-2">
+                <Upload className="h-6 w-6 text-white" />
+              </div>
+              <p className="text-sm text-indigo-700 font-medium">
+                CSV Upload → Background Processing → All Content Ready
+              </p>
+            </div>
+
+            {/* Upload Status */}
+            <div className="bg-white rounded-lg p-4 border border-indigo-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <FileText className="h-4 w-4 text-indigo-600" />
+                  <span className="text-sm font-semibold text-gray-800">
+                    products_batch_247.csv
+                  </span>
+                </div>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                  ⚡ Processing
+                </span>
+              </div>
+              <div className="text-xs text-gray-600 mb-3">
+                📊 247 products • Uploaded 3 minutes ago
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-600">
+                    Content Generation Progress
+                  </span>
+                  <span className="text-indigo-600 font-medium">
+                    164/247 complete
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 to-blue-500 h-2 rounded-full transition-all duration-1000 animate-pulse"
+                    style={{ width: '66%' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Background Process Status */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2 mb-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-sm font-semibold text-green-800">
+                  🌟 Background Processing Active
+                </span>
+              </div>
+              <div className="text-xs text-green-700 space-y-1">
+                <p>✓ Job continues even if you close browser</p>
+                <p>✓ Navigate freely - processing never stops</p>
+                <p>✓ Email notification when complete</p>
+                <p>✓ ETA: 4 minutes remaining</p>
+              </div>
             </div>
           </div>
         </div>
@@ -120,93 +348,126 @@ export default function HomePage() {
     },
     {
       icon: Wand2,
-      title: '🤖 Advanced AI Content Generation',
+      title: 'Advanced AI Engine',
       description:
-        'Powered by cutting-edge artificial intelligence, Listora creates compelling product descriptions, catchy titles, and persuasive marketing copy that converts visitors into customers.',
-      realBenefit:
-        '🎯 AI-generated content that outperforms traditional copywriting',
-      preview: (
-        <div className="bg-white rounded-lg p-4 shadow-sm border h-32">
-          <div className="space-y-2">
-            <div className="text-sm font-semibold text-gray-800">
-              AI Content Generation Progress
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span>Product Title</span>
-                <span className="text-green-600">✓ Complete</span>
+        'Powered by cutting-edge artificial intelligence that creates compelling product descriptions, catchy titles, and persuasive marketing copy.',
+      benefit: 'AI-generated content that outperforms traditional copywriting',
+      stats: '99.2% accuracy rate',
+      demo: (
+        <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 border border-green-200">
+          <div className="space-y-3">
+            {[
+              {
+                task: 'Vision Analysis',
+                status: 'complete',
+                progress: 100,
+                detail: 'Product features detected',
+              },
+              {
+                task: 'Keyword Extraction',
+                status: 'complete',
+                progress: 100,
+                detail: 'SEO keywords identified',
+              },
+              {
+                task: 'Content Generation',
+                status: 'processing',
+                progress: 75,
+                detail: 'Writing descriptions...',
+              },
+              {
+                task: 'Amazon Optimization',
+                status: 'pending',
+                progress: 30,
+                detail: 'Platform formatting',
+              },
+            ].map((item, i) => (
+              <div key={item.task} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">
+                      {item.task}
+                    </span>
+                    <div className="text-xs text-gray-500">{item.detail}</div>
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      item.status === 'complete'
+                        ? 'bg-green-100 text-green-700'
+                        : item.status === 'processing'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {item.status === 'complete'
+                      ? '✓ Complete'
+                      : item.status === 'processing'
+                        ? '⚡ Processing'
+                        : '⏳ Pending'}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-1000 ${
+                      item.status === 'complete'
+                        ? 'bg-green-500'
+                        : item.status === 'processing'
+                          ? 'bg-blue-500 animate-pulse'
+                          : 'bg-gray-400'
+                    }`}
+                    style={{ width: `${item.progress}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-1">
-                <div
-                  className="bg-green-500 h-1 rounded-full"
-                  style={{ width: '100%' }}
-                ></div>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span>Description</span>
-                <span className="text-green-600">✓ Complete</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1">
-                <div
-                  className="bg-green-500 h-1 rounded-full"
-                  style={{ width: '100%' }}
-                ></div>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span>Key Features</span>
-                <span className="text-blue-600">Processing...</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1">
-                <div
-                  className="bg-blue-500 h-1 rounded-full animate-pulse"
-                  style={{ width: '75%' }}
-                ></div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       ),
     },
     {
       icon: Cloud,
-      title: '☁️ Enterprise-Grade Cloud Storage',
+      title: 'Enterprise Cloud Storage',
       description:
-        'Your content and images are safely stored in our secure cloud infrastructure. Access your work from anywhere, anytime, with guaranteed 99.9% uptime and automatic backups.',
-      realBenefit: '🔒 Never lose your valuable content and images again',
-      preview: (
-        <div className="bg-white rounded-lg p-4 shadow-sm border h-32">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-800">
-              Cloud Storage
-            </span>
-            <span className="text-xs text-green-600 flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-              Online & Synced
-            </span>
+        'Your content and images are safely stored with guaranteed 99.9% uptime, automatic backups, and access from anywhere.',
+      benefit: 'Never lose your valuable content and images again',
+      stats: '99.9% uptime guarantee',
+      demo: (
+        <div className="bg-gradient-to-br from-cyan-50 to-blue-100 rounded-xl p-6 border border-cyan-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <Cloud className="h-5 w-5 text-cyan-600" />
+              <span className="font-semibold text-gray-800">Cloud Storage</span>
+            </div>
+            <div className="flex items-center space-x-1 text-green-600">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-xs font-medium">Live & Synced</span>
+            </div>
           </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs">
-              <span>Product Images</span>
-              <span className="text-gray-600">2.4 GB</span>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Product Images</span>
+              <span className="text-sm font-medium text-gray-800">2.4 GB</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-cyan-500 h-2 rounded-full"
+                style={{ width: '35%' }}
+              />
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Generated Content</span>
+              <span className="text-sm font-medium text-gray-800">847 MB</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
                 className="bg-blue-500 h-2 rounded-full"
-                style={{ width: '35%' }}
-              ></div>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span>Generated Content</span>
-              <span className="text-gray-600">847 MB</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-indigo-500 h-2 rounded-full"
                 style={{ width: '25%' }}
-              ></div>
+              />
             </div>
-            <div className="text-center text-xs text-green-600 font-medium">
-              ✓ Automatically backed up every 30 seconds
+            <div className="text-center pt-2">
+              <span className="text-xs text-green-600 font-medium">
+                ✓ Auto-backup every 30 seconds
+              </span>
             </div>
           </div>
         </div>
@@ -218,32 +479,38 @@ export default function HomePage() {
     {
       name: 'Sarah Chen',
       role: 'E-commerce Entrepreneur',
+      company: 'TechGadgets Pro',
       content:
-        'Listora AI has completely transformed how I create product content. What used to take me hours of writing and design work now happens in minutes. The voice feature is incredibly intuitive, and the image optimization for different platforms is a game-changer.',
+        'Listora AI completely transformed my workflow. What used to take me 4-5 hours per product now takes 5 minutes. The voice feature is incredibly intuitive!',
       rating: 5,
-      revenue: 'Increased efficiency by 300%',
+      metric: '300% efficiency boost',
       avatar: 'SC',
-      color: 'from-blue-400 to-blue-500',
+      color: 'from-blue-400 to-blue-600',
+      results: '+40% sales increase',
     },
     {
       name: 'Michael Rodriguez',
       role: 'Digital Marketing Specialist',
+      company: 'Growth Marketing Co',
       content:
-        'As someone who manages multiple e-commerce clients, Listora AI has become my secret weapon. The quality of AI-generated content consistently impresses my clients, and the time savings allow me to take on more projects.',
+        'As someone managing 50+ clients, Listora AI became my secret weapon. The AI-generated content consistently outperforms human-written copy.',
       rating: 5,
-      revenue: 'Serving 40% more clients',
+      metric: '40% more clients served',
       avatar: 'MR',
-      color: 'from-green-400 to-green-500',
+      color: 'from-green-400 to-green-600',
+      results: '+$50k monthly revenue',
     },
     {
       name: 'Emma Thompson',
       role: 'Amazon FBA Seller',
+      company: 'Home Essentials',
       content:
-        "The platform-specific image optimization is brilliant. I no longer need to worry about image dimensions for different marketplaces. The voice-to-content feature lets me create professional listings while I'm on the go.",
+        'The platform-specific optimization is brilliant. I launch products 5x faster now, and my conversion rates have never been higher.',
       rating: 5,
-      revenue: 'Faster product launches',
+      metric: '5x faster launches',
       avatar: 'ET',
-      color: 'from-purple-400 to-purple-500',
+      color: 'from-purple-400 to-purple-600',
+      results: '+65% conversion rate',
     },
   ]
 
@@ -268,12 +535,31 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Header - UPDATED WITH NEW LOGO */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm sticky top-0 z-50">
+      {/* Enhanced Header */}
+      <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <ListoraAILogo size="header" showText={true} />
+            <ListoraAILogo size="header" showText={true} />
+
+            <div className="hidden md:flex items-center space-x-8">
+              <button
+                onClick={() => scrollToSection('features-section')}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Features
+              </button>
+              <button
+                onClick={() => scrollToSection('pricing-section')}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Pricing
+              </button>
+              <button
+                onClick={() => scrollToSection('testimonials-section')}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Reviews
+              </button>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -294,240 +580,311 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero Section - UPDATED WITH NEW LOGO */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
-        <div className="text-center mb-16">
-          <div className="flex justify-center mb-6">
-            <div className="bg-indigo-100 rounded-full p-4 animate-bounce">
-              <ListoraAILogo size="lg" showText={false} />
-            </div>
-          </div>
+      {/* Enhanced Hero Section */}
+      <section className="relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 via-purple-600/5 to-pink-600/5" />
+        <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
 
-          <h1 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-            Transform Your Voice Into
-            <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              {' '}
-              Premium Marketing Copy
-            </span>
-            <br />
-            in Seconds That Actually Sells
-          </h1>
-
-          <p className="text-xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
-            <strong>Listora AI</strong> is the world's first voice-to-content
-            platform that turns your natural speech into professional marketing
-            copy that converts. Simply speak about your product, and our
-            advanced AI instantly creates compelling descriptions, optimized
-            images, and platform-specific content for Amazon, Shopify, Etsy, and
-            more.
-          </p>
-
-          <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-6 mb-8 max-w-4xl mx-auto">
-            <div className="flex items-center justify-center space-x-8 text-lg flex-wrap gap-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-800 font-semibold">
-                  🎤 Speak Naturally (30 sec)
-                </span>
-              </div>
-              <div className="text-gray-400">→</div>
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-indigo-500 rounded-full animate-pulse"></div>
-                <span className="text-indigo-800 font-semibold">
-                  🤖 AI Creates Professional Copy
-                </span>
-              </div>
-              <div className="text-gray-400">→</div>
-              <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-purple-500 rounded-full animate-pulse"></div>
-                <span className="text-purple-800 font-semibold">
-                  🚀 Copy & Launch Anywhere
-                </span>
-              </div>
-            </div>
-            <div className="mt-4 text-center">
-              <span className="text-sm text-gray-600 bg-white px-4 py-2 rounded-full border">
-                ⏱️ Average time saved: <strong>4.5 hours per product</strong> •
-                💰 Ready-to-use content for <strong>5+ platforms</strong>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-32">
+          <div className="text-center mb-16">
+            {/* Enhanced Badge */}
+            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-4 py-2 mb-8">
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <span className="text-sm font-medium text-indigo-800">
+                Join 10,000+ entrepreneurs using AI Vision + Bulk Processing +
+                Amazon Direct
               </span>
+              <Star className="h-4 w-4 text-yellow-500 fill-current" />
+            </div>
+
+            {/* Enhanced Title */}
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-8 leading-tight">
+              Transform Your
+              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
+                Voice Into Sales
+              </span>
+              in 30 Seconds
+            </h1>
+
+            {/* Enhanced Subtitle */}
+            <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
+              The world's first AI that combines voice recognition, OpenAI
+              Vision analysis, bulk CSV processing, and direct Amazon
+              publishing. Scale from 1 product to 500+ with background
+              automation.
+              <span className="font-semibold text-gray-800">
+                {' '}
+                No technical skills required.
+              </span>
+            </p>
+
+            {/* Interactive Demo Preview */}
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 max-w-5xl mx-auto mb-12 border border-white/50 shadow-2xl">
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center animate-pulse">
+                      <Mic className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        You Speak (30 sec)
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Natural conversation about your product
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Volume2 className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-500">
+                        Recording...
+                      </span>
+                    </div>
+                    <p className="text-gray-700 italic">
+                      "These wireless headphones have amazing sound quality,
+                      30-hour battery, and they're super comfortable for long
+                      listening sessions..."
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center">
+                      <Sparkles className="h-6 w-6 text-white animate-spin" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        AI Creates Content
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Professional copy ready to sell
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-600 font-medium">
+                        Generated!
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-800">
+                      <strong>Premium Wireless Headphones</strong> - Experience
+                      studio-quality audio with our premium wireless headphones
+                      featuring advanced noise cancellation...
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Enhanced CTAs */}
+            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
+              <button
+                onClick={handleSignup}
+                className="group bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all transform hover:scale-105 shadow-2xl flex items-center cursor-pointer"
+              >
+                <Mic className="mr-2 h-5 w-5 group-hover:animate-pulse" />
+                Start Creating Amazing Content
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="group flex items-center space-x-3 text-indigo-600 hover:text-indigo-700 font-semibold px-6 py-4 rounded-xl hover:bg-indigo-50 transition-all cursor-pointer"
+              >
+                <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                  {isPlaying ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Play className="h-5 w-5 ml-0.5" />
+                  )}
+                </div>
+                <span>Watch Demo Video</span>
+              </button>
+            </div>
+
+            {/* Trust Indicators */}
+            <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-500">
+              <div className="flex items-center space-x-2">
+                <Check className="h-4 w-4 text-green-500" />
+                <span>Free 14-day trial</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Check className="h-4 w-4 text-green-500" />
+                <span>No credit card required</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Check className="h-4 w-4 text-green-500" />
+                <span>Setup in 60 seconds</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
-            <button
-              onClick={handleSignup}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-all transform hover:scale-105 shadow-xl flex items-center cursor-pointer"
-            >
-              🎤 Start Creating Amazing Content
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </button>
-            <button
-              onClick={() => scrollToSection('pricing-section')}
-              className="text-indigo-600 hover:text-indigo-700 font-semibold px-6 py-4 rounded-lg hover:bg-indigo-50 transition-all flex items-center cursor-pointer"
-            >
-              💎 View Pricing Plans
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="text-sm text-gray-500 mb-8">
-            ✓ Free trial • ✓ No credit card required • ✓ Setup in 60 seconds
-            <br />
-            <span className="text-green-600 font-semibold">
-              🎉 Join 10,000+ entrepreneurs already using Listora AI
-            </span>
-          </div>
-
-          <div
-            id="features-section"
-            className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-16"
-          >
-            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all cursor-pointer">
-              <div className="text-2xl font-bold text-slate-600 mb-2">
-                🎤 Voice Magic
-              </div>
-              <div className="text-gray-600">30-Second Creation</div>
-              <div className="text-xs text-slate-500 mt-1">
-                ✨ Speak → Professional copy
-              </div>
-            </div>
-            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all cursor-pointer">
-              <div className="text-2xl font-bold text-slate-600 mb-2">
-                📸 Image AI
-              </div>
-              <div className="text-gray-600">Platform Optimization</div>
-              <div className="text-xs text-slate-500 mt-1">
-                🎨 1 upload → 5 perfect sizes
-              </div>
-            </div>
-            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all cursor-pointer">
-              <div className="text-2xl font-bold text-slate-600 mb-2">
-                🤖 Smart AI
-              </div>
-              <div className="text-gray-600">Content Generation</div>
-              <div className="text-xs text-slate-500 mt-1">
-                ⚡ Titles, descriptions, features
-              </div>
-            </div>
-            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all cursor-pointer">
-              <div className="text-2xl font-bold text-slate-600 mb-2">
-                🌐 Multi-Platform
-              </div>
-              <div className="text-gray-600">Perfect Everywhere</div>
-              <div className="text-xs text-slate-500 mt-1">
-                🎯 Amazon, Shopify, Etsy, eBay+
-              </div>
-            </div>
-            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all cursor-pointer">
-              <div className="text-2xl font-bold text-slate-600 mb-2">
-                📦 Bulk Power
-              </div>
-              <div className="text-gray-600">Scale Fast</div>
-              <div className="text-xs text-slate-500 mt-1">
-                ⚡ 50+ products simultaneously
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            The Only Platform That Understands Your Voice AND Your Business
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Stop spending hours writing product descriptions. Our revolutionary
-            AI transforms your natural speech into high-converting copy that
-            sells while you focus on growing your business.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          {/* Feature Navigation */}
-          <div className="space-y-4">
-            {features.map((feature, index) => {
-              const Icon = feature.icon
+          {/* Enhanced Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              {
+                number: '2 min',
+                label: 'Voice to Amazon Live',
+                icon: Timer,
+                color: 'from-blue-500 to-cyan-500',
+              },
+              {
+                number: 'AI Vision',
+                label: 'OpenAI Image Analysis',
+                icon: Camera,
+                color: 'from-green-500 to-emerald-500',
+              },
+              {
+                number: '500+',
+                label: 'Bulk CSV Processing',
+                icon: Upload,
+                color: 'from-purple-500 to-indigo-500',
+              },
+              {
+                number: 'Direct',
+                label: 'Amazon Integration',
+                icon: ShoppingCart,
+                color: 'from-orange-500 to-red-500',
+              },
+            ].map((stat, index) => {
+              const Icon = stat.icon
               return (
                 <div
                   key={index}
-                  onClick={() => {
-                    setActiveFeature(index)
-                    setTypingIndex(0)
-                    setContentPreview('')
-                  }}
-                  className={`p-6 rounded-xl border-2 cursor-pointer transition-all ${
-                    activeFeature === index
-                      ? 'border-indigo-500 bg-indigo-50 shadow-lg'
-                      : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
-                  }`}
+                  className="bg-white/80 backdrop-blur-lg rounded-xl p-6 text-center shadow-lg border border-white/50 hover:shadow-xl transition-all hover:scale-105"
                 >
-                  <div className="flex items-start space-x-4">
-                    <div
-                      className={`p-3 rounded-lg ${
-                        activeFeature === index
-                          ? 'bg-indigo-100'
-                          : 'bg-gray-100'
-                      }`}
-                    >
-                      <Icon
-                        className={`h-6 w-6 ${
-                          activeFeature === index
-                            ? 'text-indigo-600'
-                            : 'text-gray-600'
-                        }`}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        {feature.title}
-                      </h3>
-                      <p className="text-gray-600 mb-3">
-                        {feature.description}
-                      </p>
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <p className="text-sm text-green-800 font-semibold">
-                          {feature.realBenefit}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight
-                      className={`h-5 w-5 transition-colors ${
-                        activeFeature === index
-                          ? 'text-indigo-600'
-                          : 'text-gray-400'
-                      }`}
-                    />
+                  <div
+                    className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl mx-auto mb-3 flex items-center justify-center`}
+                  >
+                    <Icon className="h-6 w-6 text-white" />
                   </div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                    {stat.number}
+                  </div>
+                  <div className="text-sm text-gray-600">{stat.label}</div>
                 </div>
               )
             })}
           </div>
+        </div>
+      </section>
 
-          {/* Feature Preview */}
-          <div className="lg:sticky lg:top-24">
-            <div className="bg-white rounded-xl shadow-xl p-8 border">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">
-                {features[activeFeature].title} - Live Demo
-              </h3>
-              {features[activeFeature].preview}
-              <div className="mt-6 flex items-center justify-between">
-                <span className="text-sm text-gray-500">
-                  Interactive Preview
-                </span>
-                <div className="flex space-x-1">
-                  {features.map((_, index) => (
-                    <div
-                      key={index}
-                      className={`w-2 h-2 rounded-full cursor-pointer ${
-                        activeFeature === index
-                          ? 'bg-indigo-600'
-                          : 'bg-gray-300'
-                      }`}
-                      onClick={() => setActiveFeature(index)}
-                    />
-                  ))}
+      {/* Enhanced Features Section */}
+      <section id="features-section" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center space-x-2 bg-indigo-50 border border-indigo-200 rounded-full px-4 py-2 mb-6">
+              <Zap className="h-4 w-4 text-indigo-600" />
+              <span className="text-sm font-medium text-indigo-800">
+                Powerful Features
+              </span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              Everything you need to create
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                {' '}
+                content that converts
+              </span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Our revolutionary AI platform combines voice recognition, OpenAI
+              Vision analysis, bulk CSV processing with background jobs, and
+              direct Amazon integration to scale your business faster than ever.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-12 items-start">
+            {/* Feature Navigation */}
+            <div className="space-y-6">
+              {features.map((feature, index) => {
+                const Icon = feature.icon
+                return (
+                  <div
+                    key={index}
+                    onClick={() => {
+                      setActiveFeature(index)
+                      setTypingIndex(0)
+                      setContentPreview('')
+                    }}
+                    className={`group p-6 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-lg ${
+                      activeFeature === index
+                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-xl scale-[1.02]'
+                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="flex items-start space-x-4">
+                      <div
+                        className={`p-3 rounded-xl transition-all ${
+                          activeFeature === index
+                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
+                            : 'bg-gray-100 text-gray-600 group-hover:bg-indigo-100 group-hover:text-indigo-600'
+                        }`}
+                      >
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">
+                          {feature.title}
+                        </h3>
+                        <p className="text-gray-600 mb-4 leading-relaxed">
+                          {feature.description}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                            <p className="text-sm text-green-800 font-semibold">
+                              {feature.benefit}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-indigo-600">
+                              {feature.stats}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight
+                        className={`h-5 w-5 transition-all ${
+                          activeFeature === index
+                            ? 'text-indigo-600 rotate-90'
+                            : 'text-gray-400'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Feature Demo */}
+            <div className="lg:sticky lg:top-24">
+              <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-2xl p-8 border border-gray-200">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {features[activeFeature].title} - Live Demo
+                  </h3>
+                  <div className="flex space-x-1">
+                    {features.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setActiveFeature(index)}
+                        className={`w-3 h-3 rounded-full cursor-pointer transition-all ${
+                          activeFeature === index
+                            ? 'bg-indigo-600'
+                            : 'bg-gray-300 hover:bg-gray-400'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="min-h-[200px]">
+                  {features[activeFeature].demo}
                 </div>
               </div>
             </div>
@@ -535,185 +892,120 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Platform Support */}
-      <section className="bg-white py-20">
+      {/* Enhanced Testimonials Section */}
+      <section
+        id="testimonials-section"
+        className="py-24 bg-gradient-to-br from-gray-50 to-indigo-50"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Perfectly Optimized for Every Major Platform
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center space-x-2 bg-green-50 border border-green-200 rounded-full px-4 py-2 mb-6">
+              <Star className="h-4 w-4 text-yellow-500 fill-current" />
+              <span className="text-sm font-medium text-green-800">
+                4.9/5 from 2,500+ reviews
+              </span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              Real results from
+              <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                {' '}
+                real entrepreneurs
+              </span>
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Listora AI understands the unique requirements of each e-commerce
-              platform and automatically creates content and images that meet
-              their specific guidelines and best practices.
+              See how businesses of all sizes are using Listora AI to create
+              better content faster and achieve remarkable growth.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-            {[
-              {
-                name: 'Amazon',
-                icon: '🛒',
-                size: '1000×1000',
-                color: 'from-orange-300 to-orange-400',
-                description: 'Marketplace leader',
-              },
-              {
-                name: 'Shopify',
-                icon: '🏪',
-                size: '1024×1024',
-                color: 'from-green-300 to-green-400',
-                description: 'E-commerce platform',
-              },
-              {
-                name: 'Etsy',
-                icon: '🎨',
-                size: '2000×2000',
-                color: 'from-yellow-300 to-orange-300',
-                description: 'Creative marketplace',
-              },
-              {
-                name: 'eBay',
-                icon: '💰',
-                size: '1600×1600',
-                color: 'from-blue-300 to-blue-400',
-                description: 'Auction & shopping',
-              },
-              {
-                name: 'Instagram',
-                icon: '📱',
-                size: '1080×1080',
-                color: 'from-purple-300 to-pink-300',
-                description: 'Social commerce',
-              },
-            ].map((platform, index) => (
-              <div key={index} className="group">
-                <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all p-6 text-center border hover:border-indigo-200 group-hover:scale-105 cursor-pointer">
-                  <div
-                    className={`w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r ${platform.color} flex items-center justify-center text-2xl transform group-hover:rotate-12 transition-transform`}
-                  >
-                    {platform.icon}
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {platform.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    {platform.description}
-                  </p>
-                  <div className="text-xs bg-gray-100 rounded-full px-3 py-1 inline-block mb-2">
-                    {platform.size}
-                  </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-xs text-green-600 font-semibold">
-                      ✓ Perfectly Optimized
-                    </span>
-                  </div>
+          {/* Featured Testimonial */}
+          <div className="mb-16">
+            <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 border border-gray-200 max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center space-x-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className="h-6 w-6 text-yellow-400 fill-current"
+                    />
+                  ))}
+                </div>
+                <div className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-semibold">
+                  {testimonials[currentTestimonial].results}
                 </div>
               </div>
+
+              <blockquote className="text-xl md:text-2xl text-gray-800 leading-relaxed mb-8 italic">
+                "{testimonials[currentTestimonial].content}"
+              </blockquote>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div
+                    className={`w-16 h-16 bg-gradient-to-r ${testimonials[currentTestimonial].color} rounded-full flex items-center justify-center text-white font-bold text-lg`}
+                  >
+                    {testimonials[currentTestimonial].avatar}
+                  </div>
+                  <div>
+                    <div className="font-bold text-gray-900 text-lg">
+                      {testimonials[currentTestimonial].name}
+                    </div>
+                    <div className="text-indigo-600 font-medium">
+                      {testimonials[currentTestimonial].role}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {testimonials[currentTestimonial].company}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-indigo-600 mb-1">
+                    {testimonials[currentTestimonial].metric}
+                  </div>
+                  <div className="text-sm text-gray-500">improvement</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Testimonial Navigation */}
+          <div className="flex justify-center space-x-2">
+            {testimonials.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentTestimonial(index)}
+                className={`w-3 h-3 rounded-full transition-all ${
+                  currentTestimonial === index
+                    ? 'bg-indigo-600 w-8'
+                    : 'bg-gray-300 hover:bg-gray-400'
+                }`}
+              />
             ))}
           </div>
         </div>
       </section>
 
-      {/* Technology Section */}
-      <section className="bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 py-20 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">
-              Powered by Advanced AI Technology
-            </h2>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Behind Listora AI's simple interface lies sophisticated artificial
-              intelligence technology that understands context, optimizes for
-              conversions, and delivers consistent, high-quality results.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              {
-                icon: Zap,
-                title: 'Lightning Fast Processing',
-                metric: '2.1s',
-                description: 'Average content generation time',
-                progress: 95,
-              },
-              {
-                icon: Shield,
-                title: 'Enterprise Security',
-                metric: 'SOC 2',
-                description: 'Type II certified infrastructure',
-                progress: 100,
-              },
-              {
-                icon: BarChart3,
-                title: 'AI Accuracy Rate',
-                metric: '99.2%',
-                description: 'Content quality satisfaction',
-                progress: 99,
-              },
-              {
-                icon: Globe,
-                title: 'Global Infrastructure',
-                metric: '150+',
-                description: 'Edge locations worldwide',
-                progress: 87,
-              },
-            ].map((item, index) => {
-              const Icon = item.icon
-              return (
-                <div
-                  key={index}
-                  className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all cursor-pointer"
-                >
-                  <Icon className="h-8 w-8 text-indigo-400 mb-4" />
-                  <div className="text-2xl font-bold text-white mb-1">
-                    {item.metric}
-                  </div>
-                  <div className="text-sm text-gray-300 mb-3">
-                    {item.description}
-                  </div>
-                  <div className="w-full bg-gray-700 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-indigo-400 to-purple-400 h-2 rounded-full transition-all duration-1000"
-                      style={{ width: `${item.progress}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="mt-16 text-center">
-            <div className="flex justify-center space-x-8 text-gray-400">
-              <div className="flex items-center space-x-2">
-                <Award className="h-5 w-5" />
-                <span>GDPR Compliant</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Shield className="h-5 w-5" />
-                <span>ISO 27001 Certified</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Target className="h-5 w-5" />
-                <span>99.9% Uptime SLA</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing-section" className="py-20 bg-gray-50">
+      {/* Enhanced Pricing Section */}
+      <section id="pricing-section" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Choose the Perfect Plan for Your Business Growth
+          <div className="text-center mb-20">
+            <div className="inline-flex items-center space-x-2 bg-purple-50 border border-purple-200 rounded-full px-4 py-2 mb-6">
+              <DollarSign className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium text-purple-800">
+                Simple, Transparent Pricing
+              </span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              Choose the perfect plan for your
+              <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                {' '}
+                business growth
+              </span>
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Start with our generous free plan and scale as your business
-              grows. All plans include our complete feature set with
-              enterprise-grade security.
+              grows. All plans include enterprise-grade security and our
+              complete feature set.
             </p>
           </div>
 
@@ -724,14 +1016,14 @@ export default function HomePage() {
                 price: 'Free',
                 period: 'forever',
                 description: 'Perfect for testing our platform',
-                limit: '10 content generations per month',
+                limit: '10 content generations/month',
                 features: [
                   'AI content generation from text',
                   'Single image upload and processing',
                   'Platform-specific content formats',
                   'Email support',
                   'Access to all content templates',
-                  'Export to text/copy formats',
+                  'Basic CSV upload (up to 10 products)',
                 ],
                 cta: '🚀 Start Free',
                 popular: false,
@@ -742,38 +1034,42 @@ export default function HomePage() {
                 price: '$29',
                 period: 'per month',
                 description: 'For growing entrepreneurs',
-                limit: '250 content generations per month',
+                limit: '250 content generations/month',
                 badge: 'Most Popular',
                 features: [
                   'Everything in Starter',
                   'Voice-to-content generation',
+                  'OpenAI Vision image analysis',
                   'Bulk CSV upload (up to 50 products)',
+                  'Background processing jobs',
                   'Advanced image optimization',
-                  'Multiple platform formats',
                   'Priority email support',
                 ],
                 cta: '🎯 Start Free Trial',
                 popular: true,
-                color: 'border-indigo-500 bg-indigo-50',
+                color:
+                  'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50',
               },
               {
                 name: 'Premium',
                 price: '$79',
                 period: 'per month',
                 description: 'For scaling businesses',
-                limit: '1000 content generations per month',
-                badge: 'Best Value',
+                limit: '1000 content generations/month',
                 features: [
                   'Everything in Business',
                   'Bulk CSV upload (up to 200 products)',
+                  'Advanced background processing',
                   'Bulk content generation',
                   'Advanced content customization',
                   'Enhanced voice processing',
                   'Batch export capabilities',
+                  'Direct Amazon publishing',
                 ],
                 cta: '💎 Start Free Trial',
                 popular: false,
-                color: 'border-purple-500 bg-purple-50',
+                color:
+                  'border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50',
               },
               {
                 name: 'Enterprise',
@@ -784,190 +1080,180 @@ export default function HomePage() {
                 features: [
                   'Everything in Premium',
                   'Bulk CSV upload (up to 1000 products)',
-                  'Mass content generation',
+                  'Mass background processing',
+                  'Priority processing queues',
+                  'Advanced bulk operations',
                   'Priority phone support',
                   'Custom content templates',
-                  'Advanced batch processing',
+                  'Dedicated account manager',
                 ],
                 cta: '🚀 Start Free Trial',
                 popular: false,
-                color: 'border-gray-300 bg-gray-50',
+                color:
+                  'border-gray-300 bg-gradient-to-br from-gray-50 to-slate-50',
               },
             ].map((plan, index) => (
               <div
                 key={index}
-                className={`rounded-xl border-2 p-8 relative ${plan.color} ${
-                  plan.popular ? 'scale-105 shadow-xl' : 'shadow-lg'
-                } hover:shadow-xl transition-all`}
+                className={`rounded-2xl border-2 p-8 relative transition-all hover:shadow-xl ${plan.color} ${
+                  plan.popular
+                    ? 'scale-105 shadow-2xl'
+                    : 'shadow-lg hover:scale-102'
+                }`}
               >
                 {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
                       {plan.badge}
                     </span>
                   </div>
                 )}
 
-                <div className="text-center mb-6">
+                <div className="text-center mb-8">
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
                     {plan.name}
                   </h3>
-                  <div className="mb-2">
-                    <span className="text-3xl font-bold text-gray-900">
+                  <div className="mb-4">
+                    <span className="text-4xl font-bold text-gray-900">
                       {plan.price}
                     </span>
                     {plan.period && (
                       <span className="text-gray-600 ml-1">/{plan.period}</span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-600 mb-1">
-                    {plan.description}
-                  </p>
+                  <p className="text-gray-600 mb-2">{plan.description}</p>
                   <p className="text-sm font-semibold text-indigo-600">
                     {plan.limit}
                   </p>
                 </div>
 
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-4 mb-8">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start space-x-3">
                       <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-gray-600">{feature}</span>
+                      <span className="text-gray-700">{feature}</span>
                     </li>
                   ))}
                 </ul>
 
                 <button
                   onClick={handleSignup}
-                  className={`w-full py-3 px-4 rounded-lg font-semibold transition-all cursor-pointer ${
+                  className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all cursor-pointer ${
                     plan.popular
                       ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-                      : 'bg-gray-900 hover:bg-gray-800 text-white'
+                      : 'bg-gray-900 hover:bg-gray-800 text-white hover:shadow-lg'
                   }`}
                 >
                   {plan.cta}
                 </button>
 
-                <div className="mt-4 text-center text-xs text-gray-500">
+                <div className="mt-6 text-center text-sm text-gray-500">
                   ✓ 14-day free trial • ✓ No setup fees • ✓ Cancel anytime
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* Testimonials */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Real Results from Real Entrepreneurs
-            </h2>
-            <p className="text-xl text-gray-600">
-              See how Listora AI is helping businesses of all sizes create
-              better content faster and achieve remarkable results.
+          <div className="mt-16 text-center">
+            <p className="text-gray-600 mb-6">
+              Need a custom solution for your enterprise?
             </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-xl shadow-lg p-6 border hover:shadow-xl transition-all cursor-pointer"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className="h-5 w-5 text-yellow-400 fill-current"
-                      />
-                    ))}
-                  </div>
-                  <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
-                    {testimonial.revenue}
-                  </div>
-                </div>
-                <p className="text-gray-600 mb-4 italic leading-relaxed">
-                  "{testimonial.content}"
-                </p>
-                <div className="flex items-center">
-                  <div
-                    className={`w-10 h-10 bg-gradient-to-r ${testimonial.color} rounded-full flex items-center justify-center text-white font-bold text-sm mr-3`}
-                  >
-                    {testimonial.avatar}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">
-                      {testimonial.name}
-                    </div>
-                    <div className="text-sm text-indigo-600">
-                      {testimonial.role}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+            <button
+              onClick={handleContact}
+              className="inline-flex items-center space-x-2 text-indigo-600 hover:text-indigo-700 font-semibold"
+            >
+              <MessageCircle className="h-5 w-5" />
+              <span>Contact our sales team</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="bg-gradient-to-r from-indigo-600 to-purple-600 py-20">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-white mb-4">
-            Ready to 10X Your Content Creation Speed?
+      {/* Enhanced Final CTA */}
+      <section className="relative py-24 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600" />
+        <div className="absolute inset-0 bg-black/20" />
+
+        <div className="relative max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+            Ready to 10X your content creation speed?
           </h2>
-          <p className="text-xl text-indigo-100 mb-8">
+          <p className="text-xl text-indigo-100 mb-12 max-w-3xl mx-auto">
             Join thousands of entrepreneurs who have already discovered the
             power of voice-driven content creation. Start your free trial today
             and transform your business forever.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
             <button
               onClick={handleSignup}
-              className="bg-white hover:bg-gray-100 text-indigo-600 px-8 py-4 rounded-lg text-lg font-semibold transition-all transform hover:scale-105 shadow-xl cursor-pointer"
+              className="group bg-white hover:bg-gray-100 text-indigo-600 px-8 py-4 rounded-xl text-lg font-bold transition-all transform hover:scale-105 shadow-2xl flex items-center cursor-pointer"
             >
-              🎤 Start Your Free Trial
+              <Mic className="mr-2 h-5 w-5 group-hover:animate-pulse" />
+              Start Your Free Trial
+              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
               onClick={handleContact}
-              className="border-2 border-white hover:bg-white hover:text-indigo-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-all cursor-pointer"
+              className="border-2 border-white hover:bg-white hover:text-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all flex items-center cursor-pointer"
             >
-              📞 Contact Us
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Contact Our Team
             </button>
           </div>
-          <div className="mt-4 text-indigo-100 text-sm">
-            ✓ No credit card required • ✓ 14-day free trial • ✓ Setup in under
-            60 seconds
+
+          <div className="flex flex-wrap justify-center items-center gap-8 text-indigo-100">
+            <div className="flex items-center space-x-2">
+              <Check className="h-5 w-5 text-green-400" />
+              <span>No credit card required</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Check className="h-5 w-5 text-green-400" />
+              <span>14-day free trial</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Check className="h-5 w-5 text-green-400" />
+              <span>Setup in under 60 seconds</span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Footer - UPDATED WITH NEW LOGO */}
-      <footer className="bg-gray-900 text-white py-12">
+      {/* Enhanced Footer */}
+      <footer className="bg-gray-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             <div>
-              <div className="flex items-center space-x-3 mb-4">
+              <div className="flex items-center space-x-3 mb-6">
                 <ListoraAILogo size="md" showText={false} />
                 <span className="text-xl font-bold">Listora AI</span>
               </div>
-              <p className="text-gray-400 text-sm leading-relaxed">
+              <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 Revolutionizing product marketing with advanced AI technology.
                 Transform your voice into professional content and optimize
                 images for every major e-commerce platform.
               </p>
+              <div className="flex space-x-4">
+                <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
+                  <span className="text-sm font-bold">𝕏</span>
+                </button>
+                <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
+                  <span className="text-sm font-bold">in</span>
+                </button>
+                <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
+                  <span className="text-sm">@</span>
+                </button>
+              </div>
             </div>
 
             <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
+              <h3 className="font-bold text-white mb-6">Product</h3>
+              <ul className="space-y-3 text-sm text-gray-400">
                 <li>
                   <button
                     onClick={() => scrollToSection('features-section')}
-                    className="hover:text-white transition-colors cursor-pointer text-left"
+                    className="hover:text-white transition-colors cursor-pointer"
                   >
                     Features
                   </button>
@@ -975,51 +1261,23 @@ export default function HomePage() {
                 <li>
                   <button
                     onClick={() => scrollToSection('pricing-section')}
-                    className="hover:text-white transition-colors cursor-pointer text-left"
+                    className="hover:text-white transition-colors cursor-pointer"
                   >
                     Pricing
                   </button>
                 </li>
                 <li>
-                  <span className="text-gray-500 cursor-not-allowed">
-                    API Documentation
-                  </span>
+                  <span className="text-gray-500">API Documentation</span>
                 </li>
                 <li>
-                  <span className="text-gray-500 cursor-not-allowed">
-                    Platform Integrations
-                  </span>
+                  <span className="text-gray-500">Platform Integrations</span>
                 </li>
               </ul>
             </div>
 
             <div>
-              <h3 className="font-semibold mb-4">Support</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>
-                  <span className="text-gray-500 cursor-not-allowed">
-                    Help Center
-                  </span>
-                </li>
-                <li>
-                  <span className="text-gray-500 cursor-not-allowed">
-                    Getting Started
-                  </span>
-                </li>
-                <li>
-                  <button
-                    onClick={handleContact}
-                    className="hover:text-white transition-colors cursor-pointer text-left"
-                  >
-                    Contact Support
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
+              <h3 className="font-bold text-white mb-6">Company</h3>
+              <ul className="space-y-3 text-sm text-gray-400">
                 <li>
                   <a
                     href="/about"
@@ -1029,12 +1287,35 @@ export default function HomePage() {
                   </a>
                 </li>
                 <li>
-                  <span className="text-gray-500 cursor-not-allowed">Blog</span>
+                  <span className="text-gray-500">Blog</span>
                 </li>
                 <li>
-                  <span className="text-gray-500 cursor-not-allowed">
-                    Careers
-                  </span>
+                  <span className="text-gray-500">Careers</span>
+                </li>
+                <li>
+                  <a
+                    href="/contact"
+                    className="hover:text-white transition-colors cursor-pointer"
+                  >
+                    Contact
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-white mb-6">Support</h3>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li>
+                  <span className="text-gray-500">Help Center</span>
+                </li>
+                <li>
+                  <button
+                    onClick={handleContact}
+                    className="hover:text-white transition-colors cursor-pointer"
+                  >
+                    Contact Support
+                  </button>
                 </li>
                 <li>
                   <a
@@ -1044,18 +1325,62 @@ export default function HomePage() {
                     Privacy Policy
                   </a>
                 </li>
+                <li>
+                  <a
+                    href="/terms"
+                    className="hover:text-white transition-colors cursor-pointer"
+                  >
+                    Terms of Service
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
 
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-            <p>
-              &copy; 2025 Listora AI. All rights reserved. Made with ❤️ for
-              entrepreneurs worldwide.
-            </p>
+          <div className="border-t border-gray-800 pt-8">
+            <div className="flex flex-col md:flex-row justify-between items-center">
+              <p className="text-sm text-gray-400 mb-4 md:mb-0">
+                &copy; 2025 Listora AI. All rights reserved. Made with ❤️ for
+                entrepreneurs worldwide.
+              </p>
+              <div className="flex items-center space-x-6 text-sm text-gray-400">
+                <span>🔒 SOC 2 Certified</span>
+                <span>🛡️ GDPR Compliant</span>
+                <span>⚡ 99.9% Uptime</span>
+              </div>
+            </div>
           </div>
         </div>
       </footer>
+
+      <style jsx>{`
+        @keyframes blob {
+          0% {
+            transform: translate(0px, 0px) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+          100% {
+            transform: translate(0px, 0px) scale(1);
+          }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        .hover\\:scale-102:hover {
+          transform: scale(1.02);
+        }
+      `}</style>
     </div>
   )
 }
