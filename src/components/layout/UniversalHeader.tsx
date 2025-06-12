@@ -1,11 +1,11 @@
-// src/components/layout/UniversalHeader.tsx - UPDATED
+// src/components/layout/UniversalHeader.tsx - UPDATED WITH NEW LOGO
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import AvatarHeader from '@/components/AvatarHeader'
+import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
 interface UniversalHeaderProps {
   user: any
@@ -48,7 +48,7 @@ export default function UniversalHeader({
       path: '/published-products',
       label: 'Published Products',
       cursor: 'cursor-pointer',
-    }, // 🚀 NEW
+    },
     { path: '/pricing', label: 'Pricing', cursor: 'cursor-pointer' },
     ...(isAdmin
       ? [{ path: '/admin', label: 'Admin', cursor: 'cursor-pointer' }]
@@ -76,16 +76,13 @@ export default function UniversalHeader({
       <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo Section - Now Clickable */}
+            {/* Logo Section - Now with Custom Logo */}
             <div className="flex items-center space-x-8">
               <button
                 onClick={handleLogoClick}
-                className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity duration-200"
+                className="cursor-pointer hover:opacity-80 transition-opacity duration-200"
               >
-                <Sparkles className="h-8 w-8 text-indigo-600" />
-                <span className="text-2xl font-bold text-gray-900">
-                  Listora AI
-                </span>
+                <ListoraAILogo size="lg" showText={true} />
               </button>
 
               {/* Desktop Navigation */}

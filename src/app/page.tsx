@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react'
 import {
-  Sparkles,
   Wand2,
   Camera,
   Download,
@@ -26,6 +25,7 @@ import {
   Clock,
   Rocket,
 } from 'lucide-react'
+import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
 export default function HomePage() {
   const [activeFeature, setActiveFeature] = useState(0)
@@ -268,27 +268,12 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Header - FIXED: Added cursor-pointer to all clickable elements */}
+      {/* Header - UPDATED WITH NEW LOGO */}
       <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-lg">
-                  <Sparkles className="h-5 w-5 text-white" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center">
-                  <Wand2 className="h-2 w-2 text-white" />
-                </div>
-              </div>
-              <div>
-                <span className="text-2xl font-bold text-gray-900">
-                  Listora AI
-                </span>
-                <div className="text-xs text-indigo-600 font-medium -mt-1">
-                  Intelligent Content Creation
-                </div>
-              </div>
+            <div className="flex items-center">
+              <ListoraAILogo size="header" showText={true} />
             </div>
 
             <div className="flex items-center space-x-4">
@@ -309,16 +294,15 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero Section - REDUCED TITLE FONT SIZE BY 15% */}
+      {/* Hero Section - UPDATED WITH NEW LOGO */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
         <div className="text-center mb-16">
           <div className="flex justify-center mb-6">
             <div className="bg-indigo-100 rounded-full p-4 animate-bounce">
-              <Sparkles className="h-12 w-12 text-indigo-600" />
+              <ListoraAILogo size="lg" showText={false} />
             </div>
           </div>
 
-          {/* REDUCED: Font size from text-4xl md:text-6xl to text-3xl md:text-5xl (15% reduction) */}
           <h1 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
             Transform Your Voice Into
             <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -329,7 +313,6 @@ export default function HomePage() {
             in Seconds That Actually Sells
           </h1>
 
-          {/* ENHANCED: More compelling value proposition */}
           <p className="text-xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
             <strong>Listora AI</strong> is the world's first voice-to-content
             platform that turns your natural speech into professional marketing
@@ -339,7 +322,6 @@ export default function HomePage() {
             more.
           </p>
 
-          {/* ENHANCED: Added urgency and social proof */}
           <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-6 mb-8 max-w-4xl mx-auto">
             <div className="flex items-center justify-center space-x-8 text-lg flex-wrap gap-4">
               <div className="flex items-center space-x-3">
@@ -371,7 +353,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* ENHANCED: More compelling CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
             <button
               onClick={handleSignup}
@@ -389,7 +370,6 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* ENHANCED: Better social proof */}
           <div className="text-sm text-gray-500 mb-8">
             ✓ Free trial • ✓ No credit card required • ✓ Setup in 60 seconds
             <br />
@@ -398,7 +378,6 @@ export default function HomePage() {
             </span>
           </div>
 
-          {/* ENHANCED: Better feature highlights */}
           <div
             id="features-section"
             className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-16"
@@ -452,7 +431,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Section - ENHANCED */}
+      {/* Features Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
@@ -724,7 +703,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* UPDATED Pricing Section - Removed discount, updated Enterprise */}
+      {/* Pricing Section */}
       <section id="pricing-section" className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -878,7 +857,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ENHANCED Testimonials */}
+      {/* Testimonials */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -934,7 +913,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* UPDATED Final CTA - Changed Schedule Demo to Contact Us */}
+      {/* Final CTA */}
       <section className="bg-gradient-to-r from-indigo-600 to-purple-600 py-20">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-white mb-4">
@@ -966,15 +945,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* UPDATED Footer - Fixed all navigation links */}
+      {/* Footer - UPDATED WITH NEW LOGO */}
       <footer className="bg-gray-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-3 mb-4">
-                <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-lg">
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
+                <ListoraAILogo size="md" showText={false} />
                 <span className="text-xl font-bold">Listora AI</span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed">

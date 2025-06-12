@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import {
-  Sparkles,
   ArrowLeft,
   Eye,
   EyeOff,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
 export default function SignupPage() {
   const [loading, setLoading] = useState(false)
@@ -256,16 +256,13 @@ export default function SignupPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8 text-center">
-          {/* Logo with Home Navigation */}
+          {/* Logo with Home Navigation - UPDATED */}
           <div className="flex items-center justify-center mb-8">
             <Link
               href="/"
-              className="flex items-center hover:opacity-80 transition-opacity cursor-pointer"
+              className="hover:opacity-80 transition-opacity cursor-pointer"
             >
-              <Sparkles className="h-12 w-12 text-gray-600" />
-              <span className="ml-3 text-3xl font-bold text-gray-900">
-                Listora AI
-              </span>
+              <ListoraAILogo size="lg" showText={true} />
             </Link>
           </div>
 
@@ -492,16 +489,13 @@ export default function SignupPage() {
       {/* Right Side - Signup Form */}
       <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm lg:w-96">
-          {/* Logo with Home Navigation */}
+          {/* Logo with Home Navigation - UPDATED */}
           <div className="flex items-center justify-between mb-8">
             <Link
               href="/"
-              className="flex items-center hover:opacity-80 transition-opacity cursor-pointer"
+              className="hover:opacity-80 transition-opacity cursor-pointer"
             >
-              <Sparkles className="h-10 w-10 text-gray-600" />
-              <span className="ml-3 text-3xl font-bold text-gray-900">
-                Listora AI
-              </span>
+              <ListoraAILogo size="md" showText={true} />
             </Link>
             <Link
               href="/"

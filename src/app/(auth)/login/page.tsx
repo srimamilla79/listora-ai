@@ -3,16 +3,9 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import {
-  Sparkles,
-  Eye,
-  EyeOff,
-  CheckCircle,
-  Zap,
-  Crown,
-  Home,
-} from 'lucide-react'
+import { Eye, EyeOff, CheckCircle, Zap, Crown, Home } from 'lucide-react'
 import Link from 'next/link'
+import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
@@ -167,16 +160,13 @@ export default function LoginPage() {
       {/* Left Side - Login Form */}
       <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm lg:w-96">
-          {/* Logo with Home Navigation */}
+          {/* Logo with Home Navigation - UPDATED */}
           <div className="flex items-center justify-between mb-8">
             <Link
               href="/"
-              className="flex items-center hover:opacity-80 transition-opacity cursor-pointer"
+              className="hover:opacity-80 transition-opacity cursor-pointer"
             >
-              <Sparkles className="h-10 w-10 text-slate-600" />
-              <span className="ml-3 text-3xl font-bold text-gray-900">
-                Listora AI
-              </span>
+              <ListoraAILogo size="md" showText={true} />
             </Link>
             <Link
               href="/"

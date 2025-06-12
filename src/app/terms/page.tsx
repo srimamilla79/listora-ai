@@ -1,19 +1,16 @@
 // src/app/terms/page.tsx - Enhanced for Maximum Legal Protection
 import Link from 'next/link'
-import { Sparkles } from 'lucide-react'
+import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header - UPDATED */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center">
-              <Sparkles className="h-8 w-8 text-slate-600" />
-              <span className="ml-3 text-2xl font-bold text-gray-900">
-                Listora AI
-              </span>
+              <ListoraAILogo size="header" showText={true} />
             </Link>
             <nav className="flex space-x-6">
               <Link href="/" className="text-gray-600 hover:text-slate-600">
@@ -732,12 +729,12 @@ export default function TermsOfServicePage() {
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer - UPDATED */}
       <footer className="bg-white border-t border-gray-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <Sparkles className="h-6 w-6 text-slate-600" />
+              <ListoraAILogo size="sm" showText={false} />
               <span className="ml-2 text-lg font-semibold text-gray-900">
                 Listora AI
               </span>

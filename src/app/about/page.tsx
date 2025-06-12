@@ -2,7 +2,6 @@
 
 import React from 'react'
 import {
-  Sparkles,
   Zap,
   Users,
   Target,
@@ -21,6 +20,7 @@ import {
   Linkedin,
   Twitter,
 } from 'lucide-react'
+import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
 export default function AboutUsPage() {
   const stats = [
@@ -59,23 +59,11 @@ export default function AboutUsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header/Navigation */}
+      {/* Header/Navigation - UPDATED */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-lg">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <span className="text-2xl font-bold text-gray-900">
-                  Listora AI
-                </span>
-                <div className="text-xs text-indigo-600 font-medium -mt-1">
-                  Intelligent Content Creation
-                </div>
-              </div>
-            </div>
+            <ListoraAILogo size="header" showText={true} />
             <button
               onClick={() => (window.location.href = '/')}
               className="flex items-center space-x-2 text-gray-600 hover:text-indigo-600 transition-colors font-medium px-4 py-2 rounded-lg hover:bg-gray-100"
@@ -317,15 +305,13 @@ export default function AboutUsPage() {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* Footer - UPDATED */}
       <footer className="bg-gray-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-3 mb-4">
-                <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-lg">
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
+                <ListoraAILogo size="sm" showText={false} />
                 <span className="text-xl font-bold">Listora AI</span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-4">
