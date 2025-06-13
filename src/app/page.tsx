@@ -1337,18 +1337,11 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="border-t border-gray-800 pt-8">
-            <div className="flex flex-col md:flex-row justify-between items-center">
-              <p className="text-sm text-gray-400 mb-4 md:mb-0">
-                &copy; 2025 Listora AI. All rights reserved. Made with ❤️ for
-                entrepreneurs worldwide.
-              </p>
-              <div className="flex items-center space-x-6 text-sm text-gray-400">
-                <span>🔒 SOC 2 Certified</span>
-                <span>🛡️ GDPR Compliant</span>
-                <span>⚡ 99.9% Uptime</span>
-              </div>
-            </div>
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
+            <p>
+              &copy; 2025 Listora AI. All rights reserved. Built with ❤️ for
+              entrepreneurs worldwide.
+            </p>
           </div>
         </div>
       </footer>

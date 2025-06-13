@@ -271,13 +271,18 @@ export default function ProductForm({
   }
 
   // Notification functions
+  // Replace your addNotification function with this fixed version:
+
   const addNotification = (
     message: string,
     type: 'success' | 'error' | 'info' = 'success'
   ) => {
-    const id = Date.now().toString()
+    // 🔧 FIX: Generate unique ID using timestamp + random number
+    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     const notification = { id, message, type }
+
     setNotifications((prev) => [...prev, notification])
+
     setTimeout(() => {
       setNotifications((prev) => prev.filter((n) => n.id !== id))
     }, 5000)
@@ -693,15 +698,17 @@ export default function ProductForm({
     return resizedCanvas.toDataURL('image/jpeg', 0.9)
   }
 
+  // Replace your storeImagesToSupabase function with this no-refresh version:
+
+  // Replace your storeImagesToSupabase function with this:
+
   const storeImagesToSupabase = async (contentId?: string) => {
+    console.log('💾 Starting automatic image storage...')
+
     const productContentId = contentId || lastGeneratedContentId
 
-    if (
-      !user ||
-      processedImages.length === 0 ||
-      !productName.trim() ||
-      !supabase
-    ) {
+    if (!user || processedImages.length === 0 || !productName.trim()) {
+      console.log('❌ Pre-check failed')
       return
     }
 
@@ -714,15 +721,10 @@ export default function ProductForm({
     }
 
     setStoringImages(true)
+    const startTime = Date.now()
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session?.access_token) {
-        throw new Error('No access token found')
-      }
+      console.log('🔄 Preparing image data for automatic save...')
 
       const originalImages = processedImages.map((img) => img.originalPreview)
       const processedImagesData = {
@@ -738,26 +740,50 @@ export default function ProductForm({
           .filter(Boolean),
       }
 
-      const response = await fetch('/api/store-images', {
+      console.log(
+        '🚀 Making API call with cookie authentication (no session call)...'
+      )
+
+      // 🔧 KEY FIX: Use cookie auth exactly like /api/generate does
+      // No Authorization header, no getSession() call
+      const response = await fetch('/api/store-images-auto', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          // No Authorization header
         },
+        credentials: 'include', // Use cookies like /api/generate
         body: JSON.stringify({
           productName,
           originalImages,
           processedImages: processedImagesData,
-          productContentId: productContentId,
+          productContentId,
         }),
       })
 
+      console.log('📊 API response status:', response.status)
+
       if (!response.ok) {
-        throw new Error('Failed to store images')
+        const errorData = await response.json()
+        console.log('❌ API error:', errorData)
+
+        if (response.status === 404) {
+          // Fallback to original API endpoint
+          console.log('🔄 Falling back to manual save approach...')
+          throw new Error(
+            'Automatic save not available - use manual save button'
+          )
+        }
+
+        throw new Error(errorData.error || 'Failed to store images')
       }
 
       const result = await response.json()
+      const duration = Math.round((Date.now() - startTime) / 1000)
 
+      console.log('✅ Images stored automatically in', duration, 'seconds')
+
+      // Update UI state
       setProcessedImages((prev) =>
         prev.map((img, index) => ({
           ...img,
@@ -775,17 +801,22 @@ export default function ProductForm({
       )
 
       addNotification(
-        'Images saved successfully! You can now access them anytime from your dashboard.',
+        `✅ Images saved automatically in ${duration}s!`,
         'success'
       )
     } catch (error) {
-      console.error('Error storing images:', error)
-      addNotification('Failed to save images. Please try again.', 'error')
+      const duration = Math.round((Date.now() - startTime) / 1000)
+      console.error('❌ Automatic storage failed:', error)
+
+      // Show manual save option instead of failing completely
+      addNotification(
+        '🎉 Content generated successfully! Click "Save Images" button to store your images.',
+        'success'
+      )
     } finally {
       setStoringImages(false)
     }
   }
-
   const processImage = async (file: File, index: number) => {
     setProcessedImages((prev) =>
       prev.map((img, i) =>
@@ -957,31 +988,68 @@ export default function ProductForm({
       const imageUrl =
         imageToAnalyze.processedPreview || imageToAnalyze.originalPreview
 
-      console.log('🖼️ Analyzing image with AI vision...', {
+      console.log('🖼️ Converting image to base64 for AI analysis...', {
         imageType: imageToAnalyze.processedPreview ? 'processed' : 'original',
-        imageUrl: imageUrl.substring(0, 50) + '...',
       })
 
-      const response = await fetch('/api/analyze-image', {
+      // Convert blob URL to base64 on CLIENT SIDE
+      let imageBase64 = ''
+
+      if (imageUrl.startsWith('blob:')) {
+        try {
+          console.log('🔄 Converting blob URL to base64...')
+
+          // Fetch the blob and convert to base64
+          const response = await fetch(imageUrl)
+          const blob = await response.blob()
+
+          // Convert blob to base64
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              if (typeof reader.result === 'string') {
+                resolve(reader.result)
+              } else {
+                reject(new Error('Failed to convert blob to base64'))
+              }
+            }
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+
+          imageBase64 = base64
+          console.log('✅ Blob converted to base64 successfully')
+        } catch (conversionError) {
+          console.error('❌ Blob conversion failed:', conversionError)
+          throw new Error('Image conversion failed')
+        }
+      } else if (imageUrl.startsWith('data:')) {
+        // Already base64
+        imageBase64 = imageUrl
+      } else {
+        throw new Error('Unsupported image format')
+      }
+
+      const apiResponse = await fetch('/api/analyze-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          imageUrl: imageUrl,
+          imageData: imageBase64, // Send base64 data instead of blob URL
           imageCount: images.length,
           hasProcessedImages: images.some((img) => img.processed),
           productName: productName || undefined,
         }),
       })
 
-      if (!response.ok) {
+      if (!apiResponse.ok) {
         console.log('⚠️ Image analysis API failed, using basic fallback')
-        throw new Error(`Image analysis failed: ${response.status}`)
+        throw new Error(`Image analysis failed: ${apiResponse.status}`)
       }
 
-      const result = await response.json()
+      const result = await apiResponse.json()
 
       if (result.fallback) {
         console.log('⚠️ Vision analysis used fallback:', result.reason)
@@ -1029,7 +1097,14 @@ export default function ProductForm({
   }
 
   // Handle generate with usage validation
+  // Replace your handleGenerate function with this optimized version
+  // Alternative: Original behavior - wait for image storage to complete
+  // Replace your handleGenerate function with this state-corrected version
   const handleGenerate = async () => {
+    // 🚀 PERFORMANCE: Add timing
+    const startTime = Date.now()
+    console.log('🚀 Starting content generation process...')
+
     // Pre-validation checks
     if (!productName.trim() || !features.trim()) {
       addNotification('Please fill in both product name and features', 'error')
@@ -1088,10 +1163,33 @@ export default function ProductForm({
         throw new Error('No access token found')
       }
 
+      // 🚀 OPTIMIZED: Get image analysis first (if needed)
       let imageAnalysis = ''
       if (processedImages.length > 0) {
-        imageAnalysis = await analyzeImagesWithAI(processedImages)
+        console.log('🖼️ Starting image analysis...')
+        const imageStart = Date.now()
+
+        try {
+          imageAnalysis = await analyzeImagesWithAI(processedImages)
+          const imageTime = Date.now() - imageStart
+          console.log(
+            `✅ Image analysis completed in ${Math.round(imageTime / 1000)}s`
+          )
+        } catch (imageError) {
+          console.error(
+            '⚠️ Image analysis failed, continuing without:',
+            imageError
+          )
+          addNotification(
+            'Image analysis failed, generating content without image insights',
+            'info'
+          )
+        }
       }
+
+      // 🚀 OPTIMIZED: Generate content with enhanced error handling
+      console.log('📝 Starting content generation...')
+      const generationStart = Date.now()
 
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -1113,12 +1211,22 @@ export default function ProductForm({
         }),
       })
 
+      const generationTime = Date.now() - generationStart
+      console.log(
+        `✅ Content generation completed in ${Math.round(generationTime / 1000)}s`
+      )
+
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || `HTTP error! status: ${response.status}`)
       }
 
       const data = await response.json()
+
+      // 🚀 PERFORMANCE: Log API performance if available
+      if (data.performance) {
+        console.log('📊 API Performance Breakdown:', data.performance)
+      }
 
       if (!isVoiceContentAvailable) {
         setGeneratedContent(data.result || 'Content generated successfully!')
@@ -1153,24 +1261,48 @@ export default function ProductForm({
         }
       }
 
+      // 🔧 FIXED: Use the existing storeImagesToSupabase function properly
+      // 🔧 COMPATIBLE: Simple direct call to server-side auth function
       if (
         processedImages.length > 0 &&
         !processedImages.some((img) => img.isStored) &&
         data.contentId
       ) {
-        setTimeout(() => {
-          storeImagesToSupabase(data.contentId)
-        }, 1000)
+        console.log('💾 Starting image storage after content generation...')
+
+        try {
+          await storeImagesToSupabase(data.contentId)
+          console.log('✅ Image storage completed successfully')
+        } catch (storageError) {
+          console.error('❌ Image storage failed:', storageError)
+          addNotification(
+            `Content saved successfully! Image storage failed: ${
+              storageError instanceof Error
+                ? storageError.message
+                : 'Unknown error'
+            }. You can try saving images again later.`,
+            'error'
+          )
+        }
       }
+
+      const totalTime = Date.now() - startTime
+      console.log(
+        `🎉 Total process completed in ${Math.round(totalTime / 1000)}s`
+      )
 
       addNotification(
         isVoiceContentAvailable
           ? '🎤 Voice content enhanced and saved to dashboard!'
-          : '🎉 Content generated successfully and saved to dashboard!',
+          : `🎉 Content generated successfully in ${Math.round(totalTime / 1000)}s and saved to dashboard!`,
         'success'
       )
     } catch (error) {
-      console.error('Error generating content:', error)
+      const errorTime = Date.now() - startTime
+      console.error(
+        `❌ Error generating content after ${Math.round(errorTime / 1000)}s:`,
+        error
+      )
       addNotification(
         `Error: ${
           error instanceof Error ? error.message : 'Failed to generate content'
@@ -1178,6 +1310,8 @@ export default function ProductForm({
         'error'
       )
     } finally {
+      // 🔧 CRITICAL: Always clear loading state
+      console.log('🔄 Clearing loading state...')
       setLoading(false)
     }
   }

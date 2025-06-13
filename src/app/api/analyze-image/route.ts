@@ -86,66 +86,36 @@ export async function POST(req: NextRequest) {
     console.log('1. Authenticated user:', authenticatedUser.id)
 
     // Get request data
-    const { imageUrl, imageCount, hasProcessedImages, productName } =
+    const { imageData, imageCount, hasProcessedImages, productName } =
       await req.json()
 
     console.log('2. Request data:', {
       imageCount,
       hasProcessedImages,
       productName: productName || 'not provided',
-      imageUrlLength: imageUrl?.length || 0,
+      hasImageData: !!imageData,
     })
 
-    if (!imageUrl) {
+    if (!imageData) {
       return NextResponse.json(
-        { error: 'No image URL provided' },
+        { error: 'No image data provided' },
         { status: 400 }
       )
     }
 
-    console.log('3. Starting OpenAI vision analysis...')
-
-    // Convert blob URL to base64 if needed
-    let imageDataUrl = imageUrl
-
-    if (imageUrl.startsWith('blob:')) {
-      console.log('4. Converting blob URL to base64...')
-
-      // For blob URLs, we need to fetch and convert
-      try {
-        const response = await fetch(imageUrl)
-        const arrayBuffer = await response.arrayBuffer()
-        const base64 = Buffer.from(arrayBuffer).toString('base64')
-
-        // Detect image type from the first few bytes
-        const uint8Array = new Uint8Array(arrayBuffer.slice(0, 4))
-        let mimeType = 'image/jpeg' // default
-
-        if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50) {
-          mimeType = 'image/png'
-        } else if (uint8Array[0] === 0xff && uint8Array[1] === 0xd8) {
-          mimeType = 'image/jpeg'
-        } else if (uint8Array[0] === 0x47 && uint8Array[1] === 0x49) {
-          mimeType = 'image/gif'
-        }
-
-        imageDataUrl = `data:${mimeType};base64,${base64}`
-        console.log('5. Blob converted successfully, mime type:', mimeType)
-      } catch (conversionError) {
-        console.error('6. Blob conversion failed:', conversionError)
-
-        // Fallback to basic analysis
-        return NextResponse.json({
-          analysis: `${imageCount} high-quality product images${
-            hasProcessedImages ? ' with professional background removal' : ''
-          } showcase the product's key features and visual appeal.`,
-          fallback: true,
-          reason: 'Image conversion failed',
-        })
-      }
+    // Validate base64 format
+    if (!imageData.startsWith('data:image/')) {
+      console.log('3. Invalid image format')
+      return NextResponse.json({
+        analysis: `${imageCount} high-quality product images${
+          hasProcessedImages ? ' with professional background removal' : ''
+        } showcase the product's key features and visual appeal.`,
+        fallback: true,
+        reason: 'Invalid image format',
+      })
     }
 
-    console.log('6. Calling OpenAI Vision API...')
+    console.log('3. Starting OpenAI vision analysis...')
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -173,7 +143,7 @@ Keep response focused and under 250 words. This will be used to enhance product 
             {
               type: 'image_url',
               image_url: {
-                url: imageDataUrl,
+                url: imageData,
               },
             },
           ],
@@ -185,7 +155,7 @@ Keep response focused and under 250 words. This will be used to enhance product 
 
     const visionAnalysis =
       completion.choices[0]?.message?.content || 'Visual analysis unavailable'
-    console.log('7. Vision analysis completed successfully')
+    console.log('4. Vision analysis completed successfully')
 
     // Enhanced analysis combining vision with metadata
     const enhancedAnalysis = `${visionAnalysis}
@@ -196,7 +166,7 @@ TECHNICAL SPECS: ${imageCount} high-quality product image${imageCount > 1 ? 's' 
         : ''
     }. Visual content showcases product features and details suitable for professional e-commerce listings.`
 
-    console.log('8. Enhanced analysis prepared')
+    console.log('5. Enhanced analysis prepared')
 
     return NextResponse.json({
       analysis: enhancedAnalysis,
@@ -237,7 +207,11 @@ export async function GET() {
   return NextResponse.json({
     status: 'ready',
     service: 'Image Analysis API',
-    capabilities: ['OpenAI Vision', 'Blob URL processing', 'Graceful fallback'],
+    capabilities: [
+      'OpenAI Vision',
+      'Base64 image processing',
+      'Graceful fallback',
+    ],
     timestamp: new Date().toISOString(),
   })
 }

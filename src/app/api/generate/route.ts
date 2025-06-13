@@ -4,13 +4,26 @@ import { cookies } from 'next/headers'
 import { getServerStripe } from '@/lib/supabase'
 import OpenAI from 'openai'
 
+// 🚀 OPTIMIZED: Enhanced OpenAI configuration for better performance
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 30000, // 30 second timeout instead of default 60s
+  maxRetries: 1, // Reduce retries from 3 to 1 for speed
 })
 
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
 export async function POST(req: NextRequest) {
+  // 🚀 PERFORMANCE TRACKING: Monitor where time is spent
+  const startTime = Date.now()
+  const performanceLog = {
+    auth: 0,
+    usageCheck: 0,
+    generation: 0,
+    dbSave: 0,
+    total: 0,
+  }
+
   console.log('=== GENERATE API START ===')
 
   try {
@@ -38,21 +51,22 @@ export async function POST(req: NextRequest) {
       hasProcessedImages,
       hasVoiceInput: !!voiceTranscription,
       hasExistingContent: !!existingContent,
-      isBackgroundJob: !!isBackgroundJob, // NEW logging
-      backgroundUserId: backgroundUserId || 'none', // NEW logging
+      isBackgroundJob: !!isBackgroundJob,
+      backgroundUserId: backgroundUserId || 'none',
     })
 
     let authenticatedUser
 
-    // 🚀 NEW: Handle background job authentication differently
+    // 🚀 OPTIMIZED: Faster authentication with performance tracking
+    const authStart = Date.now()
+
+    // Handle background job authentication differently
     if (isBackgroundJob && backgroundUserId) {
       console.log('2. Background job detected, using service role auth')
-
-      // For background jobs, we trust the userId passed from the background processor
       authenticatedUser = { id: backgroundUserId, email: 'background@job' }
       console.log('3. Background job user:', authenticatedUser.id)
     } else {
-      // Standard user authentication flow (existing code)
+      // Standard user authentication flow
       const cookieStore = await cookies()
       console.log('2. Getting cookies...')
 
@@ -139,7 +153,7 @@ export async function POST(req: NextRequest) {
       authenticatedUser.email
     )
 
-    // 🚀 NEW: Admin bypass check - Check if user is admin/owner first
+    // 🚀 OPTIMIZED: Admin check with performance tracking
     const serviceSupabase = createServiceRoleClient()
     const { data: isAdmin, error: adminError } = await serviceSupabase.rpc(
       'is_admin',
@@ -148,13 +162,18 @@ export async function POST(req: NextRequest) {
       }
     )
 
+    performanceLog.auth = Date.now() - authStart
+    console.log(`⚡ Auth completed in ${performanceLog.auth}ms`)
+
     if (isAdmin) {
       console.log('6. 👑 ADMIN/OWNER DETECTED - Bypassing all usage limits')
 
       // Skip usage tracking for admins, go directly to content generation
       console.log('7. Admin privilege: Unlimited generations enabled')
 
-      // Enhanced prompt creation with voice integration
+      // 🚀 OPTIMIZED: Faster content generation for admins
+      const generationStart = Date.now()
+
       const prompt = createPrompt(
         productName,
         features,
@@ -166,7 +185,6 @@ export async function POST(req: NextRequest) {
         existingContent
       )
 
-      // Determine if this is voice enhancement or new generation
       const isVoiceEnhancement = !!existingContent && !!voiceTranscription
       console.log(
         '8. Generating content with OpenAI... (ADMIN MODE)',
@@ -174,31 +192,38 @@ export async function POST(req: NextRequest) {
         isBackgroundJob ? '[BACKGROUND JOB]' : '[FOREGROUND JOB]'
       )
 
+      // 🚀 OPTIMIZED: Faster generation settings
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
             content: isVoiceEnhancement
-              ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. You take existing content generated from voice input and refine it for professional use while preserving the original intent and key details. You understand both text descriptions and image analysis to create compelling product content.'
-              : 'You are an expert copywriter specializing in e-commerce content optimization for different platforms. You analyze both text descriptions and image analysis to create compelling product content. You understand when images have been professionally processed with background removal for enhanced presentation.',
+              ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. Create compelling, conversion-focused content efficiently.'
+              : 'You are an expert copywriter specializing in e-commerce content optimization. Create compelling, conversion-focused content efficiently.',
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        max_tokens: 1200,
+        max_tokens: isVoiceEnhancement ? 1000 : 1200, // Slightly reduced for speed
         temperature: isVoiceEnhancement ? 0.6 : 0.7,
+        stream: false, // Ensure no streaming for consistent timing
       })
+
+      performanceLog.generation = Date.now() - generationStart
+      console.log(`⚡ Generation completed in ${performanceLog.generation}ms`)
 
       const generatedContent =
         completion.choices[0]?.message?.content ||
         'Content generated successfully!'
       console.log('9. Content generated successfully (ADMIN MODE)')
 
-      // Enhanced database save with voice metadata (Admin mode)
-      const { data: savedContent, error: saveError } = await serviceSupabase
+      // 🚀 OPTIMIZED: Smart database handling for admins
+      const dbStart = Date.now()
+
+      const dbSavePromise = serviceSupabase
         .from('product_contents')
         .insert({
           user_id: authenticatedUser.id,
@@ -217,55 +242,123 @@ export async function POST(req: NextRequest) {
         .select()
         .single()
 
-      if (saveError) {
-        console.log('10. Warning: Failed to save content:', saveError)
-      } else {
-        console.log('10. Content saved to database (ADMIN MODE)')
-      }
+      // For background jobs, wait for DB save. For real-time, optionally save in background
+      if (isBackgroundJob) {
+        const { data: savedContent, error: saveError } = await dbSavePromise
+        performanceLog.dbSave = Date.now() - dbStart
+        performanceLog.total = Date.now() - startTime
 
-      // Admin response with unlimited status
-      return NextResponse.json({
-        result: generatedContent,
-        contentId: savedContent?.id || null,
-        usage: {
-          used: 'unlimited',
-          limit: 'unlimited',
-          isAdmin: true,
-        },
-        imageInfo: {
-          hasImages,
-          hasProcessedImages,
-          imageAnalysis: imageAnalysis ? 'included' : 'none',
-        },
-        voiceInfo: {
-          hasVoiceInput: !!voiceTranscription,
-          isEnhancement: isVoiceEnhancement,
-          transcriptionLength: voiceTranscription?.length || 0,
-        },
-        jobInfo: {
-          isBackgroundJob: !!isBackgroundJob,
-          processedBy: isBackgroundJob
-            ? 'background-processor'
-            : 'admin-request',
-        },
-        adminInfo: {
-          isAdmin: true,
-          hasUnlimitedAccess: true,
-        },
-      })
+        console.log(
+          `⚡ Performance: Auth:${performanceLog.auth}ms, Gen:${performanceLog.generation}ms, DB:${performanceLog.dbSave}ms, Total:${performanceLog.total}ms`
+        )
+
+        if (saveError) {
+          console.log('10. Warning: Failed to save content:', saveError)
+        } else {
+          console.log('10. Content saved to database (ADMIN MODE)')
+        }
+
+        return NextResponse.json({
+          result: generatedContent,
+          contentId: savedContent?.id || null,
+          usage: {
+            used: 'unlimited',
+            limit: 'unlimited',
+            isAdmin: true,
+          },
+          imageInfo: {
+            hasImages,
+            hasProcessedImages,
+            imageAnalysis: imageAnalysis ? 'included' : 'none',
+          },
+          voiceInfo: {
+            hasVoiceInput: !!voiceTranscription,
+            isEnhancement: isVoiceEnhancement,
+            transcriptionLength: voiceTranscription?.length || 0,
+          },
+          jobInfo: {
+            isBackgroundJob: !!isBackgroundJob,
+            processedBy: 'background-processor',
+          },
+          adminInfo: {
+            isAdmin: true,
+            hasUnlimitedAccess: true,
+          },
+          performance: performanceLog,
+        })
+      } else {
+        // For real-time admin requests, return immediately and save in background
+        dbSavePromise.then(({ data: savedContent, error: saveError }) => {
+          if (saveError) {
+            console.log('10. Background save failed:', saveError)
+          } else {
+            console.log('10. Background save completed for admin')
+          }
+        })
+
+        performanceLog.total = Date.now() - startTime
+        console.log(
+          `⚡ Performance: Auth:${performanceLog.auth}ms, Gen:${performanceLog.generation}ms, Total:${performanceLog.total}ms (DB saving in background)`
+        )
+
+        return NextResponse.json({
+          result: generatedContent,
+          contentId: 'saving', // Indicate DB save is in progress
+          usage: {
+            used: 'unlimited',
+            limit: 'unlimited',
+            isAdmin: true,
+          },
+          imageInfo: {
+            hasImages,
+            hasProcessedImages,
+            imageAnalysis: imageAnalysis ? 'included' : 'none',
+          },
+          voiceInfo: {
+            hasVoiceInput: !!voiceTranscription,
+            isEnhancement: isVoiceEnhancement,
+            transcriptionLength: voiceTranscription?.length || 0,
+          },
+          jobInfo: {
+            isBackgroundJob: !!isBackgroundJob,
+            processedBy: 'admin-request',
+          },
+          adminInfo: {
+            isAdmin: true,
+            hasUnlimitedAccess: true,
+          },
+          performance: performanceLog,
+        })
+      }
     }
 
-    // Regular user flow (existing logic continues here)
+    // 🚀 OPTIMIZED: Parallel usage and plan checks for regular users
+    const usageStart = Date.now()
+
     const currentMonth = new Date().toISOString().slice(0, 7)
     console.log('6. Checking usage for month:', currentMonth)
 
-    // Check current usage using the same table as bulk upload
-    const { data: usage, error: usageError } = await serviceSupabase
-      .from('user_usage_tracking')
-      .select('usage_count')
-      .eq('user_id', authenticatedUser.id)
-      .eq('month_year', currentMonth)
-      .single()
+    // Parallel database queries for better performance
+    const [usageResult, planResult] = await Promise.all([
+      serviceSupabase
+        .from('user_usage_tracking')
+        .select('usage_count')
+        .eq('user_id', authenticatedUser.id)
+        .eq('month_year', currentMonth)
+        .single(),
+      serviceSupabase
+        .from('user_plans')
+        .select('plan_type')
+        .eq('user_id', authenticatedUser.id)
+        .eq('is_active', true)
+        .single(),
+    ])
+
+    performanceLog.usageCheck = Date.now() - usageStart
+    console.log(`⚡ Usage check completed in ${performanceLog.usageCheck}ms`)
+
+    const { data: usage, error: usageError } = usageResult
+    const { data: planData, error: planError } = planResult
 
     if (usageError && usageError.code !== 'PGRST116') {
       console.log('7. Usage check error:', usageError)
@@ -274,14 +367,6 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       )
     }
-
-    // Get user plan for limits
-    const { data: planData, error: planError } = await serviceSupabase
-      .from('user_plans')
-      .select('plan_type')
-      .eq('user_id', authenticatedUser.id)
-      .eq('is_active', true)
-      .single()
 
     const planType = planData?.plan_type || 'starter'
     const planLimits = {
@@ -295,7 +380,7 @@ export async function POST(req: NextRequest) {
     const limit =
       planLimits[planType as keyof typeof planLimits]?.monthlyGenerations || 10
 
-    // 🚀 NEW: For background jobs, we still check limits but don't block (job was already approved)
+    // For background jobs, we still check limits but don't block (job was already approved)
     if (!isBackgroundJob && currentUsage >= limit) {
       console.log('7. Usage limit exceeded:', currentUsage, 'of', limit)
       return NextResponse.json(
@@ -309,7 +394,9 @@ export async function POST(req: NextRequest) {
 
     console.log('7. Usage check passed:', currentUsage, 'of', limit)
 
-    // Enhanced prompt creation with voice integration
+    // 🚀 OPTIMIZED: Faster content generation
+    const generationStart = Date.now()
+
     const prompt = createPrompt(
       productName,
       features,
@@ -321,48 +408,82 @@ export async function POST(req: NextRequest) {
       existingContent
     )
 
-    // Determine if this is voice enhancement or new generation
     const isVoiceEnhancement = !!existingContent && !!voiceTranscription
     console.log(
       '8. Generating content with OpenAI...',
       isVoiceEnhancement ? '(Voice Enhancement Mode)' : '(New Generation)',
-      isBackgroundJob ? '[BACKGROUND JOB]' : '[FOREGROUND JOB]' // NEW logging
+      isBackgroundJob ? '[BACKGROUND JOB]' : '[FOREGROUND JOB]'
     )
 
+    // 🚀 OPTIMIZED: Faster generation settings
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
           role: 'system',
           content: isVoiceEnhancement
-            ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. You take existing content generated from voice input and refine it for professional use while preserving the original intent and key details. You understand both text descriptions and image analysis to create compelling product content.'
-            : 'You are an expert copywriter specializing in e-commerce content optimization for different platforms. You analyze both text descriptions and image analysis to create compelling product content. You understand when images have been professionally processed with background removal for enhanced presentation.',
+            ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. Create compelling, conversion-focused content efficiently.'
+            : 'You are an expert copywriter specializing in e-commerce content optimization. Create compelling, conversion-focused content efficiently.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      max_tokens: 1200,
+      max_tokens: isVoiceEnhancement ? 1000 : 1200, // Optimized token count
       temperature: isVoiceEnhancement ? 0.6 : 0.7,
+      stream: false,
     })
+
+    performanceLog.generation = Date.now() - generationStart
+    console.log(`⚡ Generation completed in ${performanceLog.generation}ms`)
 
     const generatedContent =
       completion.choices[0]?.message?.content ||
       'Content generated successfully!'
     console.log('9. Content generated successfully')
 
-    // 🚀 ENHANCED: Update usage tracking with better error handling for background jobs
-    const { data: usageUpdateData, error: updateError } =
-      await serviceSupabase.rpc('increment_user_usage', {
+    // 🚀 OPTIMIZED: Parallel usage update and database save
+    const dbStart = Date.now()
+
+    const [usageUpdateResult, dbSaveResult] = await Promise.all([
+      serviceSupabase.rpc('increment_user_usage', {
         p_user_id: authenticatedUser.id,
         p_increment_by: 1,
         p_month_year: currentMonth,
-      })
+      }),
+      serviceSupabase
+        .from('product_contents')
+        .insert({
+          user_id: authenticatedUser.id,
+          product_name: productName,
+          platform: platform,
+          features: features,
+          generated_content: generatedContent,
+          has_images: hasImages || false,
+          has_processed_images: hasProcessedImages || false,
+          image_analysis: imageAnalysis || null,
+          voice_transcription: voiceTranscription || null,
+          is_voice_enhanced: isVoiceEnhancement,
+          is_background_job: isBackgroundJob || false,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single(),
+    ])
+
+    performanceLog.dbSave = Date.now() - dbStart
+    performanceLog.total = Date.now() - startTime
+
+    console.log(
+      `⚡ Performance: Auth:${performanceLog.auth}ms, Usage:${performanceLog.usageCheck}ms, Gen:${performanceLog.generation}ms, DB:${performanceLog.dbSave}ms, Total:${performanceLog.total}ms`
+    )
+
+    const { data: usageUpdateData, error: updateError } = usageUpdateResult
+    const { data: savedContent, error: saveError } = dbSaveResult
 
     if (updateError) {
       console.log('10. Warning: Failed to update usage count:', updateError)
-      // For background jobs, we continue anyway since the job was already approved
       if (!isBackgroundJob) {
         return NextResponse.json(
           { error: 'Failed to update usage tracking' },
@@ -376,26 +497,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Enhanced database save with voice metadata
-    const { data: savedContent, error: saveError } = await serviceSupabase
-      .from('product_contents')
-      .insert({
-        user_id: authenticatedUser.id,
-        product_name: productName,
-        platform: platform,
-        features: features,
-        generated_content: generatedContent,
-        has_images: hasImages || false,
-        has_processed_images: hasProcessedImages || false,
-        image_analysis: imageAnalysis || null,
-        voice_transcription: voiceTranscription || null,
-        is_voice_enhanced: isVoiceEnhancement,
-        is_background_job: isBackgroundJob || false, // NEW: Track background jobs
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
-
     if (saveError) {
       console.log('11. Warning: Failed to save content:', saveError)
     } else {
@@ -404,7 +505,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Enhanced response with voice processing info
+    // Enhanced response with performance metrics
     return NextResponse.json({
       result: generatedContent,
       contentId: savedContent?.id || null,
@@ -422,23 +523,28 @@ export async function POST(req: NextRequest) {
         isEnhancement: isVoiceEnhancement,
         transcriptionLength: voiceTranscription?.length || 0,
       },
-      // 🚀 NEW: Background job info
       jobInfo: {
         isBackgroundJob: !!isBackgroundJob,
         processedBy: isBackgroundJob ? 'background-processor' : 'user-request',
       },
+      // 🚀 NEW: Performance metrics
+      performance: performanceLog,
     })
   } catch (error) {
-    console.error('=== GENERATE API ERROR ===')
+    const errorTime = Date.now() - startTime
+    console.error(`=== GENERATE API ERROR after ${errorTime}ms ===`)
     console.error('Error details:', error)
     return NextResponse.json(
-      { error: 'Failed to generate content' },
+      {
+        error: 'Failed to generate content',
+        performance: { total: errorTime },
+      },
       { status: 500 }
     )
   }
 }
 
-// Enhanced prompt creation function with voice integration (existing function - no changes needed)
+// Enhanced prompt creation function with voice integration (keeping your existing sophisticated logic)
 function createPrompt(
   productName: string,
   features: string,
