@@ -5,8 +5,9 @@ import ProductForm from '@/components/ProductForm'
 import UsageDisplay from '@/components/UsageDisplay'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { Sparkles } from 'lucide-react'
 
-export default function GeneratePage() {
+export default function EnhancedGeneratePage() {
   const [user, setUser] = useState<any>(undefined)
   const [userPlan, setUserPlan] = useState<string>('starter')
   const [loading, setLoading] = useState(true)
@@ -209,13 +210,52 @@ export default function GeneratePage() {
   // Show loading during redirect or initial load
   if (loading || redirecting || !mounted || !supabase) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">
-            {redirecting ? 'Redirecting...' : 'Loading...'}
+      <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen flex items-center justify-center relative overflow-hidden">
+        {/* Enhanced Loading Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+          <div className="absolute top-0 right-0 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+          <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
+        </div>
+
+        <div className="text-center relative z-10">
+          <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+            <Sparkles className="h-8 w-8 text-white animate-pulse" />
+          </div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg font-medium">
+            {redirecting
+              ? 'Redirecting to login...'
+              : 'Loading AI Content Generator...'}
           </p>
         </div>
+
+        {/* Animation Styles */}
+        <style jsx>{`
+          @keyframes blob {
+            0% {
+              transform: translate(0px, 0px) scale(1);
+            }
+            33% {
+              transform: translate(30px, -50px) scale(1.1);
+            }
+            66% {
+              transform: translate(-20px, 20px) scale(0.9);
+            }
+            100% {
+              transform: translate(0px, 0px) scale(1);
+            }
+          }
+          .animate-blob {
+            animation: blob 7s infinite;
+          }
+          .animation-delay-2000 {
+            animation-delay: 2s;
+          }
+          .animation-delay-4000 {
+            animation-delay: 4s;
+          }
+        `}</style>
       </div>
     )
   }
@@ -223,44 +263,131 @@ export default function GeneratePage() {
   // This should never show now
   if (user === null) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting...</p>
+      <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen flex items-center justify-center relative overflow-hidden">
+        {/* Enhanced Loading Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+          <div className="absolute top-0 right-0 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+          <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
         </div>
+
+        <div className="text-center relative z-10">
+          <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
+            <Sparkles className="h-8 w-8 text-white animate-pulse" />
+          </div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg font-medium">Redirecting...</p>
+        </div>
+
+        {/* Animation Styles */}
+        <style jsx>{`
+          @keyframes blob {
+            0% {
+              transform: translate(0px, 0px) scale(1);
+            }
+            33% {
+              transform: translate(30px, -50px) scale(1.1);
+            }
+            66% {
+              transform: translate(-20px, 20px) scale(0.9);
+            }
+            100% {
+              transform: translate(0px, 0px) scale(1);
+            }
+          }
+          .animate-blob {
+            animation: blob 7s infinite;
+          }
+          .animation-delay-2000 {
+            animation-delay: 2s;
+          }
+          .animation-delay-4000 {
+            animation-delay: 4s;
+          }
+        `}</style>
       </div>
     )
   }
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
-      <main className="py-10">
+    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen relative overflow-hidden">
+      {/* Enhanced Background Elements */}
+      <div className="absolute inset-0">
+        <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
+      </div>
+
+      <main className="relative z-10 py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Generate Product Content
-            </h1>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          {/* Enhanced Header Section */}
+          <div className="text-center mb-12">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl mr-4">
+                <Sparkles className="h-8 w-8 text-white" />
+              </div>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-gray-900 via-indigo-800 to-purple-800 bg-clip-text text-transparent">
+                AI Content Generator
+              </h1>
+            </div>
+
+            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-8 leading-relaxed">
               Create compelling product listings for any platform using AI. Just
               enter your product details and let our AI craft the perfect
               content.
             </p>
           </div>
 
-          {/* 🚀 UPDATED: Usage Display with smart refresh */}
-          <UsageDisplay
-            userId={user?.id}
-            planType={userPlan}
-            refreshKey={usageRefreshKey}
-            onUsageUpdate={handleUsageUpdate}
-          />
-          <ProductForm
-            onGenerationSuccess={handleGenerationSuccess}
-            currentUsage={currentUsage}
-            monthlyLimit={monthlyLimit}
-          />
+          {/* Content Container */}
+          <div className="space-y-8">
+            {/* 🚀 PRESERVED: Usage Display with smart refresh - EXACT same functionality */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 overflow-hidden">
+              <UsageDisplay
+                userId={user?.id}
+                planType={userPlan}
+                refreshKey={usageRefreshKey}
+                onUsageUpdate={handleUsageUpdate}
+              />
+            </div>
+
+            {/* 🚀 PRESERVED: Product Form - EXACT same functionality */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 overflow-hidden">
+              <ProductForm
+                onGenerationSuccess={handleGenerationSuccess}
+                currentUsage={currentUsage}
+                monthlyLimit={monthlyLimit}
+              />
+            </div>
+          </div>
         </div>
       </main>
+
+      {/* Animation Styles */}
+      <style jsx>{`
+        @keyframes blob {
+          0% {
+            transform: translate(0px, 0px) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+          100% {
+            transform: translate(0px, 0px) scale(1);
+          }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+      `}</style>
     </div>
   )
 }

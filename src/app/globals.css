@@ -233,3 +233,21 @@ input:disabled {
     cursor: resize !important;
   }
 }
+
+/* ===== PAGE BACKGROUND UTILITY ===== */
+@layer utilities {
+  .page-background {
+    background: linear-gradient(to bottom right, #f9fafb, #f1f5f9, #dbeafe);
+    /* This is equivalent to: from-gray-50 via-slate-50 to-blue-50 */
+  }
+
+  .page-background-alt {
+    background: linear-gradient(to bottom right, #f9fafb, #f3f4f6, #f1f5f9);
+    /* This is equivalent to: from-gray-50 via-gray-100 to-slate-100 */
+  }
+
+  .page-background-minimal {
+    background: linear-gradient(to bottom right, #ffffff, #f9fafb, #f1f5f9);
+    /* This is equivalent to: from-white via-gray-50 to-slate-50 */
+  }
+}

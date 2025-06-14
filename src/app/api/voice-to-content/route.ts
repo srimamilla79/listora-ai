@@ -127,15 +127,46 @@ async function optimizeAudioFile(audioFile: File): Promise<File> {
 }
 
 async function transcribeAudio(audioFile: File): Promise<string> {
-  // OPTIMIZATION: Use optimal Whisper parameters for speed vs accuracy
-  return await openai.audio.transcriptions.create({
-    file: audioFile,
-    model: 'whisper-1',
-    response_format: 'text', // Faster than json
-    language: 'en', // Explicit language for faster processing
-    // OPTIMIZATION: Add temperature for faster processing
-    temperature: 0.2, // Lower temperature = faster, more focused transcription
-  })
+  try {
+    console.log('🎙️ Starting transcription for file:', {
+      size: audioFile.size,
+      type: audioFile.type,
+      name: audioFile.name,
+    })
+
+    // OPTIMIZATION: Use optimal Whisper parameters for speed vs accuracy
+    const transcription = await openai.audio.transcriptions.create({
+      file: audioFile,
+      model: 'whisper-1',
+      response_format: 'text', // Faster than json
+      language: 'en', // Explicit language for faster processing
+      temperature: 0.2, // Lower temperature = faster, more focused transcription
+    })
+
+    console.log('✅ Transcription successful, length:', transcription.length)
+    return transcription
+  } catch (error) {
+    console.error('❌ Transcription failed:', error)
+
+    // Handle specific OpenAI errors
+    if (error instanceof Error) {
+      if (error.message.includes('Invalid file format')) {
+        throw new Error(
+          'Audio format not supported. Please try again with a different recording.'
+        )
+      } else if (error.message.includes('File too large')) {
+        throw new Error(
+          'Audio file too large. Please record a shorter message.'
+        )
+      } else if (error.message.includes('quota')) {
+        throw new Error(
+          'Service temporarily unavailable. Please try again later.'
+        )
+      }
+    }
+
+    throw new Error('Failed to transcribe audio. Please try recording again.')
+  }
 }
 
 function generateContentPromptTemplate(contentType: string): string {

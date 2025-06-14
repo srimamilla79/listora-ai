@@ -22,6 +22,19 @@ import {
   TrendingUp,
   PlayCircle,
   PauseCircle,
+  Star,
+  Shield,
+  Award,
+  Activity,
+  Target,
+  Rocket,
+  Users,
+  Settings,
+  ChevronRight,
+  Database,
+  Cpu,
+  Timer,
+  Globe,
 } from 'lucide-react'
 
 interface CSVRow {
@@ -80,9 +93,9 @@ interface BulkJob {
     completed: number
     failed: number
   }
-  progress: number
-  estimatedTimeRemaining: number
-  avgProcessingTime: number
+  progress?: number
+  estimatedTimeRemaining?: number
+  avgProcessingTime?: number
 }
 
 interface BulkJobSession {
@@ -143,6 +156,8 @@ const PLAN_LIMITS = {
     monthlyGenerations: 10,
     price: 'Free',
     features: ['Single product generation', 'Basic features'],
+    color: 'from-gray-400 to-gray-600',
+    icon: Sparkles,
   },
   business: {
     name: 'Business',
@@ -154,6 +169,8 @@ const PLAN_LIMITS = {
       'Voice-to-content',
       'Priority support',
     ],
+    color: 'from-blue-500 to-indigo-600',
+    icon: Zap,
   },
   premium: {
     name: 'Premium',
@@ -165,6 +182,8 @@ const PLAN_LIMITS = {
       'Advanced customization',
       'Batch export',
     ],
+    color: 'from-yellow-500 to-orange-600',
+    icon: Crown,
   },
   enterprise: {
     name: 'Enterprise',
@@ -176,10 +195,12 @@ const PLAN_LIMITS = {
       'Priority phone support',
       'Custom templates',
     ],
+    color: 'from-purple-500 to-pink-600',
+    icon: Rocket,
   },
 }
 
-export default function BulkCSVUploadPage() {
+export default function EnhancedBulkCSVUploadPage() {
   // Add Supabase state for SSR fix
   const [supabase, setSupabase] = useState<any>(null)
   const [mounted, setMounted] = useState(false)
@@ -294,12 +315,41 @@ export default function BulkCSVUploadPage() {
 
       console.log('🔄 Starting job polling for:', jobId)
 
+      // Clear any existing polling first
+      if (jobPollingInterval) {
+        clearInterval(jobPollingInterval)
+        setJobPollingInterval(null)
+        console.log('🛑 Cleared existing polling interval')
+      }
+
+      let pollCount = 0
+      const maxPolls = 1000 // Safety limit: stop after ~50 minutes (1000 * 3 seconds)
+
       const pollJob = async () => {
+        pollCount++
+
+        // Safety check: stop polling after max attempts
+        if (pollCount > maxPolls) {
+          console.log('🛑 Stopping polling - reached maximum attempts')
+          if (jobPollingInterval) {
+            clearInterval(jobPollingInterval)
+            setJobPollingInterval(null)
+          }
+          return
+        }
+
         try {
           const {
             data: { session },
           } = await supabase.auth.getSession()
-          if (!session?.access_token) return
+          if (!session?.access_token) {
+            console.log('❌ No session, stopping polling')
+            if (jobPollingInterval) {
+              clearInterval(jobPollingInterval)
+              setJobPollingInterval(null)
+            }
+            return
+          }
 
           const response = await fetch(`/api/bulk-process/status/${jobId}`, {
             headers: {
@@ -309,6 +359,17 @@ export default function BulkCSVUploadPage() {
 
           if (response.ok) {
             const result = await response.json()
+
+            // Check if job exists and has a status
+            if (!result.job || !result.job.status) {
+              console.log('🛑 Job not found or no status, stopping polling')
+              if (jobPollingInterval) {
+                clearInterval(jobPollingInterval)
+                setJobPollingInterval(null)
+              }
+              return
+            }
+
             setCurrentJob(result.job)
 
             // Stop polling if job is completed or failed
@@ -316,27 +377,52 @@ export default function BulkCSVUploadPage() {
               result.job.status === 'completed' ||
               result.job.status === 'failed'
             ) {
+              console.log(
+                '🛑 Job finished:',
+                result.job.status,
+                '- Stopping polling'
+              )
+
+              // Clear the interval immediately
               if (jobPollingInterval) {
                 clearInterval(jobPollingInterval)
                 setJobPollingInterval(null)
               }
 
+              // Set the step to results if completed
               if (result.job.status === 'completed') {
                 setCurrentStep('results')
               }
 
-              console.log('✅ Job finished:', result.job.status)
+              // Exit the function to prevent any further polling
+              return
+            }
+
+            console.log(
+              `📊 Poll ${pollCount}: Job status = ${result.job.status}`
+            )
+          } else {
+            console.log('❌ Polling API failed, stopping')
+            if (jobPollingInterval) {
+              clearInterval(jobPollingInterval)
+              setJobPollingInterval(null)
             }
           }
         } catch (error) {
           console.error('❌ Polling error:', error)
+          if (jobPollingInterval) {
+            clearInterval(jobPollingInterval)
+            setJobPollingInterval(null)
+          }
         }
       }
 
-      // Poll immediately, then every 3 seconds
+      // Start polling immediately, then every 3 seconds
       pollJob()
       const interval = setInterval(pollJob, 3000)
       setJobPollingInterval(interval)
+
+      console.log('🔄 Polling interval started with ID:', interval)
     },
     [supabase, jobPollingInterval]
   )
@@ -367,12 +453,25 @@ export default function BulkCSVUploadPage() {
           // Start polling the active job
           startJobPolling(activeJob.id)
           setCurrentStep('processing')
+        } else {
+          console.log('🔍 No active jobs found')
+          // Clear any existing polling if no active jobs
+          if (jobPollingInterval) {
+            clearInterval(jobPollingInterval)
+            setJobPollingInterval(null)
+          }
         }
       }
     } catch (error) {
       console.error('❌ Error checking active jobs:', error)
     }
-  }, [user, supabase, startJobPolling, useBackgroundProcessing])
+  }, [
+    user,
+    supabase,
+    startJobPolling,
+    useBackgroundProcessing,
+    jobPollingInterval,
+  ])
 
   // Frontend processing functions (existing logic)
   const updateUsageTracking = async (
@@ -609,11 +708,30 @@ export default function BulkCSVUploadPage() {
     useBackgroundProcessing,
   ])
 
+  // Force stop polling when currentJob becomes completed or failed
+  useEffect(() => {
+    if (
+      currentJob &&
+      (currentJob.status === 'completed' || currentJob.status === 'failed')
+    ) {
+      console.log(
+        '🛑 Force stopping polling - job status changed to:',
+        currentJob.status
+      )
+      if (jobPollingInterval) {
+        clearInterval(jobPollingInterval)
+        setJobPollingInterval(null)
+        console.log('🛑 Polling interval cleared via useEffect')
+      }
+    }
+  }, [currentJob?.status, jobPollingInterval])
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       if (jobPollingInterval) {
         clearInterval(jobPollingInterval)
+        console.log('🛑 Cleanup: Stopped polling on component unmount')
       }
     }
   }, [jobPollingInterval])
@@ -1165,7 +1283,7 @@ export default function BulkCSVUploadPage() {
     let completedProducts: any[] = []
 
     if (useBackgroundProcessing && currentJob) {
-      completedProducts = currentJob.products.filter(
+      completedProducts = (currentJob.products || []).filter(
         (product) => product.status === 'completed'
       )
     } else {
@@ -1214,10 +1332,13 @@ export default function BulkCSVUploadPage() {
   }
 
   const resetWorkflow = () => {
+    // Stop polling first
     if (jobPollingInterval) {
       clearInterval(jobPollingInterval)
       setJobPollingInterval(null)
+      console.log('🛑 Stopped job polling')
     }
+
     clearSession()
     setCurrentJob(null)
     setCSVFile(null)
@@ -1254,6 +1375,7 @@ export default function BulkCSVUploadPage() {
   }
 
   const currentPlanLimits = PLAN_LIMITS[userPlan]
+  const PlanIcon = currentPlanLimits.icon
 
   // Recovery Modal Component (for frontend mode)
   const RecoveryModal = () => {
@@ -1272,9 +1394,11 @@ export default function BulkCSVUploadPage() {
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl">
+        <div className="bg-white/95 backdrop-blur-xl rounded-2xl max-w-lg w-full p-8 shadow-2xl border border-white/20">
           <div className="text-center">
-            <RefreshCw className="h-12 w-12 text-indigo-600 mx-auto mb-4" />
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <RefreshCw className="h-8 w-8 text-white" />
+            </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               Resume Previous Job?
             </h2>
@@ -1283,28 +1407,28 @@ export default function BulkCSVUploadPage() {
               like to resume where you left off?
             </p>
 
-            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-              <div className="text-sm text-gray-600 space-y-2">
+            <div className="bg-gray-50 rounded-xl p-6 mb-6 text-left">
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex justify-between">
-                  <span>Total Products:</span>
-                  <span className="font-semibold">
+                  <span className="text-gray-600">Total Products:</span>
+                  <span className="font-semibold text-gray-900">
                     {recoverySession.processingJobs?.length || 0}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Completed:</span>
+                  <span className="text-gray-600">Completed:</span>
                   <span className="font-semibold text-green-600">
                     {completedCount}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Failed:</span>
+                  <span className="text-gray-600">Failed:</span>
                   <span className="font-semibold text-red-600">
                     {failedCount}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Remaining:</span>
+                  <span className="text-gray-600">Remaining:</span>
                   <span className="font-semibold text-yellow-600">
                     {pendingCount}
                   </span>
@@ -1312,7 +1436,7 @@ export default function BulkCSVUploadPage() {
               </div>
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex space-x-4">
               <button
                 onClick={() => {
                   setCSVData(recoverySession.csvData || [])
@@ -1322,7 +1446,7 @@ export default function BulkCSVUploadPage() {
                   setCurrentJobId(recoverySession.id)
                   setShowRecoveryModal(false)
                 }}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-4 rounded-lg font-semibold transition-colors cursor-pointer"
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-semibold transition-all cursor-pointer"
               >
                 Resume Job {pendingCount > 0 && `(${pendingCount} remaining)`}
               </button>
@@ -1332,7 +1456,7 @@ export default function BulkCSVUploadPage() {
                   setShowRecoveryModal(false)
                   setRecoverySession(null)
                 }}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition-colors cursor-pointer"
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-xl font-semibold transition-colors cursor-pointer"
               >
                 Start Fresh
               </button>
@@ -1359,46 +1483,66 @@ export default function BulkCSVUploadPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Authentication Required
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Please log in to use the bulk upload feature.
-          </p>
-          <button
-            onClick={() => router.push('/login')}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200 cursor-pointer"
-          >
-            Go to Login
-          </button>
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-12 shadow-xl border border-white/50 max-w-md mx-auto">
+            <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-6" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Authentication Required
+            </h2>
+            <p className="text-gray-600 mb-8">
+              Please log in to use the bulk upload feature and start processing
+              your product catalogs.
+            </p>
+            <button
+              onClick={() => router.push('/login')}
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all cursor-pointer shadow-lg"
+            >
+              Go to Login
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Plan Status Banner */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3">
+    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
+      </div>
+
+      {/* Enhanced Plan Status Banner */}
+      <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-4 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Crown className="h-5 w-5 text-yellow-300" />
-              <span className="font-medium">
-                {currentPlanLimits.name} Plan:{' '}
-                {currentPlanLimits.maxBulkProducts > 0
-                  ? `Up to ${currentPlanLimits.maxBulkProducts} products per upload`
-                  : 'Bulk upload not available'}{' '}
-                • {monthlyLimit - monthlyUsage} generations left this month
-              </span>
+            <div className="flex items-center space-x-4">
+              <div
+                className={`w-8 h-8 bg-gradient-to-r ${currentPlanLimits.color} rounded-lg flex items-center justify-center`}
+              >
+                <PlanIcon className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <div className="font-bold text-lg">
+                  {currentPlanLimits.name} Plan
+                </div>
+                <div className="text-indigo-100 text-sm">
+                  {currentPlanLimits.maxBulkProducts > 0
+                    ? `Up to ${currentPlanLimits.maxBulkProducts} products per upload`
+                    : 'Bulk upload not available'}{' '}
+                  • {monthlyLimit - monthlyUsage} generations left this month
+                </div>
+              </div>
             </div>
             {userPlan !== 'enterprise' && (
               <button
                 onClick={handleUpgrade}
-                className="bg-white/20 hover:bg-white/30 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap cursor-pointer"
+                className="group bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center space-x-2"
               >
-                Upgrade Plan
+                <Crown className="h-4 w-4" />
+                <span>Upgrade Plan</span>
+                <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </button>
             )}
           </div>
@@ -1406,195 +1550,319 @@ export default function BulkCSVUploadPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Debug Info */}
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-          <strong>🚀 Processing Mode:</strong>
-          <button
-            onClick={() => setUseBackgroundProcessing(!useBackgroundProcessing)}
-            className="ml-2 px-2 py-1 bg-blue-600 text-white rounded text-xs cursor-pointer"
-          >
-            {useBackgroundProcessing ? 'Background' : 'Frontend'} (Click to
-            toggle)
-          </button>
-          <br />
-          <strong>Status:</strong> Step: {currentStep} | Processing:{' '}
-          {isProcessing ? 'Yes' : 'No'} | Jobs: {processingJobs.length} |
-          {useBackgroundProcessing && (
-            <>
-              Active Job: {currentJob ? currentJob.id : 'None'} | Job Status:{' '}
-              {currentJob ? currentJob.status : 'N/A'}
-            </>
-          )}
-        </div>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Debug/Mode Toggle - Only show in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-8 bg-white/80 backdrop-blur-xl rounded-xl p-4 shadow-lg border border-white/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Settings className="h-5 w-5 text-gray-600" />
+                  <span className="font-semibold text-gray-900">
+                    Processing Mode:
+                  </span>
+                </div>
+                <button
+                  onClick={() =>
+                    setUseBackgroundProcessing(!useBackgroundProcessing)
+                  }
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all cursor-pointer flex items-center space-x-2 ${
+                    useBackgroundProcessing
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white'
+                      : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                  }`}
+                >
+                  {useBackgroundProcessing ? (
+                    <Database className="h-4 w-4" />
+                  ) : (
+                    <Cpu className="h-4 w-4" />
+                  )}
+                  <span>
+                    {useBackgroundProcessing ? 'Background' : 'Frontend'}
+                  </span>
+                  <span className="text-xs opacity-75">(Click to toggle)</span>
+                </button>
+              </div>
+              <div className="text-right text-sm text-gray-600">
+                <div>
+                  <strong>Step:</strong> {currentStep} |{' '}
+                  <strong>Processing:</strong> {isProcessing ? 'Yes' : 'No'}
+                </div>
+                <div>
+                  <strong>Jobs:</strong> {processingJobs.length} |
+                  {useBackgroundProcessing && (
+                    <>
+                      <strong>Active Job:</strong>{' '}
+                      {currentJob ? currentJob.id.slice(-8) : 'None'}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* Page Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            {useBackgroundProcessing
-              ? '🚀 Background Bulk Content Generator'
-              : 'Bulk Content Generator'}
+        {/* Enhanced Page Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-6 py-3 mb-8">
+            <Upload className="h-5 w-5 text-indigo-600" />
+            <span className="text-sm font-medium text-indigo-800">
+              Bulk Content Generation • Scale your business effortlessly
+            </span>
+            <Sparkles className="h-4 w-4 text-purple-600" />
+          </div>
+
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            {useBackgroundProcessing ? (
+              <>
+                Background Bulk
+                <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
+                  Content Generator
+                </span>
+              </>
+            ) : (
+              <>
+                Bulk Content
+                <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
+                  Generator
+                </span>
+              </>
+            )}
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+
+          <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
             {useBackgroundProcessing
               ? 'Upload your CSV and let our servers process everything in the background. Navigate freely - your job keeps running!'
-              : 'Upload your product CSV and generate content for multiple products at once'}
+              : 'Upload your product CSV and generate content for multiple products at once with our advanced AI engine.'}
           </p>
+
           {useBackgroundProcessing && (
-            <div className="mt-4">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                ✨ Background Processing: Never stops when you navigate away!
+            <div className="mt-6">
+              <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200">
+                <Globe className="h-4 w-4 mr-2" />✨ Background Processing:
+                Never stops when you navigate away!
               </span>
             </div>
           )}
         </div>
 
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-center space-x-8">
-            {[
-              { key: 'upload', label: 'Upload CSV', icon: Upload },
-              { key: 'mapping', label: 'Smart Mapping', icon: Zap },
-              {
-                key: 'processing',
-                label: useBackgroundProcessing
-                  ? 'Background Processing'
-                  : 'AI Processing',
-                icon: useBackgroundProcessing ? PlayCircle : RefreshCw,
-              },
-              { key: 'results', label: 'Download Results', icon: Download },
-            ].map((step, index) => {
-              const Icon = step.icon
-              const isActive = currentStep === step.key
-              const isCompleted =
-                ['upload', 'mapping', 'processing', 'results'].indexOf(
-                  currentStep
-                ) > index
+        {/* Enhanced Progress Steps */}
+        <div className="mb-12">
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 shadow-xl border border-white/50">
+            <div className="flex items-center justify-between">
+              {[
+                {
+                  key: 'upload',
+                  label: 'Upload CSV',
+                  icon: Upload,
+                  desc: 'Upload your product data',
+                },
+                {
+                  key: 'mapping',
+                  label: 'Smart Mapping',
+                  icon: Zap,
+                  desc: 'AI-powered column detection',
+                },
+                {
+                  key: 'processing',
+                  label: useBackgroundProcessing
+                    ? 'Background Processing'
+                    : 'AI Processing',
+                  icon: useBackgroundProcessing ? PlayCircle : RefreshCw,
+                  desc: useBackgroundProcessing
+                    ? 'Server-side processing'
+                    : 'Real-time generation',
+                },
+                {
+                  key: 'results',
+                  label: 'Download Results',
+                  icon: Download,
+                  desc: 'Export your content',
+                },
+              ].map((step, index) => {
+                const Icon = step.icon
+                const isActive = currentStep === step.key
+                const isCompleted =
+                  ['upload', 'mapping', 'processing', 'results'].indexOf(
+                    currentStep
+                  ) > index
 
-              return (
-                <div key={step.key} className="flex items-center">
-                  <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                      isCompleted
-                        ? 'bg-green-500 text-white'
-                        : isActive
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-gray-200 text-gray-500'
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle className="h-5 w-5" />
-                    ) : (
-                      <Icon className="h-5 w-5" />
+                return (
+                  <div key={step.key} className="flex items-center">
+                    <div className="text-center">
+                      <div
+                        className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 mb-3 ${
+                          isCompleted
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg'
+                            : isActive
+                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-110'
+                              : 'bg-gray-200 text-gray-500'
+                        }`}
+                      >
+                        {isCompleted ? (
+                          <CheckCircle className="h-7 w-7" />
+                        ) : (
+                          <Icon
+                            className={`h-7 w-7 ${isActive ? 'animate-pulse' : ''}`}
+                          />
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <div
+                          className={`font-semibold transition-colors ${
+                            isActive
+                              ? 'text-indigo-600'
+                              : isCompleted
+                                ? 'text-green-600'
+                                : 'text-gray-500'
+                          }`}
+                        >
+                          {step.label}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {step.desc}
+                        </div>
+                      </div>
+                    </div>
+                    {index < 3 && (
+                      <div className="flex-1 mx-6">
+                        <div
+                          className={`h-1 rounded-full transition-all duration-500 ${
+                            isCompleted
+                              ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                              : 'bg-gray-300'
+                          }`}
+                        />
+                      </div>
                     )}
                   </div>
-                  <span
-                    className={`ml-2 text-sm font-medium ${
-                      isActive
-                        ? 'text-indigo-600'
-                        : isCompleted
-                          ? 'text-green-600'
-                          : 'text-gray-500'
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                  {index < 3 && (
-                    <ArrowRight className="h-4 w-4 text-gray-400 ml-4" />
-                  )}
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         </div>
 
-        {/* Step 1: Upload CSV */}
+        {/* Step 1: Enhanced Upload CSV */}
         {currentStep === 'upload' && (
-          <div className="bg-white rounded-lg shadow-sm border p-8">
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
             <div className="text-center">
-              <Upload className="h-16 w-16 text-indigo-600 mx-auto mb-6" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-xl">
+                <Upload className="h-10 w-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
                 Upload Your Product CSV
               </h2>
-              <p className="text-gray-600 mb-4 max-w-2xl mx-auto">
+              <p className="text-gray-600 mb-6 max-w-3xl mx-auto text-lg">
                 Upload your CSV file with product data. Your{' '}
-                {currentPlanLimits.name} plan supports
+                <span className="font-semibold text-indigo-600">
+                  {currentPlanLimits.name}
+                </span>{' '}
+                plan supports
                 {currentPlanLimits.maxBulkProducts > 0
                   ? ` up to ${currentPlanLimits.maxBulkProducts} products per upload.`
                   : ' single product generation only.'}{' '}
-                You have {monthlyLimit - monthlyUsage} generations remaining
-                this month.
+                You have{' '}
+                <span className="font-semibold text-green-600">
+                  {monthlyLimit - monthlyUsage}
+                </span>{' '}
+                generations remaining this month.
               </p>
 
               {planLoaded && currentPlanLimits.maxBulkProducts === 0 ? (
-                <div className="border-2 border-dashed border-red-300 rounded-lg p-12 bg-red-50">
-                  <Lock className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-red-900 mb-2">
+                <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-dashed border-red-300 rounded-2xl p-12 max-w-2xl mx-auto">
+                  <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <Lock className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-red-900 mb-3">
                     Bulk Upload Not Available
-                  </p>
-                  <p className="text-red-600 mb-4">
+                  </h3>
+                  <p className="text-red-700 mb-6">
                     Bulk CSV upload requires a paid plan. Upgrade to unlock
-                    batch processing.
+                    batch processing and scale your content creation.
                   </p>
                   <button
                     onClick={handleUpgrade}
-                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors cursor-pointer"
+                    className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-8 py-3 rounded-xl font-semibold transition-all cursor-pointer shadow-lg"
                   >
                     Upgrade to Business Plan
                   </button>
                 </div>
               ) : (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 hover:border-indigo-400 transition-colors">
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="csv-upload"
-                    disabled={isAnalyzing}
-                  />
-                  <label htmlFor="csv-upload" className="cursor-pointer">
-                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-lg font-medium text-gray-900 mb-2">
-                      {isAnalyzing
-                        ? 'Analyzing your CSV...'
-                        : 'Click to upload your CSV file'}
-                    </p>
-                    <p className="text-gray-500">
-                      Enhanced CSV parsing with platform detection
-                    </p>
-                    {isAnalyzing && (
-                      <div className="mt-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                <div className="max-w-2xl mx-auto">
+                  <div className="border-2 border-dashed border-gray-300 hover:border-indigo-400 rounded-2xl p-12 transition-all duration-300 hover:bg-indigo-50/50">
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="csv-upload"
+                      disabled={isAnalyzing}
+                    />
+                    <label htmlFor="csv-upload" className="cursor-pointer">
+                      <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <FileText className="h-8 w-8 text-white" />
                       </div>
-                    )}
-                  </label>
-                </div>
-              )}
+                      <h3 className="text-xl font-bold text-gray-900 mb-3">
+                        {isAnalyzing
+                          ? 'Analyzing your CSV...'
+                          : 'Click to upload your CSV file'}
+                      </h3>
+                      <p className="text-gray-600 mb-4">
+                        Enhanced CSV parsing with intelligent platform detection
+                      </p>
+                      {isAnalyzing && (
+                        <div className="mt-6">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+                          <p className="text-indigo-600 font-medium">
+                            Processing your data...
+                          </p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
 
-              {csvFile && !isAnalyzing && (
-                <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-green-800">
-                    ✅ <strong>{csvFile.name}</strong> uploaded successfully!
-                    Found {csvData.length} products.
-                  </p>
+                  {csvFile && !isAnalyzing && (
+                    <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+                      <div className="flex items-center space-x-4">
+                        <CheckCircle className="h-8 w-8 text-green-600" />
+                        <div>
+                          <h4 className="font-bold text-green-900">
+                            Upload Successful!
+                          </h4>
+                          <p className="text-green-700">
+                            <strong>{csvFile.name}</strong> - Found{' '}
+                            {csvData.length} products ready for processing.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Step 2: Column Mapping */}
+        {/* Step 2: Enhanced Column Mapping */}
         {currentStep === 'mapping' && (
-          <div className="bg-white rounded-lg shadow-sm border p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                <Zap className="h-6 w-6 mr-2 text-indigo-600" />
-                Smart Column Mapping
-              </h2>
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center">
+                  <Zap className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Smart Column Mapping
+                  </h2>
+                  <p className="text-gray-600">
+                    AI has analyzed your CSV and suggested optimal mappings
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={resetWorkflow}
-                className="text-gray-600 hover:text-gray-800 text-sm font-medium cursor-pointer"
+                className="text-gray-600 hover:text-gray-800 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 Upload Different File
               </button>
@@ -1604,47 +1872,70 @@ export default function BulkCSVUploadPage() {
               {columnMappings.map((mapping, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                  className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all"
                 >
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900">
-                      {mapping.csvColumn}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      AI Confidence: {(mapping.confidence * 100).toFixed(0)}%
-                    </div>
-                  </div>
-                  <div className="flex-1 mx-4">
-                    <select
-                      value={mapping.mappedTo}
-                      onChange={(e) =>
-                        updateColumnMapping(index, e.target.value as any)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
-                    >
-                      <option value="ignore">Ignore</option>
-                      <option value="product_name">Product Name</option>
-                      <option value="features">Features & Benefits</option>
-                      <option value="platform">Target Platform</option>
-                    </select>
-                  </div>
-                  <div className="flex-1 text-right">
-                    {csvData[0] && (
-                      <div className="text-sm text-gray-600 max-w-xs truncate">
-                        Sample: "{csvData[0][mapping.csvColumn]}"
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                    <div>
+                      <div className="font-semibold text-gray-900 text-lg mb-2">
+                        {mapping.csvColumn}
                       </div>
-                    )}
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className={`w-3 h-3 rounded-full ${
+                            mapping.confidence > 0.8
+                              ? 'bg-green-500'
+                              : mapping.confidence > 0.6
+                                ? 'bg-yellow-500'
+                                : 'bg-red-500'
+                          }`}
+                        />
+                        <span className="text-sm font-medium text-gray-600">
+                          AI Confidence: {(mapping.confidence * 100).toFixed(0)}
+                          %
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Map to Field
+                      </label>
+                      <select
+                        value={mapping.mappedTo}
+                        onChange={(e) =>
+                          updateColumnMapping(index, e.target.value as any)
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white shadow-sm cursor-pointer"
+                      >
+                        <option value="ignore">🚫 Ignore</option>
+                        <option value="product_name">📦 Product Name</option>
+                        <option value="features">✨ Features & Benefits</option>
+                        <option value="platform">🛒 Target Platform</option>
+                      </select>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-gray-700 mb-2">
+                        Sample Data
+                      </div>
+                      {csvData[0] && (
+                        <div className="text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded-lg max-w-xs truncate ml-auto">
+                          "{csvData[0][mapping.csvColumn] || 'Empty'}"
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex justify-center space-x-4">
+            <div className="flex justify-center space-x-6">
               <button
                 onClick={() => setCurrentStep('upload')}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-lg font-semibold transition-colors cursor-pointer"
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer flex items-center space-x-2"
               >
-                Back to Upload
+                <ArrowRight className="h-4 w-4 rotate-180" />
+                <span>Back to Upload</span>
               </button>
               <button
                 onClick={startBulkProcessing}
@@ -1652,7 +1943,7 @@ export default function BulkCSVUploadPage() {
                   !columnMappings.some((m) => m.mappedTo === 'product_name') ||
                   isSubmittingJob
                 }
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 cursor-pointer disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 {isSubmittingJob ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -1671,162 +1962,223 @@ export default function BulkCSVUploadPage() {
           </div>
         )}
 
-        {/* Step 3: Processing */}
+        {/* Step 3: Enhanced Processing */}
         {currentStep === 'processing' && (
-          <div className="bg-white rounded-lg shadow-sm border p-8">
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
             {useBackgroundProcessing && currentJob ? (
               // Background processing display
               <>
-                <div className="text-center mb-8">
-                  <div className="flex items-center justify-center mb-4">
+                <div className="text-center mb-10">
+                  <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
                     <PlayCircle
-                      className={`h-8 w-8 text-green-600 ${
+                      className={`h-10 w-10 text-white ${
                         currentJob.status === 'processing'
                           ? 'animate-pulse'
                           : ''
                       }`}
                     />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">
                     🚀 Background Processing Active
                   </h2>
-                  <p className="text-gray-600 mb-2">
-                    Your job is running on our servers! Navigate freely -
-                    processing continues in background.
-                  </p>
-                  <p className="text-sm text-green-600 font-medium">
-                    ✨ This job will keep running even if you close this page!
-                  </p>
-                </div>
-
-                {/* Background Processing Stats - FIXED */}
-                <div className="mb-8 grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {getJobStats(currentJob).total}
+                  <div className="max-w-2xl mx-auto">
+                    <p className="text-gray-600 mb-3 text-lg">
+                      Your job is running on our servers! Navigate freely -
+                      processing continues in background.
+                    </p>
+                    <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 rounded-full text-sm font-semibold">
+                      <Globe className="h-4 w-4 mr-2" />✨ This job will keep
+                      running even if you close this page!
                     </div>
-                    <div className="text-sm text-blue-600">Total Products</div>
-                  </div>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {getJobStats(currentJob).pending}
-                    </div>
-                    <div className="text-sm text-yellow-600">Pending</div>
-                  </div>
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-indigo-600">
-                      {getJobStats(currentJob).processing}
-                    </div>
-                    <div className="text-sm text-indigo-600">Processing</div>
-                  </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {getJobStats(currentJob).completed}
-                    </div>
-                    <div className="text-sm text-green-600">Completed</div>
-                  </div>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-red-600">
-                      {getJobStats(currentJob).failed}
-                    </div>
-                    <div className="text-sm text-red-600">Failed</div>
                   </div>
                 </div>
 
-                {/* Background Progress Bar */}
-                <div className="mb-8">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
+                {/* Enhanced Background Processing Stats */}
+                <div className="mb-10 grid grid-cols-2 md:grid-cols-5 gap-6">
+                  {[
+                    {
+                      label: 'Total Products',
+                      value: getJobStats(currentJob).total,
+                      color: 'from-blue-500 to-blue-600',
+                      icon: Database,
+                    },
+                    {
+                      label: 'Pending',
+                      value: getJobStats(currentJob).pending,
+                      color: 'from-yellow-500 to-orange-500',
+                      icon: Clock,
+                    },
+                    {
+                      label: 'Processing',
+                      value: getJobStats(currentJob).processing,
+                      color: 'from-indigo-500 to-purple-600',
+                      icon: Cpu,
+                    },
+                    {
+                      label: 'Completed',
+                      value: getJobStats(currentJob).completed,
+                      color: 'from-green-500 to-emerald-600',
+                      icon: CheckCircle,
+                    },
+                    {
+                      label: 'Failed',
+                      value: getJobStats(currentJob).failed,
+                      color: 'from-red-500 to-red-600',
+                      icon: XCircle,
+                    },
+                  ].map((stat, index) => {
+                    const Icon = stat.icon
+                    return (
+                      <div
+                        key={index}
+                        className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-all"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div
+                            className={`w-10 h-10 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
+                          >
+                            <Icon className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {stat.value}
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-600">
+                          {stat.label}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Enhanced Background Progress Bar */}
+                <div className="mb-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
                       Overall Progress
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {currentJob.progress}%
+                    </h3>
+                    <span className="text-lg font-bold text-indigo-600">
+                      {(currentJob.progress || 0).toFixed(1)}%
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
                     <div
-                      className="bg-green-600 h-3 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${currentJob.progress}%` }}
-                    ></div>
+                      className="bg-gradient-to-r from-green-500 to-emerald-600 h-4 rounded-full transition-all duration-500 ease-out shadow-lg"
+                      style={{ width: `${currentJob.progress || 0}%` }}
+                    />
                   </div>
                   {currentJob.status === 'processing' &&
-                    currentJob.estimatedTimeRemaining > 0 && (
-                      <div className="mt-2 text-sm text-gray-600 text-center">
-                        <Clock className="h-4 w-4 inline mr-1" />
-                        Estimated time remaining:{' '}
-                        {formatTime(currentJob.estimatedTimeRemaining)}
-                        {currentJob.avgProcessingTime > 0 && (
-                          <span className="ml-4">
-                            Avg: {formatTime(currentJob.avgProcessingTime)}
-                            /product
+                    (currentJob.estimatedTimeRemaining || 0) > 0 && (
+                      <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <Timer className="h-4 w-4" />
+                          <span>
+                            ETA:{' '}
+                            {formatTime(currentJob.estimatedTimeRemaining || 0)}
                           </span>
+                        </div>
+                        {(currentJob.avgProcessingTime || 0) > 0 && (
+                          <div className="flex items-center space-x-2">
+                            <Activity className="h-4 w-4" />
+                            <span>
+                              Avg:{' '}
+                              {formatTime(currentJob.avgProcessingTime || 0)}
+                              /product
+                            </span>
+                          </div>
                         )}
                       </div>
                     )}
                 </div>
 
                 {/* Background Product Status */}
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {currentJob.products.map((product, index) => (
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {(currentJob.products || []).map((product, index) => (
                     <div
-                      key={product.id}
-                      className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                      key={product.id || index}
+                      className={`p-6 rounded-xl border-2 transition-all duration-300 ${
                         product.status === 'completed'
-                          ? 'border-green-200 bg-green-50'
+                          ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50'
                           : product.status === 'failed'
-                            ? 'border-red-200 bg-red-50'
+                            ? 'border-red-200 bg-gradient-to-r from-red-50 to-red-100'
                             : product.status === 'processing'
-                              ? 'border-indigo-200 bg-indigo-50'
-                              : 'border-gray-200 bg-gray-50'
+                              ? 'border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50'
+                              : 'border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            {product.status === 'pending' && (
-                              <Clock className="h-5 w-5 text-gray-400" />
-                            )}
-                            {product.status === 'processing' && (
-                              <Loader2 className="h-5 w-5 text-indigo-600 animate-spin" />
-                            )}
-                            {product.status === 'completed' && (
-                              <CheckCircle className="h-5 w-5 text-green-600" />
-                            )}
-                            {product.status === 'failed' && (
-                              <XCircle className="h-5 w-5 text-red-600" />
-                            )}
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
-                                {product.product_name}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                Platform: {product.platform}
-                              </div>
+                          <div className="flex items-center space-x-4">
+                            <div className="flex-shrink-0">
+                              {product.status === 'pending' && (
+                                <Clock className="h-6 w-6 text-gray-400" />
+                              )}
+                              {product.status === 'processing' && (
+                                <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
+                              )}
+                              {product.status === 'completed' && (
+                                <CheckCircle className="h-6 w-6 text-green-600" />
+                              )}
+                              {product.status === 'failed' && (
+                                <XCircle className="h-6 w-6 text-red-600" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-gray-900 truncate">
+                                {product.product_name || 'Unknown Product'}
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                Platform: {product.platform || 'amazon'}
+                                {product.features && (
+                                  <span className="ml-2">
+                                    • Features:{' '}
+                                    {product.features.substring(0, 60)}
+                                    {product.features.length > 60 && '...'}
+                                  </span>
+                                )}
+                              </p>
                             </div>
                           </div>
                         </div>
-                        <div className="text-right min-w-[80px]">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              product.status === 'completed'
-                                ? 'bg-green-100 text-green-800'
-                                : product.status === 'failed'
-                                  ? 'bg-red-100 text-red-800'
-                                  : product.status === 'processing'
-                                    ? 'bg-indigo-100 text-indigo-800'
-                                    : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {product.status === 'pending' && 'Waiting'}
-                            {product.status === 'processing' && 'Processing'}
-                            {product.status === 'completed' && 'Complete'}
-                            {product.status === 'failed' && 'Failed'}
-                          </span>
+
+                        <div className="flex items-center space-x-4">
+                          {product.status === 'completed' &&
+                            product.quality_score && (
+                              <div className="text-center">
+                                <div className="text-lg font-bold text-green-600">
+                                  {product.quality_score.toFixed(0)}%
+                                </div>
+                                <div className="text-xs text-green-500">
+                                  Quality
+                                </div>
+                              </div>
+                            )}
+
+                          <div className="text-right">
+                            <span
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                                product.status === 'completed'
+                                  ? 'bg-green-100 text-green-800'
+                                  : product.status === 'failed'
+                                    ? 'bg-red-100 text-red-800'
+                                    : product.status === 'processing'
+                                      ? 'bg-indigo-100 text-indigo-800'
+                                      : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {product.status === 'pending' && '⏳ Waiting'}
+                              {product.status === 'processing' &&
+                                '⚡ Processing'}
+                              {product.status === 'completed' && '✅ Complete'}
+                              {product.status === 'failed' && '❌ Failed'}
+                            </span>
+                          </div>
                         </div>
                       </div>
+
                       {product.error_message && (
-                        <div className="mt-2 p-2 bg-red-100 border border-red-200 rounded text-sm text-red-700">
-                          Error: {product.error_message}
+                        <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-sm text-red-700">
+                          <strong>Error:</strong> {product.error_message}
                         </div>
                       )}
                     </div>
@@ -1834,16 +2186,36 @@ export default function BulkCSVUploadPage() {
                 </div>
 
                 {currentJob.status === 'completed' && (
-                  <div className="mt-8 flex justify-center space-x-4">
+                  <div className="mt-10 flex justify-center space-x-6">
                     <button
-                      onClick={resetWorkflow}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-lg font-semibold transition-colors cursor-pointer"
+                      onClick={() => {
+                        // Stop polling first
+                        if (jobPollingInterval) {
+                          clearInterval(jobPollingInterval)
+                          setJobPollingInterval(null)
+                          console.log(
+                            '🛑 Manually stopped polling from completed job'
+                          )
+                        }
+                        resetWorkflow()
+                      }}
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
                     >
                       Start New Job
                     </button>
                     <button
-                      onClick={() => setCurrentStep('results')}
-                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 cursor-pointer"
+                      onClick={() => {
+                        // Stop polling before going to results
+                        if (jobPollingInterval) {
+                          clearInterval(jobPollingInterval)
+                          setJobPollingInterval(null)
+                          console.log(
+                            '🛑 Stopped polling before viewing results'
+                          )
+                        }
+                        setCurrentStep('results')
+                      }}
+                      className="bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
                     >
                       <Download className="h-5 w-5" />
                       <span>
@@ -1855,142 +2227,175 @@ export default function BulkCSVUploadPage() {
                 )}
               </>
             ) : (
-              // Frontend processing display
+              // Frontend processing display - Enhanced
               <>
-                <div className="text-center mb-8">
-                  <div className="flex items-center justify-center mb-4">
+                <div className="text-center mb-10">
+                  <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
                     <RefreshCw
-                      className={`h-8 w-8 text-indigo-600 ${isProcessing ? 'animate-spin' : ''}`}
+                      className={`h-10 w-10 text-white ${isProcessing ? 'animate-spin' : ''}`}
                     />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">
                     AI Processing in Progress
                   </h2>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 text-lg max-w-2xl mx-auto">
                     {isProcessing
-                      ? 'Generating content for your products...'
-                      : 'Processing complete! Review results below.'}
+                      ? 'Our advanced AI is generating high-quality content for your products...'
+                      : 'Processing complete! Review your results below.'}
                   </p>
                 </div>
 
-                {/* Frontend Processing Stats */}
-                <div className="mb-8 grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {currentProcessingStats.total}
-                    </div>
-                    <div className="text-sm text-blue-600">Total Products</div>
-                  </div>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {currentProcessingStats.pending}
-                    </div>
-                    <div className="text-sm text-yellow-600">Pending</div>
-                  </div>
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-indigo-600">
-                      {currentProcessingStats.processing}
-                    </div>
-                    <div className="text-sm text-indigo-600">Processing</div>
-                  </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {currentProcessingStats.completed}
-                    </div>
-                    <div className="text-sm text-green-600">Completed</div>
-                  </div>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-                    <div className="text-2xl font-bold text-red-600">
-                      {currentProcessingStats.failed}
-                    </div>
-                    <div className="text-sm text-red-600">Failed</div>
-                  </div>
+                {/* Enhanced Frontend Processing Stats */}
+                <div className="mb-10 grid grid-cols-2 md:grid-cols-5 gap-6">
+                  {[
+                    {
+                      label: 'Total Products',
+                      value: currentProcessingStats.total,
+                      color: 'from-blue-500 to-blue-600',
+                      icon: Database,
+                    },
+                    {
+                      label: 'Pending',
+                      value: currentProcessingStats.pending,
+                      color: 'from-yellow-500 to-orange-500',
+                      icon: Clock,
+                    },
+                    {
+                      label: 'Processing',
+                      value: currentProcessingStats.processing,
+                      color: 'from-indigo-500 to-purple-600',
+                      icon: Cpu,
+                    },
+                    {
+                      label: 'Completed',
+                      value: currentProcessingStats.completed,
+                      color: 'from-green-500 to-emerald-600',
+                      icon: CheckCircle,
+                    },
+                    {
+                      label: 'Failed',
+                      value: currentProcessingStats.failed,
+                      color: 'from-red-500 to-red-600',
+                      icon: XCircle,
+                    },
+                  ].map((stat, index) => {
+                    const Icon = stat.icon
+                    return (
+                      <div
+                        key={index}
+                        className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-all"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div
+                            className={`w-10 h-10 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
+                          >
+                            <Icon className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {stat.value}
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-600">
+                          {stat.label}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
 
-                {/* Frontend Progress Bar */}
-                <div className="mb-8">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
+                {/* Enhanced Frontend Progress Bar */}
+                <div className="mb-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
                       Overall Progress
-                    </span>
-                    <span className="text-sm text-gray-500">
+                    </h3>
+                    <span className="text-lg font-bold text-indigo-600">
                       {Math.round(processingProgress)}%
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
                     <div
-                      className="bg-indigo-600 h-3 rounded-full transition-all duration-300 ease-out"
+                      className="bg-gradient-to-r from-indigo-500 to-purple-600 h-4 rounded-full transition-all duration-500 ease-out shadow-lg"
                       style={{ width: `${processingProgress}%` }}
-                    ></div>
+                    />
                   </div>
                   {isProcessing &&
                     currentProcessingStats.estimatedTimeRemaining > 0 && (
-                      <div className="mt-2 text-sm text-gray-600 text-center">
-                        <Clock className="h-4 w-4 inline mr-1" />
-                        Estimated time remaining:{' '}
-                        {formatTime(
-                          Math.round(
-                            currentProcessingStats.estimatedTimeRemaining
-                          )
-                        )}
-                        {currentProcessingStats.avgProcessingTime > 0 && (
-                          <span className="ml-4">
-                            Avg:{' '}
+                      <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <Timer className="h-4 w-4" />
+                          <span>
+                            ETA:{' '}
                             {formatTime(
                               Math.round(
-                                currentProcessingStats.avgProcessingTime
+                                currentProcessingStats.estimatedTimeRemaining
                               )
                             )}
-                            /product
                           </span>
+                        </div>
+                        {currentProcessingStats.avgProcessingTime > 0 && (
+                          <div className="flex items-center space-x-2">
+                            <Activity className="h-4 w-4" />
+                            <span>
+                              Avg:{' '}
+                              {formatTime(
+                                Math.round(
+                                  currentProcessingStats.avgProcessingTime
+                                )
+                              )}
+                              /product
+                            </span>
+                          </div>
                         )}
                       </div>
                     )}
                 </div>
 
-                {/* Frontend Product Status */}
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+                {/* Enhanced Frontend Product Status */}
+                <div className="space-y-4 max-h-96 overflow-y-auto">
                   {processingJobs.map((job, index) => (
                     <div
                       key={job.id}
-                      className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                      className={`p-6 rounded-xl border-2 transition-all duration-300 ${
                         job.status === 'completed'
-                          ? 'border-green-200 bg-green-50'
+                          ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50'
                           : job.status === 'failed'
-                            ? 'border-red-200 bg-red-50'
+                            ? 'border-red-200 bg-gradient-to-r from-red-50 to-red-100'
                             : job.status === 'processing'
-                              ? 'border-indigo-200 bg-indigo-50'
-                              : 'border-gray-200 bg-gray-50'
+                              ? 'border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50'
+                              : 'border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            {job.status === 'pending' && (
-                              <Clock className="h-5 w-5 text-gray-400" />
-                            )}
-                            {job.status === 'processing' && (
-                              <Loader2 className="h-5 w-5 text-indigo-600 animate-spin" />
-                            )}
-                            {job.status === 'completed' && (
-                              <CheckCircle className="h-5 w-5 text-green-600" />
-                            )}
-                            {job.status === 'failed' && (
-                              <XCircle className="h-5 w-5 text-red-600" />
-                            )}
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex-shrink-0">
+                              {job.status === 'pending' && (
+                                <Clock className="h-6 w-6 text-gray-400" />
+                              )}
+                              {job.status === 'processing' && (
+                                <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
+                              )}
+                              {job.status === 'completed' && (
+                                <CheckCircle className="h-6 w-6 text-green-600" />
+                              )}
+                              {job.status === 'failed' && (
+                                <XCircle className="h-6 w-6 text-red-600" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-gray-900 truncate">
                                 {job.productName}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                Platform: {job.platform} •
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                Platform: {job.platform}
                                 {job.features && (
-                                  <span className="ml-1">
-                                    Features: {job.features.substring(0, 50)}
-                                    {job.features.length > 50 && '...'}
+                                  <span className="ml-2">
+                                    • Features: {job.features.substring(0, 60)}
+                                    {job.features.length > 60 && '...'}
                                   </span>
                                 )}
-                              </div>
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -1998,7 +2403,7 @@ export default function BulkCSVUploadPage() {
                         <div className="flex items-center space-x-4">
                           {job.status === 'completed' && job.qualityScore && (
                             <div className="text-center">
-                              <div className="text-sm font-medium text-green-600">
+                              <div className="text-lg font-bold text-green-600">
                                 {job.qualityScore.toFixed(0)}%
                               </div>
                               <div className="text-xs text-green-500">
@@ -2009,16 +2414,16 @@ export default function BulkCSVUploadPage() {
 
                           {job.processingTime && (
                             <div className="text-center">
-                              <div className="text-sm font-medium text-gray-600">
+                              <div className="text-sm font-semibold text-gray-600">
                                 {formatTime(job.processingTime)}
                               </div>
                               <div className="text-xs text-gray-500">Time</div>
                             </div>
                           )}
 
-                          <div className="text-right min-w-[80px]">
+                          <div className="text-right">
                             <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
                                 job.status === 'completed'
                                   ? 'bg-green-100 text-green-800'
                                   : job.status === 'failed'
@@ -2028,18 +2433,18 @@ export default function BulkCSVUploadPage() {
                                       : 'bg-gray-100 text-gray-800'
                               }`}
                             >
-                              {job.status === 'pending' && 'Waiting'}
-                              {job.status === 'processing' && 'Processing'}
-                              {job.status === 'completed' && 'Complete'}
-                              {job.status === 'failed' && 'Failed'}
+                              {job.status === 'pending' && '⏳ Waiting'}
+                              {job.status === 'processing' && '⚡ Processing'}
+                              {job.status === 'completed' && '✅ Complete'}
+                              {job.status === 'failed' && '❌ Failed'}
                             </span>
                           </div>
                         </div>
                       </div>
 
                       {job.error && (
-                        <div className="mt-2 p-2 bg-red-100 border border-red-200 rounded text-sm text-red-700">
-                          Error: {job.error}
+                        <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-sm text-red-700">
+                          <strong>Error:</strong> {job.error}
                         </div>
                       )}
                     </div>
@@ -2047,17 +2452,17 @@ export default function BulkCSVUploadPage() {
                 </div>
 
                 {!isProcessing && (
-                  <div className="mt-8 flex justify-center space-x-4">
+                  <div className="mt-10 flex justify-center space-x-6">
                     <button
                       onClick={resetWorkflow}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-lg font-semibold transition-colors cursor-pointer"
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
                     >
                       Start Over
                     </button>
                     {currentProcessingStats.completed > 0 && (
                       <button
                         onClick={() => setCurrentStep('results')}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 cursor-pointer"
+                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
                       >
                         <Download className="h-5 w-5" />
                         <span>
@@ -2073,46 +2478,54 @@ export default function BulkCSVUploadPage() {
           </div>
         )}
 
-        {/* Step 4: Results */}
+        {/* Step 4: Enhanced Results */}
         {currentStep === 'results' && (
-          <div className="bg-white rounded-lg shadow-sm border p-8">
-            <div className="text-center mb-8">
-              <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-6" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
+            <div className="text-center mb-10">
+              <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-xl">
+                <CheckCircle className="h-10 w-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
                 {useBackgroundProcessing
                   ? '🎉 Background Processing Complete!'
-                  : 'Processing Complete!'}
+                  : '🎉 Processing Complete!'}
               </h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-6 text-lg">
                 Successfully processed{' '}
-                {useBackgroundProcessing && currentJob
-                  ? `${getJobStats(currentJob).completed} out of ${getJobStats(currentJob).total}`
-                  : `${currentProcessingStats.completed} out of ${currentProcessingStats.total}`}{' '}
-                products
+                <span className="font-bold text-green-600">
+                  {useBackgroundProcessing && currentJob
+                    ? `${getJobStats(currentJob).completed} out of ${getJobStats(currentJob).total}`
+                    : `${currentProcessingStats.completed} out of ${currentProcessingStats.total}`}
+                </span>{' '}
+                products with AI-powered content generation
               </p>
 
-              <div className="grid grid-cols-3 gap-4 max-w-md mx-auto mb-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto mb-10">
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                  <div className="text-3xl font-bold text-green-600 mb-2">
                     {useBackgroundProcessing && currentJob
                       ? getJobStats(currentJob).completed
                       : currentProcessingStats.completed}
                   </div>
-                  <div className="text-sm text-gray-500">Completed</div>
+                  <div className="text-sm font-medium text-green-700">
+                    Successfully Completed
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">
+                <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
+                  <div className="text-3xl font-bold text-red-600 mb-2">
                     {useBackgroundProcessing && currentJob
                       ? getJobStats(currentJob).failed
                       : currentProcessingStats.failed}
                   </div>
-                  <div className="text-sm text-gray-500">Failed</div>
+                  <div className="text-sm font-medium text-red-700">
+                    Failed to Process
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-indigo-600">
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
+                  <div className="text-3xl font-bold text-indigo-600 mb-2">
                     {useBackgroundProcessing && currentJob
-                      ? currentJob.avgProcessingTime > 0
-                        ? formatTime(currentJob.avgProcessingTime)
+                      ? (currentJob.avgProcessingTime || 0) > 0
+                        ? formatTime(currentJob.avgProcessingTime || 0)
                         : 'N/A'
                       : currentProcessingStats.avgProcessingTime > 0
                         ? formatTime(
@@ -2120,11 +2533,13 @@ export default function BulkCSVUploadPage() {
                           )
                         : 'N/A'}
                   </div>
-                  <div className="text-sm text-gray-500">Avg Time</div>
+                  <div className="text-sm font-medium text-indigo-700">
+                    Average Processing Time
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-center space-x-4">
+              <div className="flex justify-center space-x-6">
                 <button
                   onClick={downloadResults}
                   disabled={
@@ -2132,14 +2547,14 @@ export default function BulkCSVUploadPage() {
                       ? getJobStats(currentJob).completed === 0
                       : currentProcessingStats.completed === 0
                   }
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 cursor-pointer disabled:cursor-not-allowed"
+                  className="bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 disabled:from-gray-400 disabled:to-gray-500 text-white px-10 py-4 rounded-xl font-bold transition-all flex items-center space-x-3 cursor-pointer disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   <Download className="h-5 w-5" />
                   <span>Download Results CSV</span>
                 </button>
                 <button
                   onClick={resetWorkflow}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-3 rounded-lg font-semibold transition-colors cursor-pointer"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-4 rounded-xl font-bold transition-colors cursor-pointer"
                 >
                   Process New File
                 </button>
@@ -2152,29 +2567,32 @@ export default function BulkCSVUploadPage() {
       {/* Recovery Modal */}
       <RecoveryModal />
 
-      {/* Upgrade Modal */}
+      {/* Enhanced Upgrade Modal */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl max-w-lg w-full p-8 shadow-2xl border border-white/20">
             <div className="text-center">
-              <Crown className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+              <div className="w-16 h-16 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Crown className="h-8 w-8 text-white" />
+              </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
                 Upgrade Required
               </h2>
-              <p className="text-gray-600 mb-6">
+              <p className="text-gray-600 mb-8">
                 Your current plan doesn't support this many products. Upgrade to
-                process larger batches.
+                process larger batches and unlock the full power of bulk content
+                generation.
               </p>
-              <div className="flex space-x-3">
+              <div className="flex space-x-4">
                 <button
                   onClick={handleUpgrade}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-4 rounded-lg font-semibold transition-colors cursor-pointer"
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-semibold transition-all cursor-pointer"
                 >
                   View Plans
                 </button>
                 <button
                   onClick={() => setShowUpgradeModal(false)}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-lg font-semibold transition-colors cursor-pointer"
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 px-4 rounded-xl font-semibold transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2183,6 +2601,32 @@ export default function BulkCSVUploadPage() {
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes blob {
+          0% {
+            transform: translate(0px, 0px) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+          100% {
+            transform: translate(0px, 0px) scale(1);
+          }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+      `}</style>
     </div>
   )
 }

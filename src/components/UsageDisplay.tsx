@@ -219,20 +219,20 @@ const UsageDisplay = ({
     )
   }
 
-  // ADMIN/OWNER DISPLAY
+  // ADMIN/OWNER DISPLAY - Updated with balanced colors
   if (isAdmin) {
     return (
-      <div className="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 rounded-xl border-2 border-purple-200 p-6 mb-6 shadow-sm relative overflow-hidden">
+      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-50 rounded-xl border-2 border-blue-200 p-6 mb-6 shadow-sm relative overflow-hidden">
         {/* Background decoration */}
-        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-200 to-indigo-200 rounded-full opacity-20 -mr-10 -mt-10"></div>
-        <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-blue-200 to-purple-200 rounded-full opacity-20 -ml-8 -mb-8"></div>
+        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-200 to-indigo-200 rounded-full opacity-20 -mr-10 -mt-10"></div>
+        <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-indigo-200 to-blue-200 rounded-full opacity-20 -ml-8 -mb-8"></div>
 
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
-                <Crown className="h-6 w-6 text-purple-600" />
-                <h3 className="text-lg font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                <Crown className="h-6 w-6 text-blue-600" />
+                <h3 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   Owner Access
                 </h3>
               </div>
@@ -244,88 +244,86 @@ const UsageDisplay = ({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-purple-700">
+              <div className="text-2xl font-bold text-blue-700">
                 {monthlyUsage}
                 {isRefreshing && (
                   <span className="ml-2 text-sm">
-                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                   </span>
                 )}
               </div>
-              <div className="text-xs text-purple-600 font-medium">
+              <div className="text-xs text-blue-600 font-medium">
                 generated this month
               </div>
             </div>
           </div>
 
           {/* Infinite Progress Bar */}
-          <div className="w-full bg-purple-200 rounded-full h-3 mb-4 overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-500 h-3 rounded-full w-full relative">
+          <div className="w-full bg-blue-200 rounded-full h-3 mb-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500 h-3 rounded-full w-full relative">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse"></div>
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-indigo-400 animate-pulse"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-indigo-400 animate-pulse"></div>
             </div>
           </div>
 
           {/* Owner Stats Grid */}
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-purple-100">
+            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-blue-100">
               <div className="flex items-center space-x-2">
                 <Zap className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm font-medium text-purple-700">
+                <span className="text-sm font-medium text-blue-700">
                   No Limits
                 </span>
               </div>
-              <div className="text-xs text-purple-600 mt-1">
+              <div className="text-xs text-blue-600 mt-1">
                 Generate unlimited content
               </div>
             </div>
-            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-purple-100">
+            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-blue-100">
               <div className="flex items-center space-x-2">
                 <Target className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-purple-700">
+                <span className="text-sm font-medium text-blue-700">
                   All Features
                 </span>
               </div>
-              <div className="text-xs text-purple-600 mt-1">
+              <div className="text-xs text-blue-600 mt-1">
                 Voice, images, analytics
               </div>
             </div>
           </div>
 
           {/* Owner Features */}
-          <div className="bg-white/40 backdrop-blur-sm rounded-lg p-4 border border-purple-100">
+          <div className="bg-white/40 backdrop-blur-sm rounded-lg p-4 border border-blue-100">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-purple-700 font-medium">
+                <span className="text-blue-700 font-medium">
                   Voice Processing
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-purple-700 font-medium">
+                <span className="text-blue-700 font-medium">
                   Image Analysis
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-purple-700 font-medium">
-                  All Platforms
-                </span>
+                <span className="text-blue-700 font-medium">All Platforms</span>
               </div>
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-purple-700 font-medium">Bulk Upload</span>
+                <span className="text-blue-700 font-medium">Bulk Upload</span>
               </div>
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-purple-700 font-medium">
+                <span className="text-blue-700 font-medium">
                   Admin Dashboard
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-purple-700 font-medium">
+                <span className="text-blue-700 font-medium">
                   Priority Support
                 </span>
               </div>
@@ -333,15 +331,15 @@ const UsageDisplay = ({
           </div>
 
           {/* Owner Info */}
-          <div className="mt-4 pt-4 border-t border-purple-200">
+          <div className="mt-4 pt-4 border-t border-blue-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Crown className="h-4 w-4 text-purple-600" />
-                <span className="text-sm font-bold text-purple-700">
+                <Crown className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-bold text-blue-700">
                   Owner Privileges Active
                 </span>
               </div>
-              <div className="text-xs text-purple-600 font-medium">
+              <div className="text-xs text-blue-600 font-medium">
                 No restrictions • Full access
               </div>
             </div>
@@ -351,7 +349,7 @@ const UsageDisplay = ({
     )
   }
 
-  // Regular user display with upgrade prompts
+  // Regular user display with upgrade prompts - Updated colors
   return (
     <div className="space-y-4 mb-6">
       {/* Upgrade Prompt (Priority Display) */}
@@ -380,7 +378,7 @@ const UsageDisplay = ({
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleUpgrade}
-                className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg"
               >
                 <Rocket className="h-4 w-4" />
                 <span>Upgrade Now</span>
@@ -419,7 +417,7 @@ const UsageDisplay = ({
                     ? 'text-orange-600'
                     : warningLevel === 'warning'
                       ? 'text-yellow-600'
-                      : 'text-gray-600'
+                      : 'text-blue-600'
               }`}
             />
             <h3 className="text-sm font-medium text-gray-700">Monthly Usage</h3>
@@ -458,7 +456,7 @@ const UsageDisplay = ({
                     ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
                     : warningLevel === 'caution'
                       ? 'bg-gradient-to-r from-blue-500 to-yellow-500'
-                      : 'bg-gradient-to-r from-green-500 to-blue-500'
+                      : 'bg-gradient-to-r from-blue-500 to-indigo-500'
             } ${warningLevel === 'limit-reached' ? 'animate-pulse' : ''}`}
             style={{ width: `${Math.min(usagePercentage, 100)}%` }}
           />
@@ -488,7 +486,7 @@ const UsageDisplay = ({
                     ? 'text-orange-600'
                     : warningLevel === 'warning'
                       ? 'text-yellow-600'
-                      : 'text-green-600'
+                      : 'text-blue-600'
               }`}
             >
               {remainingGenerations > 0
@@ -554,7 +552,7 @@ const UsageDisplay = ({
               </div>
               <button
                 onClick={handleUpgrade}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center space-x-2 transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center space-x-2 transition-colors"
               >
                 <Rocket className="h-4 w-4" />
                 <span>Upgrade</span>

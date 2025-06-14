@@ -1,4 +1,4 @@
-// src/components/layout/UniversalHeader.tsx - UPDATED WITH NEW LOGO
+// src/components/layout/UniversalHeader.tsx - ORIGINAL WITH BULK UPLOAD ADDED
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -40,10 +40,11 @@ export default function UniversalHeader({
     checkAdminStatus()
   }, [user, supabase])
 
-  // Navigation items with conditional admin link and new Published Products link
+  // Navigation items with Bulk Upload added
   const navigationItems = [
     { path: '/generate', label: 'Generate', cursor: 'cursor-pointer' },
     { path: '/dashboard', label: 'Content Library', cursor: 'cursor-pointer' },
+    { path: '/bulk', label: 'Bulk Upload', cursor: 'cursor-pointer' },
     {
       path: '/published-products',
       label: 'Published Products',
@@ -72,8 +73,8 @@ export default function UniversalHeader({
 
   return (
     <>
-      {/* Desktop Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm sticky top-0 z-40">
+      {/* Desktop Header with Lighter Background */}
+      <header className="bg-slate-50/95 backdrop-blur-md border-b border-gray-100 shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo Section - Now with Custom Logo */}
@@ -103,6 +104,10 @@ export default function UniversalHeader({
                       item.path === '/published-products'
                         ? 'bg-gradient-to-r from-orange-50 to-red-50 text-orange-700 hover:from-orange-100 hover:to-red-100 border border-orange-200'
                         : ''
+                    } ${
+                      item.path === '/bulk'
+                        ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 hover:from-green-100 hover:to-emerald-100 border border-green-200'
+                        : ''
                     }`}
                   >
                     {item.label}
@@ -114,6 +119,11 @@ export default function UniversalHeader({
                     {item.path === '/published-products' && (
                       <span className="ml-1 text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded-full">
                         📦
+                      </span>
+                    )}
+                    {item.path === '/bulk' && (
+                      <span className="ml-1 text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full">
+                        📊
                       </span>
                     )}
                   </button>
@@ -138,8 +148,8 @@ export default function UniversalHeader({
         </div>
       </header>
 
-      {/* Mobile Navigation */}
-      <div className="md:hidden bg-white/90 border-b border-gray-200 px-4 py-3 sticky top-16 z-30">
+      {/* Mobile Navigation with Matching Light Background */}
+      <div className="md:hidden bg-slate-50/90 border-b border-gray-100 px-4 py-3 sticky top-16 z-30">
         <div className="flex space-x-1 overflow-x-auto">
           {navigationItems.map((item) => (
             <button
@@ -157,6 +167,10 @@ export default function UniversalHeader({
                 item.path === '/published-products'
                   ? 'bg-gradient-to-r from-orange-50 to-red-50 text-orange-700 border border-orange-200'
                   : ''
+              } ${
+                item.path === '/bulk'
+                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border border-green-200'
+                  : ''
               }`}
             >
               {item.label}
@@ -168,6 +182,11 @@ export default function UniversalHeader({
               {item.path === '/published-products' && (
                 <span className="ml-1 text-xs bg-orange-500 text-white px-1 py-0.5 rounded-full">
                   📦
+                </span>
+              )}
+              {item.path === '/bulk' && (
+                <span className="ml-1 text-xs bg-green-500 text-white px-1 py-0.5 rounded-full">
+                  📊
                 </span>
               )}
             </button>

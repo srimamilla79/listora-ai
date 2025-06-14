@@ -370,15 +370,71 @@ export default function ProductForm({
 
   const startRecording = async () => {
     try {
+      // Debug environment
+      console.log('🔍 Environment Debug:', {
+        protocol: location.protocol,
+        hostname: location.hostname,
+        isSecureContext: window.isSecureContext,
+        hasMediaDevices: !!navigator.mediaDevices,
+        hasGetUserMedia: !!navigator.mediaDevices?.getUserMedia,
+      })
+
+      // Check permission state if available
+      if ('permissions' in navigator) {
+        try {
+          const permission = await navigator.permissions.query({
+            name: 'microphone' as PermissionName,
+          })
+          console.log('🎤 Permission state:', permission.state)
+
+          if (permission.state === 'denied') {
+            addNotification(
+              "Microphone access was previously denied. Please click the camera/microphone icon in your browser's address bar and allow access, then try again.",
+              'error'
+            )
+            return
+          }
+        } catch (permError) {
+          console.log('Permission check failed:', permError)
+        }
+      }
+
+      // Check if we're on HTTPS (required for microphone access)
+      if (
+        location.protocol !== 'https:' &&
+        location.hostname !== 'localhost' &&
+        location.hostname !== '127.0.0.1'
+      ) {
+        addNotification(
+          'Microphone access requires HTTPS. Please use a secure connection.',
+          'error'
+        )
+        return
+      }
+
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        addNotification(
+          'Your browser does not support microphone access. Please use a modern browser.',
+          'error'
+        )
+        return
+      }
+
+      console.log('🎤 Requesting microphone access...')
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: { ideal: 22050, min: 16000, max: 44100 },
-          channelCount: 1,
           autoGainControl: true,
+          // Remove potentially problematic constraints for better compatibility
+          // sampleRate: { ideal: 22050, min: 16000, max: 44100 },
+          // channelCount: 1,
         },
       })
+
+      console.log('✅ Microphone access granted')
 
       const mimeTypes = [
         'audio/webm;codecs=opus',
@@ -424,12 +480,53 @@ export default function ProductForm({
       intervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1)
       }, 1000)
-    } catch (error) {
-      console.error('Error starting recording:', error)
+
       addNotification(
-        'Failed to access microphone. Please check permissions.',
-        'error'
+        '🎤 Recording started! Speak clearly about your product.',
+        'success'
       )
+    } catch (error) {
+      console.error('Microphone access error:', error)
+
+      // Provide specific error messages based on error type
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          addNotification(
+            'Microphone access denied. Please allow microphone permissions in your browser settings and try again.',
+            'error'
+          )
+        } else if (error.name === 'NotFoundError') {
+          addNotification(
+            'No microphone found. Please check that a microphone is connected to your device.',
+            'error'
+          )
+        } else if (error.name === 'NotSupportedError') {
+          addNotification(
+            'Your browser does not support microphone recording. Please try a different browser.',
+            'error'
+          )
+        } else if (error.name === 'NotReadableError') {
+          addNotification(
+            'Microphone is being used by another application. Please close other apps using the microphone and try again.',
+            'error'
+          )
+        } else if (error.message && error.message.trim()) {
+          addNotification(
+            `Microphone error: ${error.message}. Please check your microphone settings.`,
+            'error'
+          )
+        } else {
+          addNotification(
+            'Failed to access microphone. Please check permissions and try again.',
+            'error'
+          )
+        }
+      } else {
+        addNotification(
+          'Failed to access microphone. Please check permissions and try again.',
+          'error'
+        )
+      }
     }
   }
 
@@ -442,6 +539,10 @@ export default function ProductForm({
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
+      addNotification(
+        '🎤 Recording stopped! Click "Generate Content" to process.',
+        'success'
+      )
     }
   }
 
@@ -1367,8 +1468,8 @@ export default function ProductForm({
   if (!mounted || !supabase) {
     return (
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-          <div className="bg-gradient-to-r from-slate-600 via-gray-700 to-slate-800 px-8 py-8">
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/50">
+          <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-gray-900 px-8 py-8">
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
             </div>
@@ -1627,8 +1728,8 @@ export default function ProductForm({
         </div>
       )}
 
-      <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-        <div className="bg-gradient-to-r from-slate-600 via-gray-700 to-slate-800 px-8 py-8">
+      <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/50">
+        <div className="bg-gradient-to-r from-indigo-700 via-slate-700 to-gray-700 px-8 py-8">
           <h2 className="text-3xl font-bold text-white flex items-center">
             <Sparkles className="mr-3 h-8 w-8" />
             AI Content Generator
@@ -1657,22 +1758,6 @@ export default function ProductForm({
         </div>
 
         <div className="p-8">
-          {/* Persistent bulk upload option */}
-          <div className="flex items-center justify-between mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center space-x-2">
-              <FileSpreadsheet className="h-4 w-4 text-gray-600" />
-              <span className="text-sm text-gray-600">
-                Need to process multiple products?
-              </span>
-            </div>
-            <button
-              onClick={() => router.push('/bulk')}
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm px-3 py-1 rounded-md hover:bg-blue-50 transition-colors"
-            >
-              Bulk Upload →
-            </button>
-          </div>
-
           {/* Voice Integration Section */}
           <div className="mb-8 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
             <div className="flex items-center justify-between mb-4">
@@ -1724,7 +1809,37 @@ export default function ProductForm({
                 </div>
               </div>
             </div>
-
+            // Add this before your voice recorder section
+            {showVoiceRecorder && (
+              <div className="mb-4">
+                <div className="flex items-center space-x-2 text-sm text-gray-600 bg-blue-50 rounded-lg p-3">
+                  <div className="flex items-center space-x-1">
+                    <span>🔒</span>
+                    <span>Protocol: {location.protocol}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span>🎤</span>
+                    <span>
+                      Permission:{' '}
+                      {typeof navigator !== 'undefined' &&
+                      'permissions' in navigator
+                        ? 'Available'
+                        : 'Basic'}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span>🌐</span>
+                    <span>
+                      Browser:{' '}
+                      {typeof navigator !== 'undefined' &&
+                      navigator.userAgent.includes('Chrome')
+                        ? 'Chrome'
+                        : 'Other'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Voice Recorder */}
             {showVoiceRecorder && (
               <div className="mt-4 bg-white rounded-xl p-6 border border-gray-200">
@@ -1854,7 +1969,6 @@ export default function ProductForm({
                 </div>
               </div>
             )}
-
             {/* Voice Status */}
             {isVoiceContentAvailable && (
               <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
