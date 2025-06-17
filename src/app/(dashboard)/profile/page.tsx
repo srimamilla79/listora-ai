@@ -1,4 +1,4 @@
-// src/app/(dashboard)/profile/page.tsx - ENHANCED VERSION
+// src/app/(dashboard)/profile/page.tsx - MINIMAL FIX FOR USAGE DATA
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -79,12 +79,12 @@ export default function EnhancedProfilePage() {
   // Notifications
   const [notifications, setNotifications] = useState<ToastNotification[]>([])
 
-  // Usage stats (mock data - replace with real data)
+  // 🔧 FIXED: Real usage stats instead of hardcoded data
   const [usageStats, setUsageStats] = useState({
-    currentMonth: 7,
+    currentMonth: 0,
     limit: 10,
-    totalGenerated: 1247,
-    savedTime: 156,
+    totalGenerated: 0,
+    savedTime: 0,
   })
 
   useEffect(() => {
@@ -92,6 +92,104 @@ export default function EnhancedProfilePage() {
     const supabaseClient = createClient()
     setSupabase(supabaseClient)
   }, [])
+
+  // 🔧 FIXED: Real usage data fetching function
+  const fetchRealUsageStats = async (userId: string) => {
+    if (!supabase || !userId) return
+
+    console.log('🔍 Fetching real usage data for user:', userId)
+
+    try {
+      // Get current month usage (same logic as Monthly Usage section)
+      const currentMonth = new Date().toISOString().slice(0, 7) // '2025-06'
+
+      // Parallel queries for better performance
+      const [usageResult, planResult, totalContentResult] = await Promise.all([
+        // Current month usage
+        supabase
+          .from('user_usage_tracking')
+          .select('usage_count')
+          .eq('user_id', userId)
+          .eq('month_year', currentMonth)
+          .single(),
+
+        // User plan
+        supabase
+          .from('user_plans')
+          .select('plan_type')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .single(),
+
+        // Total generated content count
+        supabase
+          .from('product_contents')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId),
+      ])
+
+      const { data: usageData, error: usageError } = usageResult
+      const { data: planData, error: planError } = planResult
+      const { count: totalGenerated, error: totalError } = totalContentResult
+
+      console.log('🔍 Database results:', {
+        usageData,
+        usageError,
+        planData,
+        totalGenerated,
+      })
+
+      // Handle current month usage
+      let currentUsage = 0
+      if (usageData && !usageError) {
+        currentUsage = usageData.usage_count || 0
+      } else if (usageError && usageError.code !== 'PGRST116') {
+        // If error is not "no rows found", try fallback count
+        console.log('🔍 Using fallback count method')
+        const startOfMonth = `${currentMonth}-01T00:00:00.000Z`
+        const { count: fallbackCount } = await supabase
+          .from('product_contents')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('created_at', startOfMonth)
+
+        currentUsage = fallbackCount || 0
+      }
+
+      // Handle plan limits
+      const planLimits = {
+        starter: 10,
+        business: 250,
+        premium: 1000,
+        enterprise: 999999,
+      }
+
+      const planType = planData?.plan_type || 'starter'
+      const limit = planLimits[planType as keyof typeof planLimits] || 10
+
+      // Calculate time saved (rough estimate: 0.125 hours per content piece)
+      const timeSpent = Math.floor((totalGenerated || 0) * 0.125)
+
+      const newUsageStats = {
+        currentMonth: currentUsage,
+        limit: limit,
+        totalGenerated: totalGenerated || 0,
+        savedTime: timeSpent,
+      }
+
+      console.log('✅ Real usage stats calculated:', newUsageStats)
+      setUsageStats(newUsageStats)
+    } catch (error) {
+      console.error('❌ Error fetching usage stats:', error)
+      // Keep default values on error
+      setUsageStats({
+        currentMonth: 0,
+        limit: 10,
+        totalGenerated: 0,
+        savedTime: 0,
+      })
+    }
+  }
 
   // Add notification function
   const addNotification = (
@@ -131,6 +229,9 @@ export default function EnhancedProfilePage() {
 
         // Load subscription data
         await loadSubscription(session.user.id)
+
+        // 🔧 FIXED: Load real usage data
+        await fetchRealUsageStats(session.user.id)
       } catch (error) {
         console.error('Error loading user data:', error)
         addNotification('Failed to load profile data', 'error')
@@ -771,7 +872,8 @@ export default function EnhancedProfilePage() {
                             </p>
                             {subscription.plan_name === 'Starter' && (
                               <p className="text-sm text-gray-600 mt-1">
-                                10 free content generations monthly
+                                {usageStats.limit} free content generations
+                                monthly
                               </p>
                             )}
                           </div>
