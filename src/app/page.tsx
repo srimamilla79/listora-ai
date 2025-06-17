@@ -1008,22 +1008,26 @@ export default function HomePage() {
               complete feature set.
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               {
-                name: 'Starter',
+                name: 'Starter (Free)',
                 price: 'Free',
                 period: 'forever',
-                description: 'Perfect for testing our platform',
+                description: 'Perfect for testing our AI platform',
                 limit: '10 content generations/month',
                 features: [
-                  'AI content generation from text',
-                  'Single image upload and processing',
-                  'Platform-specific content formats',
+                  'Manual content generation (text input)',
+                  'Voice-to-content generation (up to 1 minute)',
+                  'AI Vision analysis (brands, colors, features)',
+                  'Amazon-optimized content format',
+                  'Content library access',
                   'Email support',
-                  'Access to all content templates',
-                  'Basic CSV upload (up to 10 products)',
+                ],
+                limitations: [
+                  'No bulk CSV upload',
+                  'No background processing',
+                  'No direct Amazon publishing',
                 ],
                 cta: '🚀 Start Free',
                 popular: false,
@@ -1033,17 +1037,20 @@ export default function HomePage() {
                 name: 'Business',
                 price: '$29',
                 period: 'per month',
-                description: 'For growing entrepreneurs',
+                description: 'Scale your content creation with bulk processing',
                 limit: '250 content generations/month',
                 badge: 'Most Popular',
                 features: [
-                  'Everything in Starter',
-                  'Voice-to-content generation',
-                  'OpenAI Vision image analysis',
+                  'Everything in Starter plan',
                   'Bulk CSV upload (up to 50 products)',
-                  'Background processing jobs',
-                  'Advanced image optimization',
+                  'Background job processing',
+                  'Content library with organization',
                   'Priority email support',
+                ],
+                newCapabilities: [
+                  'Bulk workflow automation',
+                  'Background processing',
+                  'Higher generation limits',
                 ],
                 cta: '🎯 Start Free Trial',
                 popular: true,
@@ -1054,17 +1061,20 @@ export default function HomePage() {
                 name: 'Premium',
                 price: '$79',
                 period: 'per month',
-                description: 'For scaling businesses',
-                limit: '1000 content generations/month',
+                description: 'Professional scale with Amazon integration',
+                limit: '1,000 content generations/month',
                 features: [
-                  'Everything in Business',
-                  'Bulk CSV upload (up to 200 products)',
-                  'Advanced background processing',
-                  'Bulk content generation',
-                  'Advanced content customization',
-                  'Enhanced voice processing',
-                  'Batch export capabilities',
-                  'Direct Amazon publishing',
+                  'Everything in Business plan',
+                  'Large bulk CSV upload (up to 200 products)',
+                  'Direct Amazon publishing integration',
+                  'Enhanced voice processing (full 1-minute)',
+                  'Advanced AI Vision analysis',
+                  'Bulk export options (CSV, Excel)',
+                ],
+                differentiators: [
+                  'Direct Amazon integration',
+                  'Higher bulk limits',
+                  'Enhanced AI features',
                 ],
                 cta: '💎 Start Free Trial',
                 popular: false,
@@ -1075,17 +1085,19 @@ export default function HomePage() {
                 name: 'Enterprise',
                 price: '$199',
                 period: 'per month',
-                description: 'For large organizations',
+                description: 'Unlimited scale for enterprise needs',
                 limit: 'Unlimited content generations',
                 features: [
-                  'Everything in Premium',
-                  'Bulk CSV upload (up to 1000 products)',
-                  'Mass background processing',
-                  'Priority processing queues',
-                  'Advanced bulk operations',
-                  'Priority phone support',
-                  'Custom content templates',
-                  'Dedicated account manager',
+                  'Everything in Premium plan',
+                  'Enterprise bulk processing (up to 1,000 products)',
+                  'Direct Amazon publishing (unlimited)',
+                  'Priority support (faster response)',
+                  'Large-scale background processing',
+                ],
+                futureFeatures: [
+                  'Custom integrations (contact us)',
+                  'White-label solutions (contact us)',
+                  'Additional platform integrations',
                 ],
                 cta: '🚀 Start Free Trial',
                 popular: false,
@@ -1121,39 +1133,111 @@ export default function HomePage() {
                       <span className="text-gray-600 ml-1">/{plan.period}</span>
                     )}
                   </div>
+
+                  <button
+                    onClick={handleSignup}
+                    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all mb-4 cursor-pointer ${
+                      plan.popular
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                        : 'bg-gray-900 hover:bg-gray-800 text-white hover:shadow-lg'
+                    }`}
+                  >
+                    {plan.cta}
+                  </button>
+
                   <p className="text-gray-600 mb-2">{plan.description}</p>
                   <p className="text-sm font-semibold text-indigo-600">
                     {plan.limit}
                   </p>
                 </div>
 
-                <ul className="space-y-4 mb-8">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start space-x-3">
-                      <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-700">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="space-y-4 mb-8">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                      ✅ Included Features:
+                    </h4>
+                    <ul className="space-y-3">
+                      {plan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start space-x-3">
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-700 text-sm">
+                            {feature}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-                <button
-                  onClick={handleSignup}
-                  className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all cursor-pointer ${
-                    plan.popular
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-                      : 'bg-gray-900 hover:bg-gray-800 text-white hover:shadow-lg'
-                  }`}
-                >
-                  {plan.cta}
-                </button>
+                  {/* Limitations for Starter */}
+                  {plan.limitations && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        ⚠️ Limitations:
+                      </h4>
+                      <ul className="space-y-2">
+                        {plan.limitations.map((limitation, idx) => (
+                          <li key={idx} className="flex items-start space-x-3">
+                            <span className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
+                              ❌
+                            </span>
+                            <span className="text-gray-600 text-sm">
+                              {limitation}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* New Capabilities for Business */}
+                  {plan.newCapabilities && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        🚀 New Capabilities:
+                      </h4>
+                      <ul className="space-y-2">
+                        {plan.newCapabilities.map((capability, idx) => (
+                          <li key={idx} className="flex items-start space-x-3">
+                            <Star className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                            <span className="text-blue-700 text-sm font-medium">
+                              {capability}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Future Features for Enterprise */}
+                  {plan.futureFeatures && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        🔮 Future Features (Contact Us):
+                      </h4>
+                      <ul className="space-y-2">
+                        {plan.futureFeatures.map((feature, idx) => (
+                          <li key={idx} className="flex items-start space-x-3">
+                            <span className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5">
+                              🏢
+                            </span>
+                            <span className="text-purple-700 text-sm">
+                              {feature}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
 
                 <div className="mt-6 text-center text-sm text-gray-500">
-                  ✓ 14-day free trial • ✓ No setup fees • ✓ Cancel anytime
+                  {plan.name === 'Starter (Free)'
+                    ? '✓ No credit card required • ✓ Forever free'
+                    : '✓ 14-day free trial • ✓ No setup fees • ✓ Cancel anytime'}
                 </div>
               </div>
             ))}
           </div>
-
           <div className="mt-16 text-center">
             <p className="text-gray-600 mb-6">
               Need a custom solution for your enterprise?

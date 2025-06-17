@@ -1,4 +1,4 @@
-// src/app/(dashboard)/pricing/page.tsx - ENHANCED MODERN DESIGN
+// src/app/(dashboard)/pricing/page.tsx - UPDATED WITH REALISTIC FEATURES
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -23,6 +23,12 @@ import {
   ShoppingCart,
   Award,
   CheckCircle,
+  Eye,
+  Cloud,
+  FileText,
+  Volume2,
+  Timer,
+  Building2,
 } from 'lucide-react'
 
 interface UserPlan {
@@ -59,12 +65,78 @@ export default function EnhancedPricingPage() {
 
   const getDisplayPlanName = (planName: string): string => {
     const displayNames = {
-      starter: 'Starter',
+      starter: 'Starter (Free)',
       business: 'Business',
       premium: 'Premium',
       enterprise: 'Enterprise',
     }
-    return displayNames[planName as keyof typeof displayNames] || 'Starter'
+    return (
+      displayNames[planName as keyof typeof displayNames] || 'Starter (Free)'
+    )
+  }
+
+  const handleLogin = () => {
+    window.location.href = '/login'
+  }
+
+  const handleUpgrade = async (planType: string) => {
+    if (!user) {
+      alert('Please log in first')
+      return
+    }
+
+    setLoading(true)
+    setProcessingPlan(planType)
+
+    try {
+      console.log('🚀 Starting upgrade to:', planType)
+
+      // Map your planType to the correct plan names that your API expects
+      const planMapping = {
+        business: 'pro', // Your API expects 'pro' for business plan
+        premium: 'premium', // This should match
+        enterprise: 'enterprise', // This should match
+      }
+
+      const apiPlanName =
+        planMapping[planType as keyof typeof planMapping] || planType
+
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan: apiPlanName,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session')
+      }
+
+      if (data.url) {
+        console.log('✅ Redirecting to Stripe checkout:', data.url)
+        window.location.href = data.url
+      } else {
+        throw new Error('No checkout URL received')
+      }
+    } catch (error) {
+      console.error('❌ Upgrade error:', error)
+      alert('Failed to start checkout. Please try again.')
+    } finally {
+      setLoading(false)
+      setProcessingPlan(null)
+    }
+  }
+
+  const getUsageColor = (current: number, limit: number) => {
+    const percentage = (current / limit) * 100
+    if (percentage >= 90) return 'from-red-500 to-red-600'
+    if (percentage >= 70) return 'from-yellow-500 to-orange-500'
+    return 'from-green-500 to-emerald-500'
   }
 
   useEffect(() => {
@@ -183,101 +255,32 @@ export default function EnhancedPricingPage() {
     }
   }
 
-  const handleLogin = () => {
-    window.location.href = '/login'
-  }
-
-  const handleUpgrade = async (planType: string) => {
-    if (!user) {
-      alert('Please log in first')
-      return
-    }
-
-    setLoading(true)
-    setProcessingPlan(planType)
-
-    try {
-      console.log('🚀 Starting upgrade to:', planType)
-
-      // Map your planType to the correct plan names that your API expects
-      const planMapping = {
-        business: 'pro', // Your API expects 'pro' for business plan
-        premium: 'premium', // This should match
-        enterprise: 'enterprise', // This should match
-      }
-
-      const apiPlanName =
-        planMapping[planType as keyof typeof planMapping] || planType
-
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plan: apiPlanName,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout session')
-      }
-
-      if (data.url) {
-        console.log('✅ Redirecting to Stripe checkout:', data.url)
-        window.location.href = data.url
-      } else {
-        throw new Error('No checkout URL received')
-      }
-    } catch (error) {
-      console.error('❌ Upgrade error:', error)
-      alert('Failed to start checkout. Please try again.')
-    } finally {
-      setLoading(false)
-      setProcessingPlan(null)
-    }
-  }
-
-  const getUsageColor = (current: number, limit: number) => {
-    const percentage = (current / limit) * 100
-    if (percentage >= 90) return 'from-red-500 to-red-600'
-    if (percentage >= 70) return 'from-yellow-500 to-orange-500'
-    return 'from-green-500 to-emerald-500'
-  }
-
-  if (!authChecked || !mounted || !supabase) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 mt-4">Loading pricing...</p>
-        </div>
-      </div>
-    )
-  }
+  const remainingGenerations = currentLimit - currentUsage
+  const usagePercentage =
+    currentLimit > 0 ? (currentUsage / currentLimit) * 100 : 0
 
   const plans = [
     {
-      name: 'Starter',
+      name: 'Starter (Free)',
       price: 0,
       period: 'forever',
-      description: 'Perfect for testing our platform',
+      description: 'Perfect for testing our AI platform',
       badge: 'Free Forever',
       features: [
         '10 content generations per month',
-        'AI content generation from text',
-        'Single image upload and processing',
-        'Platform-specific content formats',
+        'Manual content generation (text input)',
+        'Voice-to-content generation (up to 1 minute)',
+        'AI Vision analysis (brands, colors, features)',
+        'Amazon-optimized content format',
+        'Content library access',
         'Email support',
-        'Access to all content templates',
       ],
-      highlights: [
-        'Voice to content',
-        'OpenAI Vision',
-        'Platform optimization',
+      limitations: [
+        'No bulk CSV upload',
+        'No background processing',
+        'No direct Amazon publishing',
       ],
+      highlights: ['Voice input', 'AI Vision', 'Free forever'],
       icon: Sparkles,
       planType: 'starter',
       popular: false,
@@ -289,18 +292,22 @@ export default function EnhancedPricingPage() {
       name: 'Business',
       price: 29,
       period: 'month',
-      description: 'For growing entrepreneurs',
+      description: 'Scale your content creation with bulk processing',
       badge: 'Most Popular',
       features: [
         '250 content generations per month',
-        'Everything in Starter',
-        'Voice-to-content generation',
+        'Everything in Starter plan',
         'Bulk CSV upload (up to 50 products)',
-        'Advanced image optimization',
-        'Multiple platform formats',
+        'Background job processing',
+        'Content library with organization',
         'Priority email support',
       ],
-      highlights: ['Background processing', 'Bulk uploads', 'Priority support'],
+      newCapabilities: [
+        'Bulk workflow automation',
+        'Background processing',
+        'Higher generation limits',
+      ],
+      highlights: ['Background jobs', 'Bulk uploads', 'Priority support'],
       icon: Zap,
       planType: 'business',
       popular: true,
@@ -312,18 +319,23 @@ export default function EnhancedPricingPage() {
       name: 'Premium',
       price: 79,
       period: 'month',
-      description: 'For scaling businesses',
+      description: 'Professional scale with Amazon integration',
       badge: 'Best Value',
       features: [
         '1,000 content generations per month',
-        'Everything in Business',
-        'Bulk CSV upload (up to 200 products)',
-        'Bulk content generation',
-        'Advanced content customization',
-        'Enhanced voice processing',
-        'Batch export capabilities',
+        'Everything in Business plan',
+        'Large bulk CSV upload (up to 200 products)',
+        'Direct Amazon publishing integration',
+        'Enhanced voice processing (full 1-minute)',
+        'Advanced AI Vision analysis',
+        'Bulk export options (CSV, Excel)',
       ],
-      highlights: ['Advanced AI', 'Mass processing', 'Custom templates'],
+      differentiators: [
+        'Direct Amazon integration',
+        'Higher bulk limits',
+        'Enhanced AI features',
+      ],
+      highlights: ['Amazon publishing', 'Advanced AI', 'Export options'],
       icon: Crown,
       planType: 'premium',
       popular: false,
@@ -335,18 +347,27 @@ export default function EnhancedPricingPage() {
       name: 'Enterprise',
       price: 199,
       period: 'month',
-      description: 'For large organizations',
-      badge: 'Enterprise',
+      description: 'Unlimited scale for enterprise needs',
+      badge: 'Maximum Scale',
       features: [
         'Unlimited content generations',
-        'Everything in Premium',
-        'Bulk CSV upload (up to 1,000 products)',
-        'Mass content generation',
-        'Priority phone support',
-        'Custom content templates',
-        'Advanced batch processing',
+        'Everything in Premium plan',
+        'Enterprise bulk processing (up to 1,000 products)',
+        'Direct Amazon publishing (unlimited)',
+        'Priority support (faster response)',
+        'Large-scale background processing',
       ],
-      highlights: ['Unlimited usage', 'Phone support', 'Custom solutions'],
+      benefits: [
+        'No usage limits',
+        'Maximum bulk capacity',
+        'Priority support',
+      ],
+      futureFeatures: [
+        'Custom integrations (contact us)',
+        'White-label solutions (contact us)',
+        'Additional platform integrations',
+      ],
+      highlights: ['Unlimited usage', 'Priority support', 'Enterprise scale'],
       icon: Rocket,
       planType: 'enterprise',
       popular: false,
@@ -356,9 +377,16 @@ export default function EnhancedPricingPage() {
     },
   ]
 
-  const remainingGenerations = currentLimit - currentUsage
-  const usagePercentage =
-    currentLimit > 0 ? (currentUsage / currentLimit) * 100 : 0
+  if (!authChecked || !mounted || !supabase) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 mt-4">Loading pricing...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
@@ -372,14 +400,26 @@ export default function EnhancedPricingPage() {
       <div className="relative max-w-7xl mx-auto px-4 py-16">
         {/* Enhanced Header */}
         <div className="text-center mb-16">
-          {/* Badge */}
-          <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-6 py-3 mb-8">
-            <Star className="h-5 w-5 text-indigo-600" />
-            <span className="text-sm font-medium text-indigo-800">
-              Transparent pricing • No hidden fees • Cancel anytime
-            </span>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </div>
+          {/* Badge - Conditional based on user plan */}
+          {!user || currentPlan === 'starter' ? (
+            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-full px-6 py-3 mb-8">
+              <Star className="h-5 w-5 text-green-600" />
+              <span className="text-sm font-medium text-green-800">
+                🎉 10 Free Generations Monthly • No Credit Card Required •
+                Honest Pricing
+              </span>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </div>
+          ) : (
+            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-6 py-3 mb-8">
+              <Crown className="h-5 w-5 text-indigo-600" />
+              <span className="text-sm font-medium text-indigo-800">
+                {getDisplayPlanName(currentPlan)} Plan • Transparent Pricing •
+                Change Anytime
+              </span>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </div>
+          )}
 
           {user ? (
             <>
@@ -392,19 +432,25 @@ export default function EnhancedPricingPage() {
               <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">
                 Upgrade or downgrade your plan anytime. Changes take effect
                 immediately with pro-rated billing.
+                <span className="font-semibold text-gray-800 block mt-2">
+                  Only pay for features you actually use.
+                </span>
               </p>
             </>
           ) : (
             <>
               <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-                Simple, Transparent
+                Honest, Transparent
                 <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
                   Pricing
                 </span>
               </h1>
               <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">
                 Start with 10 free generations forever. Scale as you grow with
-                powerful AI content creation tools.
+                Voice + AI Vision + Bulk Processing + Amazon Integration.
+                <span className="font-semibold text-gray-800 block mt-2">
+                  Only pay for features you actually use.
+                </span>
               </p>
             </>
           )}
@@ -502,14 +548,22 @@ export default function EnhancedPricingPage() {
                     </p>
                   </div>
 
-                  <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                  <div
+                    className={`rounded-xl p-4 border ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}
+                  >
                     <div className="flex items-center space-x-2 mb-2">
-                      <Upload className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-semibold text-green-900">
+                      <Upload
+                        className={`h-5 w-5 ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'text-red-600' : 'text-green-600'}`}
+                      />
+                      <span
+                        className={`text-sm font-semibold ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'text-red-900' : 'text-green-900'}`}
+                      >
                         Bulk Upload
                       </span>
                     </div>
-                    <p className="text-sm text-green-700">
+                    <p
+                      className={`text-sm ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'text-red-700' : 'text-green-700'}`}
+                    >
                       {getPlanLimit(currentPlan).bulkProducts === 0
                         ? 'Not Available'
                         : `Up to ${getPlanLimit(currentPlan).bulkProducts} products`}
@@ -524,7 +578,7 @@ export default function EnhancedPricingPage() {
                       </span>
                     </div>
                     <p className="text-sm text-purple-700">
-                      All platforms supported
+                      Voice + Vision + Amazon
                     </p>
                   </div>
                 </div>
@@ -536,29 +590,29 @@ export default function EnhancedPricingPage() {
         {/* Feature Highlights */}
         <div className="text-center mb-16">
           <h2 className="text-2xl font-bold text-gray-900 mb-8">
-            Everything you need to scale content creation
+            What makes Listora AI different
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
             {[
               {
-                icon: Mic,
+                icon: Volume2,
                 label: 'Voice to Content',
-                desc: '30 seconds to professional copy',
+                desc: '1-minute voice → professional copy',
               },
               {
-                icon: Camera,
+                icon: Eye,
                 label: 'AI Vision Analysis',
-                desc: 'OpenAI sees your products',
+                desc: 'Reads brands, colors from images',
+              },
+              {
+                icon: Cloud,
+                label: 'Background Processing',
+                desc: 'Bulk jobs run while you work',
               },
               {
                 icon: ShoppingCart,
-                label: 'Direct Publishing',
-                desc: 'One-click to Amazon',
-              },
-              {
-                icon: Upload,
-                label: 'Bulk Processing',
-                desc: 'Background job handling',
+                label: 'Amazon Publishing',
+                desc: 'One-click to Seller Central',
               },
             ].map((feature, index) => {
               const Icon = feature.icon
@@ -581,7 +635,7 @@ export default function EnhancedPricingPage() {
         </div>
 
         {/* Enhanced Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16 items-start">
           {plans.map((plan) => {
             const Icon = plan.icon
             const isCurrentPlan = user && currentPlan === plan.planType
@@ -640,6 +694,61 @@ export default function EnhancedPricingPage() {
                     )}
                   </div>
 
+                  {/* Upgrade/Downgrade Button right under price */}
+                  {user && (
+                    <div className="mb-4">
+                      {plan.planType === currentPlan ? (
+                        <div className="w-full py-2 px-4 rounded-lg text-sm font-semibold bg-green-100 text-green-800 flex items-center justify-center">
+                          <Award className="mr-2 h-4 w-4" />
+                          Current Plan
+                        </div>
+                      ) : (
+                        (() => {
+                          const isUpgrade =
+                            getPlanLimit(plan.planType).generations >
+                            getPlanLimit(currentPlan).generations
+                          const isDowngrade =
+                            getPlanLimit(plan.planType).generations <
+                            getPlanLimit(currentPlan).generations
+
+                          return (
+                            <button
+                              onClick={() => handleUpgrade(plan.planType)}
+                              disabled={loading}
+                              className={`w-full py-2 px-4 rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center ${
+                                isUpgrade
+                                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                                  : isDowngrade
+                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
+                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              {loading && processingPlan === plan.planType ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  {isUpgrade ? (
+                                    <ArrowRight className="h-4 w-4 mr-1 rotate-45" />
+                                  ) : isDowngrade ? (
+                                    <ArrowRight className="h-4 w-4 mr-1 rotate-[-135deg]" />
+                                  ) : null}
+                                  {isUpgrade
+                                    ? 'Upgrade'
+                                    : isDowngrade
+                                      ? 'Downgrade'
+                                      : 'Switch'}
+                                </>
+                              )}
+                            </button>
+                          )
+                        })()
+                      )}
+                    </div>
+                  )}
+
                   <p className="text-gray-600 mb-4">{plan.description}</p>
 
                   {/* Plan Highlights */}
@@ -656,80 +765,312 @@ export default function EnhancedPricingPage() {
                 </div>
 
                 {/* Features List */}
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-700 leading-relaxed">
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="space-y-4 mb-8">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                      ✅ Included Features:
+                    </h4>
+                    <ul className="space-y-2">
+                      {plan.features.map((feature, index) => (
+                        <li key={index} className="flex items-start text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-700 leading-relaxed">
+                            {feature}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-                {/* CTA Button */}
-                <button
-                  onClick={() => {
-                    if (!user && plan.planType !== 'starter') {
-                      handleLogin()
-                    } else if (plan.planType && !isCurrentPlan) {
-                      handleUpgrade(plan.planType)
-                    }
-                  }}
-                  disabled={isCurrentPlan || loading}
-                  className={`group w-full py-4 px-6 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center ${
-                    isCurrentPlan
-                      ? 'bg-green-100 text-green-800 cursor-default'
-                      : plan.popular
-                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-                        : 'bg-gray-900 hover:bg-gray-800 text-white shadow-lg hover:shadow-xl'
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
-                >
-                  {loading && processingPlan === plan.planType ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Processing...
-                    </>
-                  ) : !user && plan.planType !== 'starter' ? (
-                    <>
-                      Sign In to Upgrade
-                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  ) : isCurrentPlan ? (
-                    <>
-                      <Award className="mr-2 h-4 w-4" />
-                      Current Plan
-                    </>
-                  ) : user ? (
-                    <>
-                      {currentPlan === 'enterprise'
-                        ? 'Downgrade'
-                        : getPlanLimit(plan.planType).generations >
-                            getPlanLimit(currentPlan).generations
-                          ? 'Upgrade'
-                          : 'Switch'}
-                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  ) : (
-                    <>
-                      Get {plan.name}
-                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </>
+                  {/* Limitations for Starter */}
+                  {plan.limitations && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        ⚠️ Limitations:
+                      </h4>
+                      <ul className="space-y-2">
+                        {plan.limitations.map((limitation, index) => (
+                          <li key={index} className="flex items-start text-sm">
+                            <span className="w-4 h-4 text-red-500 mr-3 flex-shrink-0 mt-0.5">
+                              ❌
+                            </span>
+                            <span className="text-gray-600 leading-relaxed">
+                              {limitation}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
-                </button>
+
+                  {/* New Capabilities */}
+                  {plan.newCapabilities && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        🚀 New Capabilities:
+                      </h4>
+                      <ul className="space-y-2">
+                        {plan.newCapabilities.map((capability, index) => (
+                          <li key={index} className="flex items-start text-sm">
+                            <Star className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0 mt-0.5" />
+                            <span className="text-blue-700 leading-relaxed font-medium">
+                              {capability}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Future Features for Enterprise */}
+                  {plan.futureFeatures && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        🔮 Future Features (Contact Us):
+                      </h4>
+                      <ul className="space-y-2">
+                        {plan.futureFeatures.map((feature, index) => (
+                          <li key={index} className="flex items-start text-sm">
+                            <Building2 className="h-4 w-4 text-purple-500 mr-3 flex-shrink-0 mt-0.5" />
+                            <span className="text-purple-700 leading-relaxed">
+                              {feature}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
 
                 {/* Value indicator for free plan */}
-                {plan.planType === 'starter' && (
+                {plan.planType === 'starter' && !user && (
                   <div className="mt-4 text-center">
                     <p className="text-sm text-green-600 font-medium flex items-center justify-center">
                       <Sparkles className="h-4 w-4 mr-1" />
-                      Worth $97/month • Yours free forever
+                      No credit card required • Forever free
                     </p>
+                  </div>
+                )}
+
+                {/* Sign in button for non-logged users on paid plans */}
+                {!user && plan.planType !== 'starter' && (
+                  <div className="mt-6">
+                    <button
+                      onClick={handleLogin}
+                      className="group w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center bg-gray-900 hover:bg-gray-800 text-white shadow-lg hover:shadow-xl"
+                    >
+                      Sign In to View Plan
+                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Start free button for non-logged users on starter plan */}
+                {!user && plan.planType === 'starter' && (
+                  <div className="mt-6">
+                    <button
+                      onClick={handleLogin}
+                      className="group w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Start Free Forever
+                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
                   </div>
                 )}
               </div>
             )
           })}
+        </div>
+
+        {/* Feature Explanation Section */}
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 mb-16 border border-white/50 shadow-xl">
+          <h3 className="text-2xl font-bold text-gray-900 mb-8 text-center">
+            What Our Features Actually Do
+          </h3>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Eye className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    AI Vision Analysis
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    Our system automatically reads your product images and
+                    identifies brands, colors, materials, and features using
+                    OpenAI Vision technology. Uses this visual data to generate
+                    more accurate descriptions.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Cloud className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    Background Job Processing
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    Upload CSV with hundreds of products and jobs continue
+                    running even if you close your browser. Navigate freely
+                    while content is being generated. Get email notification
+                    when complete.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Volume2 className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    Voice-to-Content
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    Record up to 1-minute voice recordings. AI converts natural
+                    speech to professional product content. Works in natural
+                    conversation style - just talk about your product normally.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <ShoppingCart className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    Direct Amazon Publishing
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    One-click publish generated content directly to Amazon
+                    Seller Central. No copy-paste required. Integrates directly
+                    with your Amazon seller account for seamless workflow.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    Content Library
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    Available to all users (including free tier). Store and
+                    organize all generated content. Search and filter previous
+                    generations. Download content in various formats.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Upload className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">
+                    Bulk CSV Upload
+                  </h4>
+                  <p className="text-gray-600 text-sm">
+                    Upload CSV files with multiple products at once. System
+                    processes all products automatically. Available from
+                    Business plan (50 products) up to Enterprise (1,000
+                    products).
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Roadmap Section */}
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 mb-16 border border-indigo-200">
+          <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+            What We're Building Next
+          </h3>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <h4 className="font-semibold text-indigo-900 mb-4 flex items-center">
+                <Timer className="h-5 w-5 mr-2" />
+                Coming Soon
+              </h4>
+              <ul className="space-y-3">
+                <li className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-gray-700">
+                    Multi-platform publishing (Shopify, eBay, Etsy)
+                  </span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-gray-700">
+                    Advanced analytics and performance tracking
+                  </span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <span className="text-gray-700">
+                    API access for enterprise customers
+                  </span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  <span className="text-gray-700">
+                    Custom brand voice settings
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-purple-900 mb-4 flex items-center">
+                <Building2 className="h-5 w-5 mr-2" />
+                Enterprise Inquiries
+              </h4>
+              <ul className="space-y-3">
+                <li className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                  <span className="text-gray-700">
+                    White-label solutions (contact for pricing)
+                  </span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                  <span className="text-gray-700">
+                    Dedicated account management
+                  </span>
+                </li>
+                <li className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                  <span className="text-gray-700">
+                    Custom integrations tailored to your workflow
+                  </span>
+                </li>
+              </ul>
+              <div className="mt-4">
+                <a
+                  href="/contact"
+                  className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center"
+                >
+                  Contact us for enterprise features
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Enhanced Bottom CTA */}
@@ -744,12 +1085,12 @@ export default function EnhancedPricingPage() {
                   <Rocket className="h-8 w-8 text-white" />
                 </div>
                 <h3 className="text-3xl font-bold text-gray-900 mb-4">
-                  Ready to Transform Your Content Creation?
+                  Ready to Start Creating Amazing Content?
                 </h3>
                 <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                  Join thousands of entrepreneurs who've discovered the power of
-                  voice-driven AI content creation. Start with 10 free
-                  generations - no credit card required.
+                  Start with 10 free generations forever. No credit card
+                  required. Experience the power of Voice + AI Vision +
+                  Background Processing + Amazon Integration.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
@@ -775,6 +1116,10 @@ export default function EnhancedPricingPage() {
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     <span>Setup in 60 seconds</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span>Honest pricing, real features</span>
                   </div>
                 </div>
               </div>

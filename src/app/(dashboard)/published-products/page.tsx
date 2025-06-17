@@ -1,4 +1,4 @@
-// src/app/(dashboard)/published-products/page.tsx - Light & Clean Design
+// src/app/(dashboard)/published-products/page.tsx - With Platform Filter
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -32,21 +32,22 @@ import {
 
 interface PublishedProduct {
   id: string
-  amazon_listing_id: string
-  sku: string
+  user_id: string
+  content_id: string | null
+  platform: string
+  platform_product_id: string | null
+  platform_url: string | null
   title: string
-  status: string
+  description: string | null
   price: number
   quantity: number
+  sku: string
+  images: any[] | null
+  platform_data: Record<string, any> | null
+  status: string
   published_at: string
   updated_at: string
-  last_synced?: string
-  current_price?: number
-  stock_status?: string
-  listing_status?: string
-  product_content_id: string
-  marketplace_id: string
-  submission_id?: string
+  last_synced_at: string
 }
 
 interface DashboardStats {
@@ -69,6 +70,7 @@ export default function PublishedProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [platformFilter, setPlatformFilter] = useState('all')
   const [sortBy, setSortBy] = useState('published_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [user, setUser] = useState<any>(null)
@@ -104,7 +106,7 @@ export default function PublishedProductsPage() {
     }
   }, [user, supabase])
 
-  // Load published products
+  // Load published products from unified table
   const loadProducts = async () => {
     if (!user?.id || !supabase) return
 
@@ -113,7 +115,7 @@ export default function PublishedProductsPage() {
       setError(null)
 
       const { data, error: fetchError } = await supabase
-        .from('amazon_listings')
+        .from('published_products')
         .select('*')
         .eq('user_id', user.id)
         .order('published_at', { ascending: false })
@@ -136,13 +138,12 @@ export default function PublishedProductsPage() {
   const calculateStats = (productList: PublishedProduct[]) => {
     const totalProducts = productList.length
 
-    // ✅ FIXED: Separate statuses properly
     const activeListings = productList.filter(
-      (p) => p.status === 'ACTIVE'
+      (p) => p.status === 'published'
     ).length
 
     const pendingListings = productList.filter(
-      (p) => p.status === 'SUBMITTED' || p.status === 'PENDING'
+      (p) => p.status === 'pending' || p.status === 'draft'
     ).length
 
     const totalRevenue = productList.reduce((sum, p) => sum + (p.price || 0), 0)
@@ -155,45 +156,57 @@ export default function PublishedProductsPage() {
     })
   }
 
-  // Refresh from Amazon
-  const refreshFromAmazon = async () => {
+  // Refresh from platforms
+  const refreshFromPlatforms = async () => {
     if (!user?.id || !supabase) return
 
     try {
       setRefreshing(true)
       setError(null)
 
-      console.log('🔄 Refreshing data from Amazon...')
+      console.log('🔄 Refreshing data from all platforms...')
 
-      // Call the refresh API
-      const response = await fetch('/api/amazon/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: user.id }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to refresh from Amazon')
-      }
-
-      const result = await response.json()
-      console.log('✅ Refresh completed:', result)
-
-      // Reload products after refresh
+      // For now, just reload from database
+      // Later we can add platform-specific refresh APIs
       await loadProducts()
+
+      console.log('✅ Refresh completed')
     } catch (err) {
-      console.error('Error refreshing from Amazon:', err)
-      setError('Failed to refresh data from Amazon')
+      console.error('Error refreshing data:', err)
+      setError('Failed to refresh data')
     } finally {
       setRefreshing(false)
     }
   }
 
-  // Get status badge styling - LIGHT DESIGN
+  // Get status badge styling with new statuses
   const getStatusBadge = (status: string) => {
     const statusConfig = {
+      published: {
+        bg: 'bg-green-50',
+        text: 'text-green-700',
+        border: 'border-green-200',
+        icon: CheckCircle,
+      },
+      pending: {
+        bg: 'bg-blue-50',
+        text: 'text-blue-700',
+        border: 'border-blue-200',
+        icon: Clock,
+      },
+      draft: {
+        bg: 'bg-yellow-50',
+        text: 'text-yellow-700',
+        border: 'border-yellow-200',
+        icon: AlertTriangle,
+      },
+      error: {
+        bg: 'bg-red-50',
+        text: 'text-red-700',
+        border: 'border-red-200',
+        icon: AlertCircle,
+      },
+      // Keep old statuses for backward compatibility
       ACTIVE: {
         bg: 'bg-green-50',
         text: 'text-green-700',
@@ -227,7 +240,7 @@ export default function PublishedProductsPage() {
     }
 
     const config =
-      statusConfig[status as keyof typeof statusConfig] || statusConfig.PENDING
+      statusConfig[status as keyof typeof statusConfig] || statusConfig.pending
     const Icon = config.icon
 
     return (
@@ -240,6 +253,20 @@ export default function PublishedProductsPage() {
     )
   }
 
+  // Get platform icon
+  const getPlatformIcon = (platform: string) => {
+    switch (platform) {
+      case 'amazon':
+        return '📦'
+      case 'shopify':
+        return '🛍️'
+      case 'etsy':
+        return '🎨'
+      default:
+        return '📱'
+    }
+  }
+
   // Filter and sort products
   const filteredProducts = products
     .filter((product) => {
@@ -248,7 +275,9 @@ export default function PublishedProductsPage() {
         product.sku.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesStatus =
         statusFilter === 'all' || product.status === statusFilter
-      return matchesSearch && matchesStatus
+      const matchesPlatform =
+        platformFilter === 'all' || product.platform === platformFilter
+      return matchesSearch && matchesStatus && matchesPlatform
     })
     .sort((a, b) => {
       const aValue = a[sortBy as keyof PublishedProduct] || ''
@@ -274,7 +303,7 @@ export default function PublishedProductsPage() {
                 Loading your published products...
               </p>
               <p className="text-gray-500 text-sm mt-1">
-                Fetching latest data from Amazon
+                Fetching latest data from all platforms
               </p>
             </div>
           </div>
@@ -296,14 +325,13 @@ export default function PublishedProductsPage() {
               Published Products
             </h1>
             <p className="text-gray-600 mt-2 text-lg">
-              Manage your Amazon listings and track performance across all
-              marketplaces
+              Manage your listings and track performance across all marketplaces
             </p>
           </div>
 
           <div className="flex items-center space-x-4 mt-4 lg:mt-0">
             <button
-              onClick={refreshFromAmazon}
+              onClick={refreshFromPlatforms}
               disabled={refreshing}
               className="flex items-center px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm"
             >
@@ -311,7 +339,7 @@ export default function PublishedProductsPage() {
                 className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin text-blue-600' : 'text-gray-600'}`}
               />
               <span className="font-medium">
-                {refreshing ? 'Refreshing...' : 'Refresh from Amazon'}
+                {refreshing ? 'Refreshing...' : 'Refresh Data'}
               </span>
             </button>
 
@@ -325,7 +353,7 @@ export default function PublishedProductsPage() {
           </div>
         </div>
 
-        {/* Error Message - Light Design */}
+        {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
             <div className="flex items-center space-x-2">
@@ -354,16 +382,14 @@ export default function PublishedProductsPage() {
             </div>
             <div className="mt-4 flex items-center text-sm text-gray-600">
               <TrendingUp className="h-4 w-4 mr-1 text-blue-500" />
-              <span>All time listings</span>
+              <span>All platforms</span>
             </div>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all hover:scale-105">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Active Listings
-                </p>
+                <p className="text-sm font-medium text-gray-600">Published</p>
                 <p className="text-3xl font-bold text-green-600">
                   {stats.activeListings}
                 </p>
@@ -374,7 +400,7 @@ export default function PublishedProductsPage() {
             </div>
             <div className="mt-4 flex items-center text-sm text-gray-600">
               <Globe className="h-4 w-4 mr-1 text-green-500" />
-              <span>Live on Amazon</span>
+              <span>Live listings</span>
             </div>
           </div>
 
@@ -415,7 +441,7 @@ export default function PublishedProductsPage() {
           </div>
         </div>
 
-        {/* Enhanced Filters and Search */}
+        {/* Enhanced Filters and Search with Platform Filter */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
@@ -430,17 +456,29 @@ export default function PublishedProductsPage() {
                 />
               </div>
 
+              {/* Platform Filter */}
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value)}
+                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors"
+              >
+                <option value="all">All Platforms</option>
+                <option value="amazon">📦 Amazon</option>
+                <option value="shopify">🛍️ Shopify</option>
+                <option value="etsy">🎨 Etsy</option>
+              </select>
+
+              {/* Status Filter */}
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 focus:bg-white transition-colors"
               >
                 <option value="all">All Status</option>
-                <option value="ACTIVE">Active</option>
-                <option value="SUBMITTED">Submitted</option>
-                <option value="PENDING">Pending</option>
-                <option value="INACTIVE">Inactive</option>
-                <option value="ERROR">Error</option>
+                <option value="published">Published</option>
+                <option value="pending">Pending</option>
+                <option value="draft">Draft</option>
+                <option value="error">Error</option>
               </select>
             </div>
 
@@ -458,6 +496,7 @@ export default function PublishedProductsPage() {
                 <option value="title">Product Name</option>
                 <option value="price">Price</option>
                 <option value="status">Status</option>
+                <option value="platform">Platform</option>
               </select>
 
               <button
@@ -488,7 +527,7 @@ export default function PublishedProductsPage() {
             </h3>
             <p className="text-gray-600 mb-8 max-w-md mx-auto">
               {products.length === 0
-                ? 'Start by generating content and publishing your first product to Amazon. Our AI will help you create professional listings in minutes.'
+                ? 'Start by generating content and publishing your first product. Our AI will help you create professional listings in minutes.'
                 : "Try adjusting your search terms or filters to find the products you're looking for."}
             </p>
             {products.length === 0 && (
@@ -509,6 +548,9 @@ export default function PublishedProductsPage() {
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Product
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Platform
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                       Status
@@ -546,13 +588,23 @@ export default function PublishedProductsPage() {
                             </div>
                             <div className="text-sm text-gray-500 mt-1">
                               ID:{' '}
-                              {product.amazon_listing_id || (
+                              {product.platform_product_id || (
                                 <span className="text-yellow-600 font-medium">
                                   Pending Assignment
                                 </span>
                               )}
                             </div>
                           </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg">
+                            {getPlatformIcon(product.platform)}
+                          </span>
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {product.platform}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -593,15 +645,17 @@ export default function PublishedProductsPage() {
                           >
                             <Edit3 className="h-4 w-4" />
                           </button>
-                          <a
-                            href={`https://sellercentral.amazon.com/inventory?ref_=xx_invmgr_dnav_xx&tbla_myitable=sort:%7B%22sortOrder%22%3A%22DESCENDING%22%2C%22sortedColumnId%22%3A%22date%22%7D;search:${product.sku}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
-                            title="View on Amazon Seller Central"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
+                          {product.platform_url && (
+                            <a
+                              href={product.platform_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
+                              title={`View on ${product.platform}`}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -632,7 +686,7 @@ export default function PublishedProductsPage() {
             </div>
             <div className="flex items-center space-x-2 text-blue-600">
               <Sparkles className="h-4 w-4" />
-              <span className="font-medium">Live data from Amazon</span>
+              <span className="font-medium">Multi-platform dashboard</span>
             </div>
           </div>
         </div>

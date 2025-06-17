@@ -34,8 +34,7 @@ import {
 
 // Import Amazon Components
 import AmazonConnection from '@/components/AmazonConnection'
-import AmazonPublisher from '@/components/AmazonPublisher'
-
+import UnifiedPublisher from '@/components/UnifiedPublisher'
 interface ProcessedImage {
   original: File
   processed?: string
@@ -199,10 +198,13 @@ export default function ProductForm({
   const remainingGenerations = actualMonthlyLimit - actualCurrentUsage
   const usagePercentage = (actualCurrentUsage / actualMonthlyLimit) * 100
 
-  // Amazon publish success handler
-  const handleAmazonPublishSuccess = (listingId: string) => {
+  // Unified publish success handler
+  const handlePublishSuccess = (result: any) => {
+    const platform = result.platform || 'platform'
+    const id = result.listingId || result.productId || result.id || 'N/A'
+
     addNotification(
-      `🎉 Product successfully published to Amazon! Listing ID: ${listingId}`,
+      `🎉 Product successfully published to ${platform}! ID: ${id}`,
       'success'
     )
   }
@@ -2508,7 +2510,7 @@ export default function ProductForm({
                     🚀 Publish Your Content
                   </h2>
                   <p className="text-gray-600">
-                    Take your generated content live on Amazon marketplace
+                    Choose your platform and publish instantly
                   </p>
                 </div>
 
@@ -2518,38 +2520,28 @@ export default function ProductForm({
                   onConnectionChange={setAmazonConnected}
                 />
 
-                {/* Temporary Debug Info */}
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm font-bold">Debug Info:</p>
-                  <p className="text-xs">
-                    lastGeneratedContentId:{' '}
-                    {lastGeneratedContentId || 'MISSING'}
-                  </p>
-                  <p className="text-xs">
-                    productName: {productName || 'MISSING'}
-                  </p>
-                  <p className="text-xs">
-                    generatedContent exists: {generatedContent ? 'YES' : 'NO'}
-                  </p>
-                </div>
-
-                {/* Amazon Publisher Component - Only show if content exists */}
-                {lastGeneratedContentId && (
-                  <AmazonPublisher
-                    productContent={{
-                      id: lastGeneratedContentId,
-                      product_name: productName,
-                      features: features,
-                      platform: platform,
-                      content: generatedContent,
-                    }}
-                    images={processedImages
-                      .filter((img) => img.platforms.amazon)
-                      .map((img) => img.platforms.amazon)}
-                    isConnected={amazonConnected}
-                    onPublishSuccess={handleAmazonPublishSuccess}
-                  />
-                )}
+                {/* Unified Publisher Component - Only show if content exists */}
+                <UnifiedPublisher
+                  productContent={{
+                    id: lastGeneratedContentId || '',
+                    product_name: productName,
+                    features: features,
+                    platform: platform,
+                    content: generatedContent,
+                  }}
+                  images={processedImages
+                    .map(
+                      (img) =>
+                        img.publicUrls?.processed?.shopify ||
+                        img.platforms?.amazon
+                    )
+                    .filter(
+                      (url): url is string =>
+                        Boolean(url) && !url.startsWith('data:')
+                    )}
+                  onPublishSuccess={handlePublishSuccess}
+                  user={user}
+                />
 
                 {/* Integration Benefits */}
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">

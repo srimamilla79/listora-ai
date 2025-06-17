@@ -25,12 +25,13 @@ export function decryptToken(encryptedToken: string): string {
   return decrypted
 }
 
-// Amazon OAuth URLs and configuration
+// Amazon OAuth URLs and configuration - FIXED VERSION
 export const AMAZON_OAUTH_CONFIG = {
   authUrl: 'https://sellercentral.amazon.com/apps/authorize/consent',
   tokenUrl: 'https://api.amazon.com/auth/o2/token',
   scope: 'messaging:read messaging:write marketplace:all',
-  clientId: process.env.AMAZON_SP_API_CLIENT_ID!,
+  applicationId: 'amzn1.sp.solution.1d2d0060-9bf5-417f-87b3-ae6a053a85bf', // Use Application ID for OAuth
+  clientId: process.env.AMAZON_SP_API_CLIENT_ID!, // Keep Client ID for token exchange
   clientSecret: process.env.AMAZON_SP_API_CLIENT_SECRET!,
   redirectUri: `${process.env.NEXT_PUBLIC_APP_URL}/api/amazon/oauth/callback`,
 }
@@ -62,14 +63,15 @@ export function verifyOAuthState(
   }
 }
 
-// Get Amazon authorization URL for user
+// Get Amazon authorization URL for user - FIXED VERSION
 export function getAmazonAuthUrl(userId: string): string {
   const state = generateOAuthState(userId)
   const params = new URLSearchParams({
-    application_id: AMAZON_OAUTH_CONFIG.clientId,
+    application_id: AMAZON_OAUTH_CONFIG.applicationId, // FIXED: Use applicationId instead of clientId
     redirect_uri: AMAZON_OAUTH_CONFIG.redirectUri,
     state,
     scope: AMAZON_OAUTH_CONFIG.scope,
+    version: 'beta', // FIXED: Added for draft apps
   })
 
   return `${AMAZON_OAUTH_CONFIG.authUrl}?${params.toString()}`
