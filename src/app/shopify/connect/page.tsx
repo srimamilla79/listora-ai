@@ -1,10 +1,9 @@
-// src/app/shopify/connect/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 
-export default function ShopifyConnectPage() {
+function ShopifyConnectForm() {
   const [shopDomain, setShopDomain] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
   const searchParams = useSearchParams()
@@ -34,7 +33,10 @@ export default function ShopifyConnectPage() {
     // Build Shopify OAuth URL
     const scopes = 'write_products,read_products,write_inventory,read_inventory'
     const redirectUri = `${window.location.origin}/api/shopify/callback`
-    const shopifyAuthUrl = `https://${cleanDomain}/admin/oauth/authorize?client_id=${process.env.NEXT_PUBLIC_SHOPIFY_API_KEY}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
+
+    // Use environment variable for API key
+    const apiKey = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY
+    const shopifyAuthUrl = `https://${cleanDomain}/admin/oauth/authorize?client_id=${apiKey}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`
 
     // Redirect to Shopify
     window.location.href = shopifyAuthUrl
@@ -96,5 +98,24 @@ export default function ShopifyConnectPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-8 h-8 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function ShopifyConnectPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ShopifyConnectForm />
+    </Suspense>
   )
 }
