@@ -1,8 +1,9 @@
 // src/lib/supabase-server.ts
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
-// Server-side Supabase client for API routes
+// Server-side Supabase client for API routes (UNCHANGED - this is fine)
 export async function createServerClientWithCookies() {
   const cookieStore = await cookies()
 
@@ -25,16 +26,15 @@ export async function createServerClientWithCookies() {
   )
 }
 
-// Service role client for database operations that bypass RLS
+// 🔧 FIXED: Service role client for new sb_secret_ key format
 export function createServiceRoleClient() {
-  return createServerClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
-      cookies: {
-        get: () => null,
-        set: () => {},
-        remove: () => {},
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
       },
     }
   )
