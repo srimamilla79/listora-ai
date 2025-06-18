@@ -337,6 +337,16 @@ export async function POST(req: NextRequest) {
 
     const currentMonth = new Date().toISOString().slice(0, 7)
     console.log('6. Checking usage for month:', currentMonth)
+    // 🔍 DEBUG: Test service role client
+    console.log('🔍 Testing service role client...')
+    try {
+      const testQuery = await serviceSupabase
+        .from('user_usage_tracking')
+        .select('count', { count: 'exact', head: true })
+      console.log('🔍 Service role test result:', testQuery)
+    } catch (testError) {
+      console.log('🔍 Service role test error:', testError)
+    }
 
     // Parallel database queries for better performance
     const [usageResult, planResult] = await Promise.all([
