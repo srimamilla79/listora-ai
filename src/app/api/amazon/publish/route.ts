@@ -227,13 +227,18 @@ async function createAmazonListing(
     // Prepare image attributes for Amazon
     // Prepare image attributes for Amazon
     const imageAttributes: any = {}
-
+    // ✅ DISABLE ALL IMAGE PROCESSING TO ISOLATE THE ISSUE
+    console.log(
+      '📸 Images temporarily disabled for debugging image_locator_ps03 error'
+    )
+    // Comment out all image processing
+    /*
     if (amazonImages.length > 0) {
       console.log(
-        '📸 Processing',
-        amazonImages.length,
-        'images for Amazon listing'
-      )
+       '📸 Processing',
+   amazonImages.length,
+   //'images for Amazon listing'
+      //)
 
       // ✅ ONLY main product image - no additional images
       if (amazonImages[0] && amazonImages[0].trim()) {
@@ -251,6 +256,7 @@ async function createAmazonListing(
     } else {
       console.log('📸 No images available for this product')
     }
+      */
     // Determine product type based on content
     let productType = 'WATCH' // Default fallback - known working type
     let itemTypeKeyword = 'watch' // Default fallback
