@@ -234,26 +234,31 @@ async function createAmazonListing(
         'images for Amazon listing'
       )
 
-      // ✅ Main product image (only once!)
-      imageAttributes.main_product_image_locator = [
-        {
-          value: amazonImages[0],
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ]
-
-      // ✅ Additional images (if available)
-      for (let i = 1; i < Math.min(amazonImages.length, 9); i++) {
-        // ✅ Up to 9 total images
-        imageAttributes[`other_product_image_locator_${i}`] = [
+      // ✅ Main product image (only if image exists and is valid)
+      if (amazonImages[0] && amazonImages[0].trim()) {
+        imageAttributes.main_product_image_locator = [
           {
-            value: amazonImages[i],
+            value: amazonImages[0],
             marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
           },
         ]
       }
 
+      // ✅ Additional images (only if they exist and are valid)
+      for (let i = 1; i < Math.min(amazonImages.length, 3); i++) {
+        // ✅ Limit to 3 total for now
+        if (amazonImages[i] && amazonImages[i].trim()) {
+          imageAttributes[`other_product_image_locator_${i}`] = [
+            {
+              value: amazonImages[i],
+              marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
+            },
+          ]
+        }
+      }
+
       console.log('📸 Image attributes prepared:', Object.keys(imageAttributes))
+      console.log('📸 Image URLs:', amazonImages.slice(0, 3)) // Debug: show first 3 URLs
     } else {
       console.log('📸 No images available for this product')
     }
