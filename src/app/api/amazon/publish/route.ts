@@ -452,19 +452,31 @@ export async function POST(request: NextRequest) {
     console.log('✅ Amazon listing created:', amazonResult)
 
     // Save to database
+    // Replace the database insert section with this:
     const { data: publishData, error: publishError } = await supabase
-      .from('amazon_publications')
+      .from('published_products') // ✅ Use the correct table
       .insert({
         content_id: contentId,
         user_id: userId,
+        platform: 'amazon',
+        platform_product_id: amazonResult.feedId, // Use Feed ID as platform product ID
+        platform_url: `https://sellercentral.amazon.com/`, // Generic Amazon URL
+        title:
+          productData.title || productData.product_name || 'Amazon Product',
+        description: productData.description || productData.content || '',
+        price: options.price || 0,
+        quantity: options.quantity || 1,
         sku: amazonResult.sku,
-        feed_id: amazonResult.feedId,
-        listing_id: null, // Will be updated when feed processes
+        images: [], // Add images array if you have them
+        platform_data: {
+          feed_id: amazonResult.feedId,
+          sku: amazonResult.sku,
+          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
+          product_type: 'PRODUCT',
+          status: amazonResult.status,
+        },
         status: amazonResult.status,
-        marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
         published_at: new Date().toISOString(),
-        product_data: productData,
-        options: options,
       })
       .select()
       .single()
