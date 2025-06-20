@@ -282,21 +282,45 @@ export default function UnifiedPublisher({
     setPublishSuccess(null)
 
     try {
-      const requestPayload = {
-        contentId: productContent?.id,
-        userId: passedUser?.id,
-        productData: {
-          // ✅ Fixed this already
-          id: productContent?.id,
-          title: productContent.product_name, // ✅ Map product_name to title
-          product_name: productContent.product_name,
-          features: productContent.features,
-          content: productContent.content,
-          description: productContent.content, // ✅ Add description mapping
-        },
-        options: publishingOptions, // ✅ ADD THIS - was missing!
-        images: images,
-        platform: selectedPlatform,
+      // ✅ PLATFORM-SPECIFIC PAYLOAD
+      let requestPayload
+
+      if (selectedPlatform === 'amazon') {
+        // Amazon format
+        requestPayload = {
+          contentId: productContent?.id,
+          userId: passedUser?.id,
+          productData: {
+            id: productContent?.id,
+            title: productContent.product_name,
+            product_name: productContent.product_name,
+            features: productContent.features,
+            content: productContent.content,
+            description: productContent.content,
+          },
+          options: publishingOptions,
+          images: images,
+          platform: selectedPlatform,
+        }
+      } else {
+        // Shopify format (original working format)
+        requestPayload = {
+          productContent: {
+            id: productContent?.id,
+            product_name: productContent.product_name,
+            features: productContent.features,
+            content: productContent.content,
+          },
+          images: images,
+          publishingOptions: {
+            ...publishingOptions,
+            price: parseFloat(publishingOptions.price),
+            quantity: parseInt(publishingOptions.quantity),
+            sku: publishingOptions.sku || generateSKU(),
+          },
+          platform: selectedPlatform,
+          userId: passedUser?.id,
+        }
       }
 
       const response = await fetch(`/api/${selectedPlatform}/publish`, {
@@ -304,7 +328,6 @@ export default function UnifiedPublisher({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestPayload),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(
