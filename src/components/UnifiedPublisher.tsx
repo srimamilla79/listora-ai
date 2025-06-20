@@ -283,6 +283,8 @@ export default function UnifiedPublisher({
 
     try {
       const requestPayload = {
+        contentId: productContent?.id, // This is what route.ts expects
+        userId: passedUser?.id, // This is what route.ts expects
         productContent: {
           id: productContent?.id,
           product_name: productContent.product_name,
@@ -297,7 +299,6 @@ export default function UnifiedPublisher({
           sku: publishingOptions.sku || generateSKU(),
         },
         platform: selectedPlatform,
-        userId: passedUser?.id,
       }
 
       const response = await fetch(`/api/${selectedPlatform}/publish`, {
