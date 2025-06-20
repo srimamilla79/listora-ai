@@ -261,14 +261,10 @@ async function createAmazonListing(
     }
 
     // Determine product type based on content
-    let productType = 'PRODUCT' // Default fallback
-    let itemTypeKeyword = 'general'
+    let productType = 'SHOES' // Default fallback (changed from 'PRODUCT')
+    let itemTypeKeyword = 'shoes' // Default fallback (changed from 'general')
 
     // Smart product type detection
-    // Replace this section in your route.ts file (around lines 245-265):
-
-    // Smart product type detection
-    // Smart product type detection - SIMPLIFIED
     const title = productData.title?.toLowerCase() || ''
     const description = productData.description?.toLowerCase() || ''
     const features = productData.features?.toLowerCase() || ''
@@ -279,18 +275,48 @@ async function createAmazonListing(
       allText.substring(0, 80) + '...'
     )
 
-    // Use PRODUCT for everything to avoid complex category requirements
-    productType = 'PRODUCT'
-    itemTypeKeyword = 'general'
-
-    // Only use specific types for very simple categories
-    if (allText.includes('watch') || allText.includes('timepiece')) {
-      productType = 'WATCH'
-      itemTypeKeyword = 'watch'
+    // ✅ NEW: Use user-selected product type if provided
+    if (options.productType) {
+      productType = options.productType
+      itemTypeKeyword = options.productType.toLowerCase().replace('_', ' ')
+      console.log('👤 User selected product type:', productType)
+    } else {
+      // ✅ ENHANCED: Fallback to smart detection if no user selection
+      if (allText.includes('watch') || allText.includes('timepiece')) {
+        productType = 'WATCH'
+        itemTypeKeyword = 'watch'
+      } else if (
+        allText.includes('shoe') ||
+        allText.includes('sneaker') ||
+        allText.includes('footwear')
+      ) {
+        productType = 'SHOES'
+        itemTypeKeyword = 'shoes'
+      } else if (
+        allText.includes('clothing') ||
+        allText.includes('apparel') ||
+        allText.includes('shirt') ||
+        allText.includes('dress')
+      ) {
+        productType = 'CLOTHING'
+        itemTypeKeyword = 'clothing'
+      } else if (
+        allText.includes('electronic') ||
+        allText.includes('gadget') ||
+        allText.includes('device')
+      ) {
+        productType = 'ELECTRONICS'
+        itemTypeKeyword = 'electronics'
+      } else {
+        // Default to SHOES for unknown products (more permissive than PRODUCT)
+        productType = 'SHOES'
+        itemTypeKeyword = 'shoes'
+      }
+      console.log('🤖 Auto-detected product type:', productType)
     }
 
     console.log(
-      '🎯 Detected product type:',
+      '🎯 Final product type:',
       productType,
       'for:',
       title.substring(0, 50)

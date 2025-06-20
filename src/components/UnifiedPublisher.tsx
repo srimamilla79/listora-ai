@@ -84,11 +84,13 @@ export default function UnifiedPublisher({
   }>({})
   const [loading, setLoading] = useState(true) // ✅ Add loading state
 
+  // ✅ Updated publishingOptions to include productType
   const [publishingOptions, setPublishingOptions] = useState({
     price: '',
     quantity: '1',
     sku: '',
     condition: 'new',
+    productType: '', // ✅ NEW: Amazon Product Type field
   })
 
   const [supabase, setSupabase] = useState<any>(null)
@@ -336,7 +338,14 @@ export default function UnifiedPublisher({
       }
 
       const result = await response.json()
-      setPublishSuccess(`Successfully published to ${selectedPlatform}!`)
+
+      // ✅ Enhanced success message with platform-specific info
+      const successMessage =
+        selectedPlatform === 'amazon'
+          ? `✅ Successfully published to ${selectedPlatformData?.name}! Feed ID: ${result.data?.feedId || result.data?.productId || 'Processing'}`
+          : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.data?.productId || 'N/A'}`
+
+      setPublishSuccess(successMessage)
 
       // ✅ Store the published product details for this platform
       setPublishedProducts((prev) => ({
@@ -498,9 +507,11 @@ export default function UnifiedPublisher({
                 </button>
               </div>
 
+              {/* ✅ Updated Publishing Options Form with Amazon Product Type */}
               {showOptions && (
                 <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Price */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <DollarSign className="h-4 w-4 inline mr-1 text-green-600" />
@@ -521,6 +532,7 @@ export default function UnifiedPublisher({
                       />
                     </div>
 
+                    {/* Quantity */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Hash className="h-4 w-4 inline mr-1 text-blue-600" />
@@ -540,10 +552,11 @@ export default function UnifiedPublisher({
                       />
                     </div>
 
+                    {/* SKU */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Package className="h-4 w-4 inline mr-1 text-purple-600" />
-                        SKU (Optional)
+                        SKU (Auto-generated if empty)
                       </label>
                       <input
                         type="text"
@@ -554,15 +567,16 @@ export default function UnifiedPublisher({
                             sku: e.target.value,
                           }))
                         }
-                        placeholder="Auto-generated if empty"
+                        placeholder={generateSKU()}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       />
                     </div>
 
+                    {/* Condition */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <ShoppingCart className="h-4 w-4 inline mr-1 text-indigo-600" />
-                        Condition
+                        Product Condition
                       </label>
                       <select
                         value={publishingOptions.condition}
@@ -575,10 +589,50 @@ export default function UnifiedPublisher({
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       >
                         <option value="new">New</option>
-                        <option value="used">Used</option>
-                        <option value="refurbished">Refurbished</option>
+                        <option value="used_like_new">Used - Like New</option>
+                        <option value="used_very_good">Used - Very Good</option>
+                        <option value="used_good">Used - Good</option>
+                        <option value="used_acceptable">
+                          Used - Acceptable
+                        </option>
                       </select>
                     </div>
+
+                    {/* ✅ NEW: Amazon Product Type - Only shows for Amazon platform */}
+                    {selectedPlatform === 'amazon' && (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <Package className="h-4 w-4 inline mr-1 text-orange-600" />
+                          Amazon Product Type
+                        </label>
+                        <select
+                          value={publishingOptions.productType}
+                          onChange={(e) =>
+                            setPublishingOptions((prev) => ({
+                              ...prev,
+                              productType: e.target.value,
+                            }))
+                          }
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                          <option value="">Auto-detect (recommended)</option>
+                          <option value="SHOES">Shoes</option>
+                          <option value="WATCH">Watches</option>
+                          <option value="CLOTHING">Clothing</option>
+                          <option value="ELECTRONICS">Electronics</option>
+                          <option value="HOME_AND_GARDEN">Home & Garden</option>
+                          <option value="BEAUTY">Beauty</option>
+                          <option value="AUTOMOTIVE">Automotive</option>
+                          <option value="BOOKS">Books</option>
+                          <option value="SPORTS">Sports</option>
+                          <option value="TOYS_AND_GAMES">Toys & Games</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Select a specific product type or let AI auto-detect
+                          based on your content
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -622,8 +676,9 @@ export default function UnifiedPublisher({
                       </p>
                     </div>
                     <p className="text-green-700 text-sm mt-1">
-                      Product ID:{' '}
-                      {publishedProducts[selectedPlatform].productId}
+                      {selectedPlatform === 'amazon'
+                        ? `Feed ID: ${publishedProducts[selectedPlatform].productId}`
+                        : `Product ID: ${publishedProducts[selectedPlatform].productId}`}
                     </p>
                   </div>
 
