@@ -260,9 +260,8 @@ async function createAmazonListing(
       console.log('📸 No images available for this product')
     }
 
-    // Determine product type based on content
-    let productType = 'SHOES' // Default fallback (changed from 'PRODUCT')
-    let itemTypeKeyword = 'shoes' // Default fallback (changed from 'general')
+    let productType = 'LUGGAGE' // Default fallback - simple Amazon category
+    let itemTypeKeyword = 'luggage' // Default fallback
 
     // Smart product type detection
     const title = productData.title?.toLowerCase() || ''
@@ -309,8 +308,8 @@ async function createAmazonListing(
         itemTypeKeyword = 'electronics'
       } else {
         // Default to SHOES for unknown products (more permissive than PRODUCT)
-        productType = 'SHOES'
-        itemTypeKeyword = 'shoes'
+        productType = 'LUGGAGE'
+        itemTypeKeyword = 'luggage'
       }
       console.log('🤖 Auto-detected product type:', productType)
     }
