@@ -386,12 +386,12 @@ async function createAmazonListing(
                 marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
               },
             ],
-            target_audience_keyword: [
-              {
-                value: 'Adults',
-                marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-              },
-            ],
+            //target_audience_keyword: [
+            // {
+            //  value: 'Adults',
+            // marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
+            //},
+            //],
             // Add images if available
             ...imageAttributes,
           },
