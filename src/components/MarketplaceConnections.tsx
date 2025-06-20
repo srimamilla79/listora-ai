@@ -71,6 +71,9 @@ export default function MarketplaceConnections({
     }
   }, [currentUserId])
 
+  // SAFE FIX 1: Replace loadConnections function in MarketplaceConnections.tsx
+  // Find this function (around line 80-150) and replace it with this:
+
   const loadConnections = async () => {
     if (!currentUserId) {
       setLoading(false)
@@ -89,52 +92,90 @@ export default function MarketplaceConnections({
     }, 5000) // 5 second timeout
 
     try {
-      // ✅ Use API endpoint instead of direct Supabase queries
-      const response = await fetch('/api/marketplace-connections', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Use cookies for auth
-        body: JSON.stringify({
-          userId: currentUserId,
-        }),
-      })
+      // ✅ SAME LOGIC AS UnifiedPublisher - Use direct Supabase queries
+      const supabase = createClient()
+
+      console.log('🔍 MarketplaceConnections: Querying Amazon connections...')
+      const { data: amazonConnections, error: amazonError } = await supabase
+        .from('amazon_connections')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('status', 'active')
+
+      if (amazonError) {
+        console.error(
+          '❌ MarketplaceConnections: Amazon connection error:',
+          amazonError
+        )
+      } else {
+        console.log(
+          '✅ MarketplaceConnections: Amazon query successful, found:',
+          amazonConnections?.length || 0,
+          'connections'
+        )
+      }
+
+      console.log('🔍 MarketplaceConnections: Querying Shopify connections...')
+      const { data: shopifyConnections, error: shopifyError } = await supabase
+        .from('platform_connections')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('platform', 'shopify')
+        .eq('status', 'connected')
+
+      if (shopifyError) {
+        console.error(
+          '❌ MarketplaceConnections: Shopify connection error:',
+          shopifyError
+        )
+      } else {
+        console.log(
+          '✅ MarketplaceConnections: Shopify query successful, found:',
+          shopifyConnections?.length || 0,
+          'connections'
+        )
+      }
 
       clearTimeout(timeoutId) // Clear timeout if request completes
 
-      if (!response.ok) {
-        console.log('⚠️ API call failed, using fallback state')
-        // Don't throw error, just use default state
-        setConnections([
-          { platform: 'amazon', connected: false },
-          { platform: 'shopify', connected: false },
-        ])
+      // ✅ SAME FILTERING as UnifiedPublisher
+      const validAmazonConnection =
+        amazonConnections?.find(
+          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
+        ) || null
 
-        // Notify parent of default state
-        if (onConnectionChange) {
-          onConnectionChange('amazon', false)
-          onConnectionChange('shopify', false)
-        }
+      const validShopifyConnection =
+        shopifyConnections && shopifyConnections.length > 0
+          ? shopifyConnections[0]
+          : null
 
-        setLoading(false)
-        return
-      }
-
-      const data = await response.json()
+      console.log(
+        '🔍 MarketplaceConnections: Valid Amazon connection:',
+        !!validAmazonConnection
+      )
+      console.log(
+        '🔍 MarketplaceConnections: Valid Shopify connection:',
+        !!validShopifyConnection
+      )
 
       const updatedConnections = [
         {
           platform: 'amazon',
-          connected: data.amazon?.connected || false,
-          storeInfo: data.amazon?.storeInfo,
-          connectedAt: data.amazon?.connectedAt,
+          connected: !!validAmazonConnection?.access_token,
+          storeInfo: {
+            seller_id: validAmazonConnection?.seller_id,
+            marketplace_id: validAmazonConnection?.marketplace_id,
+          },
+          connectedAt: validAmazonConnection?.created_at,
         },
         {
           platform: 'shopify',
-          connected: data.shopify?.connected || false,
-          storeInfo: data.shopify?.storeInfo,
-          connectedAt: data.shopify?.connectedAt,
+          connected: !!validShopifyConnection,
+          storeInfo: {
+            shop_name: validShopifyConnection?.shop_name,
+            shop_domain: validShopifyConnection?.shop_domain,
+          },
+          connectedAt: validShopifyConnection?.created_at,
         },
       ]
 
@@ -143,8 +184,8 @@ export default function MarketplaceConnections({
 
       // Notify parent components
       if (onConnectionChange) {
-        onConnectionChange('amazon', data.amazon?.connected || false)
-        onConnectionChange('shopify', data.shopify?.connected || false)
+        onConnectionChange('amazon', !!validAmazonConnection?.access_token)
+        onConnectionChange('shopify', !!validShopifyConnection)
       }
     } catch (error) {
       clearTimeout(timeoutId)

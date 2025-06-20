@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import { ExternalLink, RefreshCw } from 'lucide-react'
 import {
   Upload,
   Package,
@@ -78,6 +79,9 @@ export default function UnifiedPublisher({
   const [publishSuccess, setPublishSuccess] = useState<string | null>(null)
   const [showOptions, setShowOptions] = useState(false)
   const [publishedPlatforms, setPublishedPlatforms] = useState<string[]>([])
+  const [publishedProducts, setPublishedProducts] = useState<{
+    [key: string]: any
+  }>({})
   const [loading, setLoading] = useState(true) // ✅ Add loading state
 
   const [publishingOptions, setPublishingOptions] = useState({
@@ -311,6 +315,18 @@ export default function UnifiedPublisher({
 
       const result = await response.json()
       setPublishSuccess(`Successfully published to ${selectedPlatform}!`)
+
+      // ✅ Store the published product details for this platform
+      setPublishedProducts((prev) => ({
+        ...prev,
+        [selectedPlatform]: {
+          ...result,
+          publishedAt: new Date().toISOString(),
+          productUrl:
+            result.productUrl || result.listing_url || result.product_url,
+          productId: result.listingId || result.productId || result.id || 'N/A',
+        },
+      }))
 
       if (onPublishSuccess) {
         onPublishSuccess({
@@ -571,27 +587,99 @@ export default function UnifiedPublisher({
               )}
 
               {/* Publish Button */}
-              <button
-                onClick={handlePublish}
-                disabled={isPublishing || !publishingOptions.price}
-                className={`w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all ${
-                  isPublishing || !publishingOptions.price
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-                }`}
-              >
-                {isPublishing ? (
-                  <>
-                    <Loader className="h-5 w-5 mr-2 animate-spin" />
-                    Publishing to {selectedPlatformData?.name}...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-5 w-5 mr-2" />
-                    Publish to {selectedPlatformData?.name}
-                  </>
-                )}
-              </button>
+              {/* ✅ Show different button if already published to this platform */}
+              {publishedProducts[selectedPlatform] ? (
+                <div className="space-y-3">
+                  {/* Success message */}
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <p className="text-green-800 font-medium">
+                        ✅ Successfully published to{' '}
+                        {selectedPlatformData?.name}!
+                      </p>
+                    </div>
+                    <p className="text-green-700 text-sm mt-1">
+                      Product ID:{' '}
+                      {publishedProducts[selectedPlatform].productId}
+                    </p>
+                  </div>
+
+                  {/* View Product Button */}
+                  <button
+                    onClick={() => {
+                      const publishedProduct =
+                        publishedProducts[selectedPlatform]
+                      if (publishedProduct?.productUrl) {
+                        window.open(publishedProduct.productUrl, '_blank')
+                      } else if (
+                        selectedPlatform === 'shopify' &&
+                        selectedPlatformData
+                      ) {
+                        // Fallback for Shopify - go to admin
+                        const shopifyConnection = platforms.find(
+                          (p) => p.id === 'shopify'
+                        )
+                        if (shopifyConnection) {
+                          window.open('https://admin.shopify.com/', '_blank')
+                        }
+                      } else if (selectedPlatform === 'amazon') {
+                        // Fallback for Amazon - go to seller central
+                        window.open(
+                          'https://sellercentral.amazon.com/',
+                          '_blank'
+                        )
+                      }
+                    }}
+                    className="w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    <ExternalLink className="h-5 w-5 mr-2" />
+                    View Product on {selectedPlatformData?.name}
+                  </button>
+
+                  {/* Publish Again Button (smaller) */}
+                  <button
+                    onClick={() => {
+                      // Clear the published state for this platform to allow republishing
+                      setPublishedProducts((prev) => {
+                        const updated = { ...prev }
+                        delete updated[selectedPlatform]
+                        return updated
+                      })
+                      setPublishedPlatforms((prev) =>
+                        prev.filter((p) => p !== selectedPlatform)
+                      )
+                      setPublishSuccess(null)
+                    }}
+                    className="w-full flex items-center justify-center px-4 py-2 rounded-lg font-medium text-sm transition-all bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Publish Again
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handlePublish}
+                  disabled={isPublishing || !publishingOptions.price}
+                  className={`w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all ${
+                    isPublishing || !publishingOptions.price
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                  }`}
+                >
+                  {isPublishing ? (
+                    <>
+                      <Loader className="h-5 w-5 mr-2 animate-spin" />
+                      Publishing to {selectedPlatformData?.name}...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-5 w-5 mr-2" />
+                      Publish to {selectedPlatformData?.name}
+                    </>
+                  )}
+                </button>
+              )}
             </>
           )}
         </>
