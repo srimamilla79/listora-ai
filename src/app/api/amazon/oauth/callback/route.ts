@@ -13,15 +13,22 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const code = searchParams.get('code')
+
+    // FIXED: Amazon sends 'spapi_oauth_code' not 'code'
+    const code =
+      searchParams.get('spapi_oauth_code') || searchParams.get('code')
     const state = searchParams.get('state')
     const error = searchParams.get('error')
-    // ADD THIS DEBUG CODE HERE ⬇️
+
+    // Also get the seller ID that Amazon provides
+    const sellerId = searchParams.get('selling_partner_id')
+
     console.log('🔍 FULL CALLBACK DEBUG:', {
       fullUrl: request.url,
-      code: searchParams.get('code'),
-      state: searchParams.get('state'),
-      error: searchParams.get('error'),
+      code: code,
+      state: state,
+      error: error,
+      sellerId: sellerId,
       allParams: Object.fromEntries(searchParams.entries()),
     })
 
@@ -30,7 +37,6 @@ export async function GET(request: NextRequest) {
       state: !!state,
       error,
     })
-
     // Handle OAuth errors
     if (error) {
       console.error('❌ Amazon OAuth error:', error)
