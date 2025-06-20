@@ -335,6 +335,7 @@ async function createAmazonListing(
         {
           Amount: parseFloat(options.price) || 49.99,
           CurrencyCode: 'USD',
+          marketplace_id: process.env.AMAZON_MARKETPLACE_ID, // ✅ ADD this line
         },
       ],
       fulfillment_availability: [
@@ -360,7 +361,10 @@ async function createAmazonListing(
         { value: 'US', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
       ],
       target_gender: [
-        { value: 'Unisex', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
+        {
+          value: 'mens', // ✅ CHANGE from 'Unisex' to 'mens' for WATCH category
+          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
+        },
       ],
       department: [
         { value: 'Unisex', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
@@ -411,8 +415,12 @@ async function createAmazonListing(
             marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
           },
         ],
+        // ✅ FIXED: merchant_suggested_asin with 10+ characters
         merchant_suggested_asin: [
-          { value: '', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
+          {
+            value: 'B000000000',
+            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
+          },
         ],
       }
     } else if (productType === 'SHOES') {
