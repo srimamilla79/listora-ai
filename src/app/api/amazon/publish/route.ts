@@ -225,6 +225,7 @@ async function createAmazonListing(
     }
 
     // Prepare image attributes for Amazon
+    // Prepare image attributes for Amazon
     const imageAttributes: any = {}
 
     if (amazonImages.length > 0) {
@@ -234,7 +235,7 @@ async function createAmazonListing(
         'images for Amazon listing'
       )
 
-      // ✅ Main product image (only if image exists and is valid)
+      // ✅ ONLY main product image - no additional images
       if (amazonImages[0] && amazonImages[0].trim()) {
         imageAttributes.main_product_image_locator = [
           {
@@ -244,21 +245,9 @@ async function createAmazonListing(
         ]
       }
 
-      // ✅ Additional images (only if they exist and are valid)
-      for (let i = 1; i < Math.min(amazonImages.length, 3); i++) {
-        // ✅ Limit to 3 total for now
-        if (amazonImages[i] && amazonImages[i].trim()) {
-          imageAttributes[`other_product_image_locator_${i}`] = [
-            {
-              value: amazonImages[i],
-              marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-            },
-          ]
-        }
-      }
-
-      console.log('📸 Image attributes prepared:', Object.keys(imageAttributes))
-      console.log('📸 Image URLs:', amazonImages.slice(0, 3)) // Debug: show first 3 URLs
+      // ✅ REMOVE all other_product_image_locator_X attributes for now
+      console.log('📸 Using only main image to avoid validation errors')
+      console.log('📸 Main image URL:', amazonImages[0])
     } else {
       console.log('📸 No images available for this product')
     }
