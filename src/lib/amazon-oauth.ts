@@ -9,7 +9,8 @@ const ALGORITHM = 'aes-256-cbc'
 
 export function encryptToken(token: string): string {
   const iv = crypto.randomBytes(16)
-  const cipher = crypto.createCipher(ALGORITHM, ENCRYPTION_KEY)
+  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+  const cipher = crypto.createCipher('aes-256-cbc', key)
   let encrypted = cipher.update(token, 'utf8', 'hex')
   encrypted += cipher.final('hex')
   return iv.toString('hex') + ':' + encrypted
@@ -19,7 +20,8 @@ export function decryptToken(encryptedToken: string): string {
   const textParts = encryptedToken.split(':')
   const iv = Buffer.from(textParts.shift()!, 'hex')
   const encryptedText = textParts.join(':')
-  const decipher = crypto.createDecipher(ALGORITHM, ENCRYPTION_KEY)
+  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+  const decipher = crypto.createDecipher('aes-256-cbc', key)
   let decrypted = decipher.update(encryptedText, 'hex', 'utf8')
   decrypted += decipher.final('utf8')
   return decrypted
