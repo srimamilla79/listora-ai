@@ -16,6 +16,14 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const state = searchParams.get('state')
     const error = searchParams.get('error')
+    // ADD THIS DEBUG CODE HERE ⬇️
+    console.log('🔍 FULL CALLBACK DEBUG:', {
+      fullUrl: request.url,
+      code: searchParams.get('code'),
+      state: searchParams.get('state'),
+      error: searchParams.get('error'),
+      allParams: Object.fromEntries(searchParams.entries()),
+    })
 
     console.log('🔄 Amazon OAuth callback received:', {
       code: !!code,
