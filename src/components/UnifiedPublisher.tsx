@@ -283,9 +283,11 @@ export default function UnifiedPublisher({
 
     try {
       const requestPayload = {
-        contentId: productContent?.id, // This is what route.ts expects
-        userId: passedUser?.id, // This is what route.ts expects
-        productContent: {
+        contentId: productContent?.id,
+        userId: passedUser?.id,
+        // ✅ CHANGE THIS LINE:
+        productData: {
+          // Changed from 'productContent' to 'productData'
           id: productContent?.id,
           product_name: productContent.product_name,
           features: productContent.features,
