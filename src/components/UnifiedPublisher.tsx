@@ -285,21 +285,17 @@ export default function UnifiedPublisher({
       const requestPayload = {
         contentId: productContent?.id,
         userId: passedUser?.id,
-        // ✅ CHANGE THIS LINE:
         productData: {
-          // Changed from 'productContent' to 'productData'
+          // ✅ Fixed this already
           id: productContent?.id,
+          title: productContent.product_name, // ✅ Map product_name to title
           product_name: productContent.product_name,
           features: productContent.features,
           content: productContent.content,
+          description: productContent.content, // ✅ Add description mapping
         },
+        options: publishingOptions, // ✅ ADD THIS - was missing!
         images: images,
-        publishingOptions: {
-          ...publishingOptions,
-          price: parseFloat(publishingOptions.price),
-          quantity: parseInt(publishingOptions.quantity),
-          sku: publishingOptions.sku || generateSKU(),
-        },
         platform: selectedPlatform,
       }
 
