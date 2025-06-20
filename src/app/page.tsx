@@ -33,6 +33,8 @@ import {
   FileText,
   Upload,
   Volume2,
+  Store,
+  Package,
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
@@ -43,6 +45,7 @@ export default function HomePage() {
   const [typingIndex, setTypingIndex] = useState(0)
   const [currentTestimonial, setCurrentTestimonial] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [activePlatform, setActivePlatform] = useState(0)
 
   // Enhanced typing effect
   const sampleContent =
@@ -63,7 +66,15 @@ export default function HomePage() {
     const timer = setInterval(() => {
       setCurrentTestimonial((prev) => (prev + 1) % testimonials.length)
     }, 5000)
-    return () => clearInterval(timer)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Auto-rotate platform showcase
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActivePlatform((prev) => (prev + 1) % 2)
+    }, 4000)
+    return () => clearTimeout(timer)
   }, [])
 
   const features = [
@@ -115,9 +126,9 @@ export default function HomePage() {
     },
     {
       icon: Camera,
-      title: 'AI Vision Analysis + Image Suite',
+      title: 'AI Vision Analysis + Multi-Platform Images',
       description:
-        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions and keywords. Then automatically optimize for Amazon, Shopify, Etsy, eBay, and Instagram.',
+        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions. Then automatically optimize for Amazon, Shopify, Etsy, eBay, and Instagram.',
       benefit:
         'AI sees your product and writes descriptions based on actual visual details',
       stats: 'OpenAI Vision + 5 platform optimization',
@@ -132,7 +143,6 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Vision Analysis Demo */}
           <div className="bg-white rounded-lg p-4 mb-4 border border-purple-200">
             <div className="flex items-center space-x-2 mb-2">
               <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
@@ -155,12 +165,12 @@ export default function HomePage() {
               {
                 name: 'Amazon',
                 color: 'from-orange-400 to-orange-500',
-                emoji: '🛒',
+                emoji: '📦',
               },
               {
                 name: 'Shopify',
                 color: 'from-green-400 to-green-500',
-                emoji: '🏪',
+                emoji: '🛍️',
               },
               {
                 name: 'Etsy',
@@ -195,20 +205,26 @@ export default function HomePage() {
     },
     {
       icon: ShoppingCart,
-      title: 'Direct Amazon Publishing',
+      title: 'Direct Amazon & Shopify Publishing',
       description:
-        'Skip the copy-paste hassle! Publish your AI-generated content directly to Amazon with one click. Our integration connects to your seller account for seamless product listing creation.',
-      benefit: 'From voice input to live Amazon listing in under 2 minutes',
-      stats: 'Direct API integration',
+        'Skip the copy-paste hassle! Publish your AI-generated content directly to Amazon and Shopify with one click. Our integration connects to your seller accounts for seamless product listing creation.',
+      benefit:
+        'From voice input to live marketplace listings in under 2 minutes',
+      stats: 'Direct API integration with both platforms',
       demo: (
-        <div className="bg-gradient-to-br from-orange-50 to-red-100 rounded-xl p-6 border border-orange-200">
+        <div className="bg-gradient-to-br from-orange-50 to-green-100 rounded-xl p-6 border border-orange-200">
           <div className="space-y-4">
             <div className="text-center">
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl mx-auto flex items-center justify-center mb-2">
-                <ShoppingCart className="h-6 w-6 text-white" />
+              <div className="flex justify-center space-x-2 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                  <span className="text-white text-lg">📦</span>
+                </div>
+                <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                  <span className="text-white text-lg">🛍️</span>
+                </div>
               </div>
-              <p className="text-sm text-orange-700 font-medium">
-                Voice → AI Content → Amazon Live
+              <p className="text-sm text-gray-700 font-medium">
+                Voice → AI Content → Amazon & Shopify Live
               </p>
             </div>
 
@@ -225,18 +241,18 @@ export default function HomePage() {
                   icon: '🤖',
                 },
                 {
-                  step: '3. Amazon API Connected',
+                  step: '3. Platforms Connected',
                   status: 'complete',
                   icon: '🔗',
                 },
                 {
-                  step: '4. Publishing to Amazon...',
+                  step: '4. Publishing to Both...',
                   status: 'processing',
                   icon: '🚀',
                 },
               ].map((item, i) => (
                 <div key={item.step} className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-orange-200">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-gray-200">
                     <span className="text-sm">{item.icon}</span>
                   </div>
                   <div className="flex-1">
@@ -259,12 +275,22 @@ export default function HomePage() {
               ))}
             </div>
 
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-              <div className="text-sm font-semibold text-green-800">
-                🎉 Product live on Amazon in 90 seconds!
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
+                <div className="text-sm font-semibold text-orange-800">
+                  📦 Amazon Live!
+                </div>
+                <div className="text-xs text-orange-600 mt-1">
+                  ASIN: B08XYZ123
+                </div>
               </div>
-              <div className="text-xs text-green-600 mt-1">
-                ASIN: B08XYZ123 • Status: Active
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                <div className="text-sm font-semibold text-green-800">
+                  🛍️ Shopify Live!
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  Product ID: 789456
+                </div>
               </div>
             </div>
           </div>
@@ -291,7 +317,6 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* Upload Status */}
             <div className="bg-white rounded-lg p-4 border border-indigo-200">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
@@ -308,7 +333,6 @@ export default function HomePage() {
                 📊 247 products • Uploaded 3 minutes ago
               </div>
 
-              {/* Progress Bar */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-600">
@@ -327,7 +351,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Background Process Status */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
               <div className="flex items-center space-x-2 mb-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -350,7 +373,7 @@ export default function HomePage() {
       icon: Wand2,
       title: 'Advanced AI Engine',
       description:
-        'Powered by cutting-edge artificial intelligence that creates compelling product descriptions, catchy titles, and persuasive marketing copy.',
+        'Powered by cutting-edge artificial intelligence that creates compelling product descriptions, catchy titles, and persuasive marketing copy optimized for both Amazon and Shopify.',
       benefit: 'AI-generated content that outperforms traditional copywriting',
       stats: '99.2% accuracy rate',
       demo: (
@@ -376,10 +399,10 @@ export default function HomePage() {
                 detail: 'Writing descriptions...',
               },
               {
-                task: 'Amazon Optimization',
+                task: 'Platform Optimization',
                 status: 'pending',
                 progress: 30,
-                detail: 'Platform formatting',
+                detail: 'Amazon & Shopify formatting',
               },
             ].map((item, i) => (
               <div key={item.task} className="space-y-2">
@@ -481,7 +504,7 @@ export default function HomePage() {
       role: 'E-commerce Entrepreneur',
       company: 'TechGadgets Pro',
       content:
-        'Listora AI completely transformed my workflow. What used to take me 4-5 hours per product now takes 5 minutes. The voice feature is incredibly intuitive!',
+        'Listora AI completely transformed my workflow. What used to take me 4-5 hours per product now takes 5 minutes. The voice feature is incredibly intuitive, and publishing to both Amazon and Shopify is seamless!',
       rating: 5,
       metric: '300% efficiency boost',
       avatar: 'SC',
@@ -493,7 +516,7 @@ export default function HomePage() {
       role: 'Digital Marketing Specialist',
       company: 'Growth Marketing Co',
       content:
-        'As someone managing 50+ clients, Listora AI became my secret weapon. The AI-generated content consistently outperforms human-written copy.',
+        'As someone managing 50+ clients, Listora AI became my secret weapon. The AI-generated content consistently outperforms human-written copy across all platforms.',
       rating: 5,
       metric: '40% more clients served',
       avatar: 'MR',
@@ -502,10 +525,10 @@ export default function HomePage() {
     },
     {
       name: 'Emma Thompson',
-      role: 'Amazon FBA Seller',
+      role: 'Amazon FBA & Shopify Seller',
       company: 'Home Essentials',
       content:
-        'The platform-specific optimization is brilliant. I launch products 5x faster now, and my conversion rates have never been higher.',
+        'The multi-platform optimization is brilliant. I launch products 5x faster now on both Amazon and Shopify, and my conversion rates have never been higher.',
       rating: 5,
       metric: '5x faster launches',
       avatar: 'ET',
@@ -524,6 +547,10 @@ export default function HomePage() {
 
   const handleContact = () => {
     window.location.href = '/contact'
+  }
+
+  const handleAbout = () => {
+    window.location.href = '/about'
   }
 
   const scrollToSection = (sectionId: string) => {
@@ -560,6 +587,12 @@ export default function HomePage() {
               >
                 Reviews
               </button>
+              <button
+                onClick={handleAbout}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                About Us
+              </button>
             </div>
 
             <div className="flex items-center space-x-4">
@@ -594,8 +627,8 @@ export default function HomePage() {
             <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-4 py-2 mb-8">
               <Sparkles className="h-4 w-4 text-indigo-600" />
               <span className="text-sm font-medium text-indigo-800">
-                Join 10,000+ entrepreneurs using AI Vision + Bulk Processing +
-                Amazon Direct
+                Join thousands of entrepreneurs using AI Vision + Bulk
+                Processing + Amazon & Shopify Direct
               </span>
               <Star className="h-4 w-4 text-yellow-500 fill-current" />
             </div>
@@ -612,18 +645,20 @@ export default function HomePage() {
             {/* Enhanced Subtitle */}
             <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
               The world's first AI that combines voice recognition, OpenAI
-              Vision analysis, bulk CSV processing, and direct Amazon
-              publishing. Scale from 1 product to 500+ with background
-              automation.
+              Vision analysis, bulk CSV processing, and direct publishing to
+              <span className="font-semibold text-orange-600"> Amazon</span> &
+              <span className="font-semibold text-green-600"> Shopify</span>.
+              Scale from 1 product to 500+ with background automation.
               <span className="font-semibold text-gray-800">
                 {' '}
                 No technical skills required.
               </span>
             </p>
 
-            {/* Interactive Demo Preview */}
-            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 max-w-5xl mx-auto mb-12 border border-white/50 shadow-2xl">
-              <div className="grid md:grid-cols-2 gap-8 items-center">
+            {/* Platform Showcase */}
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 max-w-6xl mx-auto mb-12 border border-white/50 shadow-2xl">
+              <div className="grid md:grid-cols-3 gap-8 items-center">
+                {/* Voice Input */}
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center animate-pulse">
@@ -645,17 +680,17 @@ export default function HomePage() {
                         Recording...
                       </span>
                     </div>
-                    <p className="text-gray-700 italic">
+                    <p className="text-gray-700 italic text-sm">
                       "These wireless headphones have amazing sound quality,
-                      30-hour battery, and they're super comfortable for long
-                      listening sessions..."
+                      30-hour battery, perfect for both work and leisure..."
                     </p>
                   </div>
                 </div>
 
+                {/* AI Processing */}
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
                       <Sparkles className="h-6 w-6 text-white animate-spin" />
                     </div>
                     <div>
@@ -663,21 +698,78 @@ export default function HomePage() {
                         AI Creates Content
                       </h3>
                       <p className="text-sm text-gray-600">
-                        Professional copy ready to sell
+                        Platform-optimized copy ready to sell
                       </p>
                     </div>
                   </div>
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
                     <div className="flex items-center space-x-2 mb-2">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-green-600 font-medium">
-                        Generated!
+                      <Check className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm text-blue-600 font-medium">
+                        Generated & Optimized!
                       </span>
                     </div>
                     <div className="text-sm text-gray-800">
                       <strong>Premium Wireless Headphones</strong> - Experience
-                      studio-quality audio with our premium wireless headphones
-                      featuring advanced noise cancellation...
+                      studio-quality audio with advanced noise cancellation...
+                    </div>
+                  </div>
+                </div>
+
+                {/* Platform Publishing */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex -space-x-2">
+                      <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full flex items-center justify-center border-2 border-white">
+                        <span className="text-white text-xs">📦</span>
+                      </div>
+                      <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center border-2 border-white">
+                        <span className="text-white text-xs">🛍️</span>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        Publish Everywhere
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Amazon & Shopify go live instantly
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    className={`rounded-lg p-4 border transition-all duration-1000 ${
+                      activePlatform === 0
+                        ? 'bg-gradient-to-br from-orange-50 to-red-50 border-orange-200'
+                        : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="text-lg">
+                        {activePlatform === 0 ? '📦' : '🛍️'}
+                      </span>
+                      <span
+                        className={`text-sm font-medium ${
+                          activePlatform === 0
+                            ? 'text-orange-700'
+                            : 'text-green-700'
+                        }`}
+                      >
+                        {activePlatform === 0
+                          ? 'Live on Amazon!'
+                          : 'Live on Shopify!'}
+                      </span>
+                    </div>
+                    <div
+                      className={`text-xs ${
+                        activePlatform === 0
+                          ? 'text-orange-600'
+                          : 'text-green-600'
+                      }`}
+                    >
+                      {activePlatform === 0
+                        ? 'ASIN: B08XYZ123'
+                        : 'Product ID: 789456'}{' '}
+                      • Status: Active
                     </div>
                   </div>
                 </div>
@@ -731,7 +823,7 @@ export default function HomePage() {
             {[
               {
                 number: '2 min',
-                label: 'Voice to Amazon Live',
+                label: 'Voice to Live Products',
                 icon: Timer,
                 color: 'from-blue-500 to-cyan-500',
               },
@@ -748,8 +840,8 @@ export default function HomePage() {
                 color: 'from-purple-500 to-indigo-500',
               },
               {
-                number: 'Direct',
-                label: 'Amazon Integration',
+                number: '2 Platforms',
+                label: 'Amazon + Shopify Direct',
                 icon: ShoppingCart,
                 color: 'from-orange-500 to-red-500',
               },
@@ -796,7 +888,8 @@ export default function HomePage() {
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Our revolutionary AI platform combines voice recognition, OpenAI
               Vision analysis, bulk CSV processing with background jobs, and
-              direct Amazon integration to scale your business faster than ever.
+              direct Amazon & Shopify integration to scale your business faster
+              than ever.
             </p>
           </div>
 
@@ -902,7 +995,7 @@ export default function HomePage() {
             <div className="inline-flex items-center space-x-2 bg-green-50 border border-green-200 rounded-full px-4 py-2 mb-6">
               <Star className="h-4 w-4 text-yellow-500 fill-current" />
               <span className="text-sm font-medium text-green-800">
-                4.9/5 from 2,500+ reviews
+                4.9/5 from 3,500+ reviews
               </span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
@@ -914,7 +1007,8 @@ export default function HomePage() {
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               See how businesses of all sizes are using Listora AI to create
-              better content faster and achieve remarkable growth.
+              better content faster and achieve remarkable growth across Amazon
+              and Shopify.
             </p>
           </div>
 
@@ -1005,7 +1099,7 @@ export default function HomePage() {
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Start with our generous free plan and scale as your business
               grows. All plans include enterprise-grade security and our
-              complete feature set.
+              complete feature set with Amazon & Shopify integration.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -1020,14 +1114,14 @@ export default function HomePage() {
                   'Manual content generation (text input)',
                   'Voice-to-content generation (up to 1 minute)',
                   'AI Vision analysis (brands, colors, features)',
-                  'Amazon-optimized content format',
+                  'Amazon & Shopify optimized content format',
                   'Content library access',
                   'Email support',
                 ],
                 limitations: [
                   'No bulk CSV upload',
                   'No background processing',
-                  'No direct Amazon publishing',
+                  'No direct platform publishing',
                 ],
                 cta: '🚀 Start Free',
                 popular: false,
@@ -1061,20 +1155,25 @@ export default function HomePage() {
                 name: 'Premium',
                 price: '$79',
                 period: 'per month',
-                description: 'Professional scale with Amazon integration',
+                description: 'Professional scale with marketplace integration',
                 limit: '1,000 content generations/month',
                 features: [
                   'Everything in Business plan',
                   'Large bulk CSV upload (up to 200 products)',
-                  'Direct Amazon publishing integration',
+                  'Direct Amazon & Shopify publishing integration',
                   'Enhanced voice processing (full 1-minute)',
                   'Advanced AI Vision analysis',
                   'Bulk export options (CSV, Excel)',
                 ],
                 differentiators: [
-                  'Direct Amazon integration',
+                  'Direct Amazon & Shopify integration',
                   'Higher bulk limits',
                   'Enhanced AI features',
+                ],
+                newCapabilities: [
+                  'Direct marketplace integration',
+                  'Advanced AI processing',
+                  'Large-scale bulk processing',
                 ],
                 cta: '💎 Start Free Trial',
                 popular: false,
@@ -1090,7 +1189,7 @@ export default function HomePage() {
                 features: [
                   'Everything in Premium plan',
                   'Enterprise bulk processing (up to 1,000 products)',
-                  'Direct Amazon publishing (unlimited)',
+                  'Direct Amazon & Shopify publishing (unlimited)',
                   'Priority support (faster response)',
                   'Large-scale background processing',
                 ],
@@ -1168,7 +1267,6 @@ export default function HomePage() {
                     </ul>
                   </div>
 
-                  {/* Limitations for Starter */}
                   {plan.limitations && (
                     <div>
                       <h4 className="text-sm font-semibold text-gray-900 mb-3">
@@ -1189,7 +1287,6 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* New Capabilities for Business */}
                   {plan.newCapabilities && (
                     <div>
                       <h4 className="text-sm font-semibold text-gray-900 mb-3">
@@ -1208,7 +1305,6 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Future Features for Enterprise */}
                   {plan.futureFeatures && (
                     <div>
                       <h4 className="text-sm font-semibold text-gray-900 mb-3">
@@ -1265,8 +1361,9 @@ export default function HomePage() {
           </h2>
           <p className="text-xl text-indigo-100 mb-12 max-w-3xl mx-auto">
             Join thousands of entrepreneurs who have already discovered the
-            power of voice-driven content creation. Start your free trial today
-            and transform your business forever.
+            power of voice-driven content creation with direct Amazon & Shopify
+            publishing. Start your free trial today and transform your business
+            forever.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
@@ -1316,7 +1413,7 @@ export default function HomePage() {
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 Revolutionizing product marketing with advanced AI technology.
                 Transform your voice into professional content and optimize
-                images for every major e-commerce platform.
+                images for Amazon, Shopify, and every major e-commerce platform.
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
@@ -1363,12 +1460,12 @@ export default function HomePage() {
               <h3 className="font-bold text-white mb-6">Company</h3>
               <ul className="space-y-3 text-sm text-gray-400">
                 <li>
-                  <a
-                    href="/about"
+                  <button
+                    onClick={handleAbout}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     About Us
-                  </a>
+                  </button>
                 </li>
                 <li>
                   <span className="text-gray-500">Blog</span>
@@ -1377,12 +1474,12 @@ export default function HomePage() {
                   <span className="text-gray-500">Careers</span>
                 </li>
                 <li>
-                  <a
-                    href="/contact"
+                  <button
+                    onClick={handleContact}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     Contact
-                  </a>
+                  </button>
                 </li>
               </ul>
             </div>
@@ -1436,7 +1533,7 @@ export default function HomePage() {
             transform: translate(0px, 0px) scale(1);
           }
           33% {
-            transform: translate(30px, -50px) scale(1.1);
+            color: translate(30px, -50px) scale(1.1);
           }
           66% {
             transform: translate(-20px, 20px) scale(0.9);

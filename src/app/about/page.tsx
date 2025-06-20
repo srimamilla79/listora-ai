@@ -47,7 +47,7 @@ export default function EnhancedAboutUsPage() {
     const timer = setInterval(() => {
       setCurrentMilestone((prev) => (prev + 1) % milestones.length)
     }, 4000)
-    return () => clearInterval(timer)
+    return () => clearTimeout(timer)
   }, [])
 
   // Auto-rotate values
@@ -55,19 +55,19 @@ export default function EnhancedAboutUsPage() {
     const timer = setInterval(() => {
       setCurrentValue((prev) => (prev + 1) % values.length)
     }, 3000)
-    return () => clearInterval(timer)
+    return () => clearTimeout(timer)
   }, [])
 
   const stats = [
     {
-      number: '10,000+',
+      number: 'Thousands',
       label: 'Entrepreneurs Served',
       icon: Users,
       description: 'Active users creating content daily',
     },
     {
       number: '2 min',
-      label: 'Voice to Amazon Live',
+      label: 'Voice to Live Products',
       icon: Zap,
       description: 'Average time from voice to published listing',
     },
@@ -78,10 +78,10 @@ export default function EnhancedAboutUsPage() {
       description: 'Enterprise-grade reliability',
     },
     {
-      number: '5 Platforms',
-      label: 'Supported',
+      number: '2 Platforms',
+      label: 'Amazon & Shopify Direct',
       icon: Globe,
-      description: 'Amazon, Shopify, Etsy, eBay, Instagram',
+      description: 'Direct publishing to major marketplaces',
     },
   ]
 
@@ -147,9 +147,9 @@ export default function EnhancedAboutUsPage() {
     },
     {
       phase: 'Integration',
-      title: 'Direct Amazon Publishing',
+      title: 'Direct Amazon & Shopify Publishing',
       description:
-        'Skip the copy-paste hassle! One-click publishing directly to Amazon with seamless seller account integration.',
+        'Skip the copy-paste hassle! One-click publishing directly to Amazon and Shopify with seamless seller account integration.',
       icon: ShoppingCart,
       color: 'from-orange-400 to-red-500',
     },
@@ -240,10 +240,24 @@ export default function EnhancedAboutUsPage() {
 
             <div className="hidden md:flex items-center space-x-8">
               <button
-                onClick={() => (window.location.href = '/')}
+                onClick={() => (window.location.href = '/#features-section')}
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
-                Home
+                Features
+              </button>
+              <button
+                onClick={() => (window.location.href = '/#pricing-section')}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Pricing
+              </button>
+              <button
+                onClick={() =>
+                  (window.location.href = '/#testimonials-section')
+                }
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Reviews
               </button>
               <button
                 onClick={() => (window.location.href = '/contact')}
@@ -405,9 +419,9 @@ export default function EnhancedAboutUsPage() {
                 <p>
                   Today, a solo entrepreneur with a great product idea can
                   compete with massive corporations. They can create content
-                  that converts, optimize for every platform, and scale their
-                  business without hiring expensive agencies or learning complex
-                  tools.
+                  that converts, optimize for Amazon and Shopify, and scale
+                  their business without hiring expensive agencies or learning
+                  complex tools.
                 </p>
               </div>
 
@@ -590,9 +604,18 @@ export default function EnhancedAboutUsPage() {
                 <div
                   className={`w-20 h-20 bg-gradient-to-r ${values[currentValue].color} rounded-2xl mx-auto mb-8 flex items-center justify-center shadow-xl`}
                 >
-                  {React.createElement(values[currentValue].icon, {
-                    className: 'h-10 w-10 text-white',
-                  })}
+                  {currentValue === 0 && (
+                    <Lightbulb className="h-10 w-10 text-white" />
+                  )}
+                  {currentValue === 1 && (
+                    <Heart className="h-10 w-10 text-white" />
+                  )}
+                  {currentValue === 2 && (
+                    <Shield className="h-10 w-10 text-white" />
+                  )}
+                  {currentValue === 3 && (
+                    <Rocket className="h-10 w-10 text-white" />
+                  )}
                 </div>
                 <h3 className="text-3xl font-bold text-gray-900 mb-6">
                   {values[currentValue].title}
@@ -706,8 +729,8 @@ export default function EnhancedAboutUsPage() {
                     </h4>
                     <p className="text-gray-700 text-sm">
                       "Every entrepreneur deserves the same powerful tools as
-                      big corporations. Voice + AI + Direct Publishing = The
-                      future of content creation."
+                      big corporations. Voice + AI + Direct Amazon & Shopify
+                      Publishing = The future of content creation."
                     </p>
                   </div>
 
@@ -907,7 +930,8 @@ export default function EnhancedAboutUsPage() {
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 Empowering entrepreneurs with AI-powered content creation tools.
-                From voice to professional content in seconds.
+                From voice to professional content in seconds, with direct
+                Amazon & Shopify publishing.
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">

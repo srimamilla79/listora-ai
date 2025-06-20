@@ -1,4 +1,4 @@
-// src/components/UnifiedPublisher.tsx
+// src/components/UnifiedPublisher.tsx - Fixed Connection Detection
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -54,30 +54,31 @@ export default function UnifiedPublisher({
       name: 'Amazon',
       icon: '📦',
       color: 'orange',
-      connected: process.env.NODE_ENV === 'development' ? true : false, // ← Environment-based
+      connected: false, // ✅ Start with false, detect from database
     },
     {
       id: 'shopify',
       name: 'Shopify',
       icon: '🛍️',
       color: 'green',
-      connected: process.env.NODE_ENV === 'development' ? true : false, // ← Environment-based
+      connected: false, // ✅ Start with false, detect from database
     },
     {
       id: 'etsy',
       name: 'Etsy',
       icon: '🎨',
       color: 'orange',
-      connected: false,
+      connected: false, // ✅ Etsy always false for now
     },
   ])
 
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('amazon')
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('')
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
   const [publishSuccess, setPublishSuccess] = useState<string | null>(null)
   const [showOptions, setShowOptions] = useState(false)
   const [publishedPlatforms, setPublishedPlatforms] = useState<string[]>([])
+  const [loading, setLoading] = useState(true) // ✅ Add loading state
 
   const [publishingOptions, setPublishingOptions] = useState({
     price: '',
@@ -98,92 +99,136 @@ export default function UnifiedPublisher({
   useEffect(() => {
     if (passedUser?.id && supabase) {
       console.log('📝 Loading platform connections for user:', passedUser.id)
-      loadPlatformConnections(supabase)
-    }
-  }, [passedUser?.id, supabase])
-  // Handle OAuth success from URL parameter - AGGRESSIVE VERSION
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const shopifyParam = urlParams.get('shopify')
-
-    if (shopifyParam === 'connected' && passedUser?.id && supabase) {
-      console.log('🎉 Shopify connection detected in URL - FORCING refresh...')
-
-      // Force multiple refreshes to ensure it works
-      setTimeout(() => loadPlatformConnections(supabase), 500)
-      setTimeout(() => loadPlatformConnections(supabase), 1500)
-      setTimeout(() => loadPlatformConnections(supabase), 3000)
-
-      // Clean URL after a delay
-      setTimeout(() => {
-        const newUrl = window.location.pathname
-        window.history.replaceState({}, '', newUrl)
-      }, 4000)
+      loadPlatformConnections()
     }
   }, [passedUser?.id, supabase])
 
-  const loadPlatformConnections = async (supabaseClient: any) => {
-    if (!passedUser?.id) return
+  // ✅ Use the SAME logic as MarketplaceConnections
+  const loadPlatformConnections = async () => {
+    if (!passedUser?.id || !supabase) {
+      setLoading(false)
+      return
+    }
+
+    console.log(
+      '🔗 UnifiedPublisher: Loading connections for user:',
+      passedUser.id
+    )
+    setLoading(true)
 
     try {
-      // Check platform connections from database
-      const { data: connections } = await supabaseClient
-        .from('platform_connections')
-        .select('platform, status')
+      // ✅ SAME QUERIES as MarketplaceConnections
+      console.log('🔍 UnifiedPublisher: Querying Amazon connections...')
+      const { data: amazonConnections, error: amazonError } = await supabase
+        .from('amazon_connections')
+        .select('*')
         .eq('user_id', passedUser.id)
+        .eq('status', 'active')
 
-      console.log('🔗 Platform connections loaded:', connections)
+      if (amazonError) {
+        console.error(
+          '❌ UnifiedPublisher: Amazon connection error:',
+          amazonError
+        )
+      } else {
+        console.log(
+          '✅ UnifiedPublisher: Amazon query successful, found:',
+          amazonConnections?.length || 0,
+          'connections'
+        )
+      }
 
-      // NUCLEAR OPTION: Force Shopify to show as connected
-      setPlatforms((prev) =>
-        prev.map((platform) => {
-          const connection = connections?.find(
-            (c: any) => c.platform === platform.id
-          )
+      console.log('🔍 UnifiedPublisher: Querying Shopify connections...')
+      const { data: shopifyConnections, error: shopifyError } = await supabase
+        .from('platform_connections')
+        .select('*')
+        .eq('user_id', passedUser.id)
+        .eq('platform', 'shopify')
+        .eq('status', 'connected')
 
-          let isConnected = false
+      if (shopifyError) {
+        console.error(
+          '❌ UnifiedPublisher: Shopify connection error:',
+          shopifyError
+        )
+      } else {
+        console.log(
+          '✅ UnifiedPublisher: Shopify query successful, found:',
+          shopifyConnections?.length || 0,
+          'connections'
+        )
+      }
 
-          if (platform.id === 'amazon') {
-            isConnected = true // Amazon always connected
-          } else if (platform.id === 'shopify') {
-            // Force Shopify connected if ANY connection exists OR if URL shows connected
-            const hasShopifyConnection = connection?.status === 'connected'
-            const urlHasConnected =
-              window.location.search.includes('shopify=connected')
-            isConnected =
-              hasShopifyConnection ||
-              urlHasConnected ||
-              connections?.some((c: any) => c.platform === 'shopify')
-          } else {
-            isConnected = connection?.status === 'connected'
-          }
+      // ✅ SAME FILTERING as MarketplaceConnections
+      const validAmazonConnection =
+        amazonConnections?.find(
+          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
+        ) || null
 
-          console.log(
-            `📱 Platform ${platform.id}: ${isConnected ? 'Connected' : 'Not connected'}`
-          )
+      const validShopifyConnection =
+        shopifyConnections && shopifyConnections.length > 0
+          ? shopifyConnections[0]
+          : null
 
-          return {
-            ...platform,
-            connected: isConnected,
-          }
-        })
+      console.log(
+        '🔍 UnifiedPublisher: Valid Amazon connection:',
+        !!validAmazonConnection
+      )
+      console.log(
+        '🔍 UnifiedPublisher: Valid Shopify connection:',
+        !!validShopifyConnection
       )
 
-      // Set first connected platform as default
-      const connectedPlatform = platforms.find((p) => p.connected)
-      if (connectedPlatform && !selectedPlatform) {
+      // ✅ Update platforms with CORRECT connection status
+      const updatedPlatforms = platforms.map((platform) => {
+        let isConnected = false
+
+        if (platform.id === 'amazon') {
+          isConnected = !!validAmazonConnection?.access_token
+        } else if (platform.id === 'shopify') {
+          isConnected = !!validShopifyConnection
+        } else if (platform.id === 'etsy') {
+          isConnected = false // Etsy not implemented yet
+        }
+
+        console.log(
+          `📱 UnifiedPublisher: Platform ${platform.id}: ${isConnected ? 'Connected' : 'Not connected'}`
+        )
+
+        return {
+          ...platform,
+          connected: isConnected,
+        }
+      })
+
+      setPlatforms(updatedPlatforms)
+
+      // ✅ Set first connected platform as default
+      const connectedPlatform = updatedPlatforms.find((p) => p.connected)
+      if (connectedPlatform) {
         setSelectedPlatform(connectedPlatform.id)
+        console.log(
+          '✅ UnifiedPublisher: Selected platform:',
+          connectedPlatform.id
+        )
+      } else {
+        setSelectedPlatform('')
+        console.log('⚠️ UnifiedPublisher: No connected platforms found')
       }
     } catch (error) {
-      console.error('Error loading platform connections:', error)
+      console.error('❌ UnifiedPublisher: Error loading connections:', error)
 
-      // FALLBACK: If database fails, at least show Amazon and Shopify as connected
+      // ✅ Graceful fallback - all platforms disconnected
       setPlatforms((prev) =>
         prev.map((platform) => ({
           ...platform,
-          connected: platform.id === 'amazon' || platform.id === 'shopify',
+          connected: false,
         }))
       )
+      setSelectedPlatform('')
+    } finally {
+      setLoading(false)
+      console.log('✅ UnifiedPublisher: Loading completed')
     }
   }
 
@@ -295,6 +340,21 @@ export default function UnifiedPublisher({
   }
 
   const selectedPlatformData = platforms.find((p) => p.id === selectedPlatform)
+  const connectedPlatforms = platforms.filter((p) => p.connected)
+
+  // ✅ Show loading state
+  if (loading) {
+    return (
+      <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-center py-8">
+          <Loader className="h-6 w-6 animate-spin text-blue-600" />
+          <span className="ml-3 text-gray-600">
+            Loading publishing options...
+          </span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
@@ -315,296 +375,227 @@ export default function UnifiedPublisher({
         </div>
       </div>
 
-      {/* Platform Selection */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Select Publishing Platform
-        </label>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {platforms.map((platform) => (
-            <div
-              key={platform.id}
-              className={`relative border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                selectedPlatform === platform.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              onClick={() =>
-                platform.connected && setSelectedPlatform(platform.id)
-              }
-            >
-              <div className="flex items-center space-x-3">
-                <span className="text-2xl">{platform.icon}</span>
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{platform.name}</h4>
-                  <p
-                    className={`text-xs ${
-                      platform.connected ? 'text-green-600' : 'text-gray-500'
-                    }`}
-                  >
-                    {platform.connected ? '✓ Connected' : 'Not connected'}
-                  </p>
-                </div>
-              </div>
-
-              {!platform.connected && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handlePlatformConnect(platform.id)
-                  }}
-                  className="mt-3 w-full px-3 py-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Connect {platform.name}
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Publishing Options */}
-      {selectedPlatform && selectedPlatformData?.connected && (
-        <>
-          <div className="mb-6">
-            <button
-              onClick={() => setShowOptions(!showOptions)}
-              className="flex items-center justify-between w-full p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
-            >
-              <div className="flex items-center space-x-2">
-                <Settings className="h-5 w-5 text-gray-600" />
-                <span className="font-medium text-gray-900">
-                  Publishing Options
-                </span>
-              </div>
-              <ChevronDown
-                className={`h-5 w-5 text-gray-500 transition-transform ${
-                  showOptions ? 'rotate-180' : ''
+      {/* ✅ Show message when no platforms are connected */}
+      {connectedPlatforms.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="h-8 w-8 text-yellow-600" />
+          </div>
+          <h4 className="text-lg font-medium text-gray-900 mb-2">
+            No Connected Platforms
+          </h4>
+          <p className="text-gray-600 mb-6">
+            Connect at least one marketplace above to start publishing your
+            content.
+          </p>
+          <div className="flex justify-center space-x-3">
+            {platforms.map((platform) => (
+              <button
+                key={platform.id}
+                onClick={() => handlePlatformConnect(platform.id)}
+                className={`px-4 py-2 rounded-lg font-medium text-sm text-white transition-colors ${
+                  platform.id === 'amazon'
+                    ? 'bg-orange-600 hover:bg-orange-700'
+                    : platform.id === 'shopify'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
                 }`}
-              />
-            </button>
+              >
+                {platform.icon} {platform.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* ✅ Only show connected platforms */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Select Publishing Platform
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {connectedPlatforms.map((platform) => (
+                <div
+                  key={platform.id}
+                  className={`relative border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                    selectedPlatform === platform.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setSelectedPlatform(platform.id)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">{platform.icon}</span>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">
+                        {platform.name}
+                      </h4>
+                      <p className="text-xs text-green-600">✓ Connected</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {showOptions && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <DollarSign className="h-4 w-4 inline mr-1 text-green-600" />
-                    Price (USD) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={publishingOptions.price}
-                    onChange={(e) =>
-                      setPublishingOptions((prev) => ({
-                        ...prev,
-                        price: e.target.value,
-                      }))
-                    }
-                    placeholder="29.99"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Hash className="h-4 w-4 inline mr-1 text-blue-600" />
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={publishingOptions.quantity}
-                    onChange={(e) =>
-                      setPublishingOptions((prev) => ({
-                        ...prev,
-                        quantity: e.target.value,
-                      }))
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <Package className="h-4 w-4 inline mr-1 text-purple-600" />
-                    SKU (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={publishingOptions.sku}
-                    onChange={(e) =>
-                      setPublishingOptions((prev) => ({
-                        ...prev,
-                        sku: e.target.value,
-                      }))
-                    }
-                    placeholder="Auto-generated if empty"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    <ShoppingCart className="h-4 w-4 inline mr-1 text-indigo-600" />
-                    Condition
-                  </label>
-                  <select
-                    value={publishingOptions.condition}
-                    onChange={(e) =>
-                      setPublishingOptions((prev) => ({
-                        ...prev,
-                        condition: e.target.value,
-                      }))
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                  >
-                    <option value="new">New</option>
-                    <option value="used">Used</option>
-                    <option value="refurbished">Refurbished</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Status Messages */}
-          {publishError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <p className="text-red-800 font-medium">Publishing Failed</p>
-              </div>
-              <p className="text-red-700 text-sm mt-1">{publishError}</p>
-            </div>
-          )}
-
-          {publishSuccess && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <p className="text-green-800 font-medium">Success!</p>
-              </div>
-              <p className="text-green-700 text-sm mt-1">{publishSuccess}</p>
-            </div>
-          )}
-
-          {/* Publish Button or Published Status */}
-          {publishedPlatforms.includes(selectedPlatform) ? (
-            <div className="space-y-4">
-              {/* Published Status */}
-              <div className="w-full flex items-center justify-center px-6 py-4 rounded-lg bg-green-50 border-2 border-green-200">
-                <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
-                <span className="font-medium text-green-800">
-                  ✅ Published to {selectedPlatformData?.name}
-                </span>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-3">
+          {/* Publishing Options */}
+          {selectedPlatform && selectedPlatformData?.connected && (
+            <>
+              <div className="mb-6">
                 <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    // Get the platform URL from success message or construct it
-                    const shopifyAdminUrl =
-                      selectedPlatform === 'shopify'
-                        ? `https://listora-ai-test-store.myshopify.com/admin/products`
-                        : '#'
-                    window.open(shopifyAdminUrl, '_blank')
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  onClick={() => setShowOptions(!showOptions)}
+                  className="flex items-center justify-between w-full p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
                 >
-                  View in {selectedPlatformData?.name}
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setPublishedPlatforms([])
-                    setPublishSuccess(null)
-                    setPublishError(null)
-                    // Optionally refresh the page for a completely clean start
-                    // window.location.reload()
-                  }}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
-                >
-                  Start New Product
+                  <div className="flex items-center space-x-2">
+                    <Settings className="h-5 w-5 text-gray-600" />
+                    <span className="font-medium text-gray-900">
+                      Publishing Options
+                    </span>
+                  </div>
+                  <ChevronDown
+                    className={`h-5 w-5 text-gray-500 transition-transform ${
+                      showOptions ? 'rotate-180' : ''
+                    }`}
+                  />
                 </button>
               </div>
-            </div>
-          ) : (
-            /* Original Publish Button */
-            <button
-              onClick={handlePublish}
-              disabled={isPublishing || !publishingOptions.price}
-              className={`w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all ${
-                isPublishing || !publishingOptions.price
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-              }`}
-            >
-              {isPublishing ? (
-                <>
-                  <Loader className="h-5 w-5 mr-2 animate-spin" />
-                  Publishing to {selectedPlatformData?.name}...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-5 w-5 mr-2" />
-                  Publish to {selectedPlatformData?.name}
-                </>
+
+              {showOptions && (
+                <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <DollarSign className="h-4 w-4 inline mr-1 text-green-600" />
+                        Price (USD) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={publishingOptions.price}
+                        onChange={(e) =>
+                          setPublishingOptions((prev) => ({
+                            ...prev,
+                            price: e.target.value,
+                          }))
+                        }
+                        placeholder="29.99"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Hash className="h-4 w-4 inline mr-1 text-blue-600" />
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={publishingOptions.quantity}
+                        onChange={(e) =>
+                          setPublishingOptions((prev) => ({
+                            ...prev,
+                            quantity: e.target.value,
+                          }))
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Package className="h-4 w-4 inline mr-1 text-purple-600" />
+                        SKU (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={publishingOptions.sku}
+                        onChange={(e) =>
+                          setPublishingOptions((prev) => ({
+                            ...prev,
+                            sku: e.target.value,
+                          }))
+                        }
+                        placeholder="Auto-generated if empty"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <ShoppingCart className="h-4 w-4 inline mr-1 text-indigo-600" />
+                        Condition
+                      </label>
+                      <select
+                        value={publishingOptions.condition}
+                        onChange={(e) =>
+                          setPublishingOptions((prev) => ({
+                            ...prev,
+                            condition: e.target.value,
+                          }))
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      >
+                        <option value="new">New</option>
+                        <option value="used">Used</option>
+                        <option value="refurbished">Refurbished</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
               )}
-            </button>
+
+              {/* Status Messages */}
+              {publishError && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                    <p className="text-red-800 font-medium">
+                      Publishing Failed
+                    </p>
+                  </div>
+                  <p className="text-red-700 text-sm mt-1">{publishError}</p>
+                </div>
+              )}
+
+              {publishSuccess && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <p className="text-green-800 font-medium">Success!</p>
+                  </div>
+                  <p className="text-green-700 text-sm mt-1">
+                    {publishSuccess}
+                  </p>
+                </div>
+              )}
+
+              {/* Publish Button */}
+              <button
+                onClick={handlePublish}
+                disabled={isPublishing || !publishingOptions.price}
+                className={`w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all ${
+                  isPublishing || !publishingOptions.price
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                }`}
+              >
+                {isPublishing ? (
+                  <>
+                    <Loader className="h-5 w-5 mr-2 animate-spin" />
+                    Publishing to {selectedPlatformData?.name}...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-5 w-5 mr-2" />
+                    Publish to {selectedPlatformData?.name}
+                  </>
+                )}
+              </button>
+            </>
           )}
         </>
       )}
-
-      {/* Platform Selection Guidance */}
-      {selectedPlatform && !selectedPlatformData?.connected && (
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
-            <p className="text-yellow-800 font-medium">
-              Platform Not Connected
-            </p>
-          </div>
-          <p className="text-yellow-700 text-sm mt-1">
-            Please connect your {selectedPlatformData?.name} account to publish
-            products.
-          </p>
-        </div>
-      )}
-
-      {/* Product Preview */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-        <h4 className="font-medium text-gray-900 mb-2">Publishing Preview:</h4>
-        <div className="text-sm text-gray-600 space-y-1">
-          <p>
-            <strong>Product:</strong> {productContent.product_name}
-          </p>
-          <p>
-            <strong>Platform:</strong>{' '}
-            {selectedPlatformData?.name || 'None selected'}
-          </p>
-          <p>
-            <strong>Images:</strong> {images.length} image(s)
-          </p>
-          {publishingOptions.price && (
-            <p>
-              <strong>Price:</strong> ${publishingOptions.price}
-            </p>
-          )}
-          <p>
-            <strong>User:</strong>{' '}
-            {passedUser?.id ? 'Authenticated' : 'Not authenticated'}
-          </p>
-        </div>
-      </div>
     </div>
   )
 }

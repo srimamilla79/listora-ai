@@ -1,4 +1,4 @@
-// src/app/(dashboard)/pricing/page.tsx - UPDATED WITH REALISTIC FEATURES
+// src/app/(dashboard)/pricing/page.tsx - UPDATED WITH SHOPIFY INTEGRATION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -29,6 +29,7 @@ import {
   Volume2,
   Timer,
   Building2,
+  Store,
 } from 'lucide-react'
 
 interface UserPlan {
@@ -271,14 +272,14 @@ export default function EnhancedPricingPage() {
         'Manual content generation (text input)',
         'Voice-to-content generation (up to 1 minute)',
         'AI Vision analysis (brands, colors, features)',
-        'Amazon-optimized content format',
+        'Amazon & Shopify optimized content format',
         'Content library access',
         'Email support',
       ],
       limitations: [
         'No bulk CSV upload',
         'No background processing',
-        'No direct Amazon publishing',
+        'No direct marketplace publishing',
       ],
       highlights: ['Voice input', 'AI Vision', 'Free forever'],
       icon: Sparkles,
@@ -298,6 +299,7 @@ export default function EnhancedPricingPage() {
         '250 content generations per month',
         'Everything in Starter plan',
         'Bulk CSV upload (up to 50 products)',
+        'Direct Amazon & Shopify publishing integration',
         'Background job processing',
         'Content library with organization',
         'Priority email support',
@@ -319,23 +321,28 @@ export default function EnhancedPricingPage() {
       name: 'Premium',
       price: 79,
       period: 'month',
-      description: 'Professional scale with Amazon integration',
+      description: 'Professional scale with Amazon & Shopify integration',
       badge: 'Best Value',
       features: [
         '1,000 content generations per month',
         'Everything in Business plan',
         'Large bulk CSV upload (up to 200 products)',
-        'Direct Amazon publishing integration',
+        'Direct Amazon & Shopify publishing integration',
         'Enhanced voice processing (full 1-minute)',
         'Advanced AI Vision analysis',
         'Bulk export options (CSV, Excel)',
       ],
       differentiators: [
-        'Direct Amazon integration',
+        'Direct Amazon & Shopify integration',
         'Higher bulk limits',
         'Enhanced AI features',
       ],
-      highlights: ['Amazon publishing', 'Advanced AI', 'Export options'],
+      newCapabilities: [
+        'Direct marketplace integration',
+        'Advanced AI processing',
+        'Large-scale bulk processing',
+      ],
+      highlights: ['Marketplace publishing', 'Advanced AI', 'Export options'],
       icon: Crown,
       planType: 'premium',
       popular: false,
@@ -353,7 +360,7 @@ export default function EnhancedPricingPage() {
         'Unlimited content generations',
         'Everything in Premium plan',
         'Enterprise bulk processing (up to 1,000 products)',
-        'Direct Amazon publishing (unlimited)',
+        'Direct Amazon & Shopify publishing (unlimited)',
         'Priority support (faster response)',
         'Large-scale background processing',
       ],
@@ -447,7 +454,8 @@ export default function EnhancedPricingPage() {
               </h1>
               <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">
                 Start with 10 free generations forever. Scale as you grow with
-                Voice + AI Vision + Bulk Processing + Amazon Integration.
+                Voice + AI Vision + Bulk Processing + Amazon & Shopify
+                Integration.
                 <span className="font-semibold text-gray-800 block mt-2">
                   Only pay for features you actually use.
                 </span>
@@ -578,7 +586,7 @@ export default function EnhancedPricingPage() {
                       </span>
                     </div>
                     <p className="text-sm text-purple-700">
-                      Voice + Vision + Amazon
+                      Voice + Vision + Marketplaces
                     </p>
                   </div>
                 </div>
@@ -610,9 +618,9 @@ export default function EnhancedPricingPage() {
                 desc: 'Bulk jobs run while you work',
               },
               {
-                icon: ShoppingCart,
-                label: 'Amazon Publishing',
-                desc: 'One-click to Seller Central',
+                icon: Store,
+                label: 'Marketplace Publishing',
+                desc: 'Direct Amazon & Shopify integration',
               },
             ].map((feature, index) => {
               const Icon = feature.icon
@@ -945,16 +953,16 @@ export default function EnhancedPricingPage() {
             <div className="space-y-6">
               <div className="flex items-start space-x-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <ShoppingCart className="h-6 w-6 text-white" />
+                  <Store className="h-6 w-6 text-white" />
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-2">
-                    Direct Amazon Publishing
+                    Direct Marketplace Publishing
                   </h4>
                   <p className="text-gray-600 text-sm">
-                    One-click publish generated content directly to Amazon
-                    Seller Central. No copy-paste required. Integrates directly
-                    with your Amazon seller account for seamless workflow.
+                    One-click publish generated content directly to Amazon and
+                    Shopify. No copy-paste required. Integrates directly with
+                    your seller accounts for seamless workflow.
                   </p>
                 </div>
               </div>
@@ -1011,7 +1019,7 @@ export default function EnhancedPricingPage() {
                 <li className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                   <span className="text-gray-700">
-                    Multi-platform publishing (Shopify, eBay, Etsy)
+                    Enhanced Shopify integration with inventory sync
                   </span>
                 </li>
                 <li className="flex items-center space-x-3">
@@ -1090,7 +1098,7 @@ export default function EnhancedPricingPage() {
                 <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
                   Start with 10 free generations forever. No credit card
                   required. Experience the power of Voice + AI Vision +
-                  Background Processing + Amazon Integration.
+                  Background Processing + Amazon & Shopify Integration.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">

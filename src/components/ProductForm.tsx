@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 
 // Import Amazon Components
-import AmazonConnection from '@/components/AmazonConnection'
+import MarketplaceConnections from '@/components/MarketplaceConnections'
 import UnifiedPublisher from '@/components/UnifiedPublisher'
 interface ProcessedImage {
   original: File
@@ -2501,26 +2501,30 @@ export default function ProductForm({
             )}
           </div>
 
-          {/* Amazon Integration Section */}
+          {/* Marketplace Integration Section - SINGLE CLEAN VERSION */}
           {generatedContent && user && (
             <div className="mt-8 space-y-6">
               <div className="border-t border-gray-200 pt-8">
                 <div className="text-center mb-6">
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    🚀 Publish Your Content
+                    🚀 Publish to Marketplaces
                   </h2>
                   <p className="text-gray-600">
-                    Choose your platform and publish instantly
+                    Connect your accounts and publish instantly to Amazon,
+                    Shopify, and more
                   </p>
                 </div>
 
-                {/* Amazon Connection Component */}
-                <AmazonConnection
+                <MarketplaceConnections
                   userId={user.id}
-                  onConnectionChange={setAmazonConnected}
+                  onConnectionChange={(platform, connected) => {
+                    if (platform === 'amazon') {
+                      setAmazonConnected(connected)
+                    }
+                    console.log(`${platform} connection changed:`, connected)
+                  }}
                 />
 
-                {/* Unified Publisher Component - Only show if content exists */}
                 <UnifiedPublisher
                   productContent={{
                     id: lastGeneratedContentId || '',
@@ -2542,37 +2546,6 @@ export default function ProductForm({
                   onPublishSuccess={handlePublishSuccess}
                   user={user}
                 />
-
-                {/* Integration Benefits */}
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border border-blue-200">
-                  <h3 className="font-bold text-blue-900 mb-3 flex items-center">
-                    <span className="mr-2">⚡</span>
-                    Why Use Direct Publishing?
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-800">
-                    <div className="flex items-start space-x-2">
-                      <span className="text-green-600 mt-1">✓</span>
-                      <div>
-                        <div className="font-medium">Save Time</div>
-                        <div>No manual copy-pasting to Amazon</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <span className="text-green-600 mt-1">✓</span>
-                      <div>
-                        <div className="font-medium">Reduce Errors</div>
-                        <div>Automated formatting and validation</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <span className="text-green-600 mt-1">✓</span>
-                      <div>
-                        <div className="font-medium">Track Status</div>
-                        <div>Real-time publishing updates</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           )}
