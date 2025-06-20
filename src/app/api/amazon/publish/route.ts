@@ -234,7 +234,7 @@ async function createAmazonListing(
         'images for Amazon listing'
       )
 
-      // Main product image (first image)
+      // ✅ Main product image (only once!)
       imageAttributes.main_product_image_locator = [
         {
           value: amazonImages[0],
@@ -242,8 +242,9 @@ async function createAmazonListing(
         },
       ]
 
-      // Additional images (up to 8 more)
+      // ✅ Additional images (if available)
       for (let i = 1; i < Math.min(amazonImages.length, 9); i++) {
+        // ✅ Up to 9 total images
         imageAttributes[`other_product_image_locator_${i}`] = [
           {
             value: amazonImages[i],
@@ -256,7 +257,6 @@ async function createAmazonListing(
     } else {
       console.log('📸 No images available for this product')
     }
-
     // Determine product type based on content
     let productType = 'WATCH' // Default fallback - known working type
     let itemTypeKeyword = 'watch' // Default fallback
@@ -333,9 +333,9 @@ async function createAmazonListing(
         })),
       list_price: [
         {
-          Amount: parseFloat(options.price) || 49.99,
-          CurrencyCode: 'USD',
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID, // ✅ ADD this line
+          value: parseFloat(options.price) || 49.99, // ✅ Change 'Amount' to 'value'
+          currency_code: 'USD', // ✅ Change 'CurrencyCode' to 'currency_code'
+          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
         },
       ],
       fulfillment_availability: [
@@ -362,7 +362,7 @@ async function createAmazonListing(
       ],
       target_gender: [
         {
-          value: 'mens', // ✅ CHANGE from 'Unisex' to 'mens' for WATCH category
+          value: 'male', // ✅ Try 'male' instead of 'mens'
           marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
         },
       ],
