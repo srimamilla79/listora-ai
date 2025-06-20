@@ -30,8 +30,8 @@ export const AMAZON_OAUTH_CONFIG = {
   authUrl: 'https://sellercentral.amazon.com/apps/authorize/consent',
   tokenUrl: 'https://api.amazon.com/auth/o2/token',
   scope: 'messaging:read messaging:write marketplace:all',
-  applicationId: 'amzn1.sp.solution.1d2d0060-9bf5-417f-87b3-ae6a053a85bf', // Use Application ID for OAuth
-  clientId: process.env.AMAZON_SP_API_CLIENT_ID!, // Keep Client ID for token exchange
+  applicationId: process.env.AMAZON_APPLICATION_ID!, // ✅ FIXED: Use environment variable
+  clientId: process.env.AMAZON_SP_API_CLIENT_ID!,
   clientSecret: process.env.AMAZON_SP_API_CLIENT_SECRET!,
   redirectUri: `${process.env.NEXT_PUBLIC_APP_URL}/api/amazon/oauth/callback`,
 }
