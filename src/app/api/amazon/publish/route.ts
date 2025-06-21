@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { generateDynamicAttributes } from '../../../../lib/amazon-attribute-generator'
 
 // Initialize Supabase
 const supabase = createClient(
@@ -175,7 +176,7 @@ async function makeSignedSPAPIRequest(
   return await response.json()
 }
 
-// Create Amazon listing using Feeds API with dynamic attributes
+// Create Amazon listing using Feeds API with UNIVERSAL DYNAMIC ATTRIBUTES
 async function createAmazonListing(
   productData: any,
   options: any
@@ -224,42 +225,38 @@ async function createAmazonListing(
       }
     }
 
-    // Prepare image attributes for Amazon
-    // Prepare image attributes for Amazon
+    // Prepare image attributes for Amazon - RE-ENABLED WITH SAFE PROCESSING
     const imageAttributes: any = {}
-    // ✅ DISABLE ALL IMAGE PROCESSING TO ISOLATE THE ISSUE
-    console.log(
-      '📸 Images temporarily disabled for debugging image_locator_ps03 error'
-    )
-    // Comment out all image processing
-    /*
+
     if (amazonImages.length > 0) {
       console.log(
-       '📸 Processing',
-   amazonImages.length,
-   //'images for Amazon listing'
-      //)
+        '📸 Processing',
+        amazonImages.length,
+        'images for Amazon listing'
+      )
 
-      // ✅ ONLY main product image - no additional images
-      if (amazonImages[0] && amazonImages[0].trim()) {
+      // ✅ Only add main image if URL is valid
+      if (
+        amazonImages[0] &&
+        amazonImages[0].trim() &&
+        amazonImages[0].startsWith('http')
+      ) {
         imageAttributes.main_product_image_locator = [
           {
             value: amazonImages[0],
             marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
           },
         ]
+        console.log('📸 Added main image:', amazonImages[0])
+      } else {
+        console.log('📸 Main image URL invalid, skipping images')
       }
-
-      // ✅ REMOVE all other_product_image_locator_X attributes for now
-      console.log('📸 Using only main image to avoid validation errors')
-      console.log('📸 Main image URL:', amazonImages[0])
     } else {
       console.log('📸 No images available for this product')
     }
-      */
+
     // Determine product type based on content
     let productType = 'WATCH' // Default fallback - known working type
-    let itemTypeKeyword = 'watch' // Default fallback
 
     // Smart product type detection
     const title = productData.title?.toLowerCase() || ''
@@ -275,17 +272,22 @@ async function createAmazonListing(
     // ✅ NEW: Use user-selected product type if provided
     if (options.productType) {
       productType = options.productType
-      itemTypeKeyword = options.productType.toLowerCase().replace('_', ' ')
       console.log('👤 User selected product type:', productType)
     } else {
       // ✅ ENHANCED: Fallback to smart detection if no user selection
       if (allText.includes('watch') || allText.includes('timepiece')) {
         productType = 'WATCH'
-        itemTypeKeyword = 'watch'
+      } else if (
+        allText.includes('shoe') ||
+        allText.includes('sneaker') ||
+        allText.includes('footwear')
+      ) {
+        productType = 'SHOES'
+      } else if (allText.includes('fryer') || allText.includes('air fryer')) {
+        productType = 'AIR_FRYER'
       } else {
         // Default to WATCH for all other products (we know it works)
         productType = 'WATCH'
-        itemTypeKeyword = 'watch'
       }
       console.log('🤖 Auto-detected product type:', productType)
     }
@@ -297,284 +299,45 @@ async function createAmazonListing(
       title.substring(0, 50)
     )
 
-    // ✅ DYNAMIC ATTRIBUTES SYSTEM - Works for all product types
-    const baseAttributes = {
-      condition_type: [{ value: 'new_new' }],
-      item_name: [
-        {
-          value: productData.title,
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ],
-      brand: [
-        {
-          value: productData.brand || 'Listora AI',
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ],
-      manufacturer: [
-        {
-          value: productData.manufacturer || 'Listora AI',
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ],
-      product_description: [
-        {
-          value: productData.description,
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ],
-      bullet_point: productData.features
-        .split('\n')
-        .filter((f: string) => f.trim())
-        .map((feature: string) => ({
-          value: feature.trim(),
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        })),
-      list_price: [
-        {
-          value: parseFloat(options.price) || 49.99, // ✅ Change 'Amount' to 'value'
-          currency_code: 'USD', // ✅ Change 'CurrencyCode' to 'currency_code'
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ],
-      fulfillment_availability: [
-        {
-          fulfillment_channel_code: 'DEFAULT',
-          quantity: parseInt(options.quantity) || 10,
-        },
-      ],
-      item_type_keyword: [
-        {
-          value: itemTypeKeyword,
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ],
-      // Universal attributes that most categories need
-      color: [
-        {
-          value: 'Multi-Color',
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ],
-      country_of_origin: [
-        { value: 'US', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
-      ],
-      target_gender: [
-        {
-          value: 'male', // ✅ Try 'male' instead of 'mens'
-          marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-        },
-      ],
-      department: [
-        { value: 'Unisex', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
-      ],
-      age_range_description: [
-        { value: 'Adult', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
-      ],
-      // ✅ Keep images
-      ...imageAttributes,
-    }
+    // 🚀 REVOLUTIONARY: Use Universal Dynamic Attribute Generator
+    console.log(
+      '🔧 Using Universal Dynamic Attribute Generator for',
+      productType
+    )
 
-    // ✅ ADD product-type specific attributes
-    let productSpecificAttributes = {}
-
-    if (productType === 'WATCH') {
-      productSpecificAttributes = {
-        externally_assigned_product_identifier: [
-          {
-            product_identity: 'UPC',
-            value: '123456789012',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        part_number: [
-          {
-            value: `LISTORA-${sku}`,
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        calendar_type: [
-          {
-            value: 'Analog',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        item_shape: [
-          { value: 'Round', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
-        ],
-        warranty_type: [
-          {
-            value: 'Limited',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        supplier_declared_dg_hz_regulation: [
-          {
-            value: 'not_applicable',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        // ✅ FIXED: merchant_suggested_asin with 10+ characters
-        merchant_suggested_asin: [
-          {
-            value: 'B000000000',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-      }
-    } else if (productType === 'SHOES') {
-      productSpecificAttributes = {
-        footwear_size: [
-          {
-            value: 'One Size',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        heel: [
-          { value: 'flat', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
-        ],
-        closure: [
-          {
-            value: 'slip-on',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        outer: [
-          {
-            value: 'synthetic',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        sole_material: [
-          {
-            value: 'rubber',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        model_name: [
-          {
-            value: 'Generic',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        model_number: [
-          {
-            value: `LISTORA-${sku}`,
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        style: [
-          {
-            value: 'casual',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        height_map: [
-          { value: 'low', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
-        ],
-        water_resistance_level: [
-          {
-            value: 'not_water_resistant',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        externally_assigned_product_identifier: [
-          {
-            product_identity: 'UPC',
-            value: '123456789012',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        merchant_suggested_asin: [
-          { value: '', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
-        ],
-      }
-    } else if (productType === 'CLOTHING') {
-      productSpecificAttributes = {
-        size: [
-          {
-            value: 'One Size',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        material_type: [
-          {
-            value: 'cotton',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        model_name: [
-          {
-            value: 'Generic',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        model_number: [
-          {
-            value: `LISTORA-${sku}`,
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        style: [
-          {
-            value: 'casual',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-      }
-    } else if (productType === 'ELECTRONICS') {
-      productSpecificAttributes = {
-        model_name: [
-          {
-            value: 'Generic',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        model_number: [
-          {
-            value: `LISTORA-${sku}`,
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        externally_assigned_product_identifier: [
-          {
-            product_identity: 'UPC',
-            value: '123456789012',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        merchant_suggested_asin: [
-          { value: '', marketplace_id: process.env.AMAZON_MARKETPLACE_ID },
-        ],
-      }
-    } else {
-      // ✅ Default minimal attributes for unknown types
-      productSpecificAttributes = {
-        model_name: [
-          {
-            value: 'Generic',
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-        model_number: [
-          {
-            value: `LISTORA-${sku}`,
-            marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          },
-        ],
-      }
-    }
-
-    // ✅ COMBINE base + product-specific attributes
-    const finalAttributes = { ...baseAttributes, ...productSpecificAttributes }
+    const dynamicAttributes = await generateDynamicAttributes(
+      productType,
+      {
+        title: productData.title,
+        description: productData.description,
+        features: productData.features,
+        brand: productData.brand,
+        manufacturer: productData.manufacturer,
+        id: productData.id,
+      },
+      {
+        price: parseFloat(options.price) || 49.99,
+        quantity: parseInt(options.quantity) || 10,
+        condition: options.condition || 'new_new',
+        productType: options.productType,
+      },
+      sku,
+      imageAttributes
+    )
 
     console.log(
-      '🏷️ Final attributes for',
-      productType,
-      ':',
-      Object.keys(finalAttributes)
+      '✅ Generated',
+      Object.keys(dynamicAttributes).length,
+      'dynamic attributes for',
+      productType
     )
+    console.log(
+      '🎯 Sample attributes:',
+      Object.keys(dynamicAttributes).slice(0, 10)
+    )
+
+    // Use dynamic attributes in feed document
+    const finalAttributes = dynamicAttributes
 
     // Create feed document for JSON_LISTINGS_FEED
     const feedDocument = {
@@ -590,13 +353,16 @@ async function createAmazonListing(
           operationType: 'UPDATE',
           productType: productType,
           requirements: 'LISTING',
-          attributes: finalAttributes, // ✅ Use dynamic attributes
+          attributes: finalAttributes, // ✅ Now uses dynamic attributes
         },
       ],
     }
 
     console.log('📦 Creating Amazon listing via Feeds API...')
-    console.log('📄 Feed document:', JSON.stringify(feedDocument, null, 2))
+    console.log(
+      '📊 Feed document preview - Attributes count:',
+      Object.keys(finalAttributes).length
+    )
 
     // STEP 1: Create feed document
     console.log('📄 Step 1: Creating feed document...')
@@ -647,7 +413,9 @@ async function createAmazonListing(
       status: 'submitted',
       imageCount: amazonImages.length,
       imagesIncluded: amazonImages.length > 0,
-      message: `Product submitted to Amazon via Feeds API${amazonImages.length > 0 ? ` with ${amazonImages.length} images` : ' (no images)'}. It will appear in Seller Central within 15 minutes.`,
+      attributeCount: Object.keys(finalAttributes).length,
+      productType: productType,
+      message: `Product submitted to Amazon via Feeds API with ${Object.keys(finalAttributes).length} dynamic attributes${amazonImages.length > 0 ? ` and ${amazonImages.length} images` : ' (no images)'}. It will appear in Seller Central within 15 minutes.`,
     }
   } catch (error: any) {
     console.error('❌ Error creating Amazon listing:', error)
@@ -657,7 +425,9 @@ async function createAmazonListing(
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🚀 Amazon publish route called')
+    console.log(
+      '🚀 Amazon publish route called with Universal Dynamic Attributes'
+    )
 
     const body = await request.json()
     const { contentId, userId, productData, options } = body
@@ -666,12 +436,18 @@ export async function POST(request: NextRequest) {
       contentId,
       userId,
       productData: productData?.title,
+      productType: options?.productType || 'auto-detect',
     })
 
-    // Create listing on Amazon using working Feeds API
+    // Create listing on Amazon using Universal Dynamic Attribute Generator
     const amazonResult = await createAmazonListing(productData, options)
 
-    console.log('✅ Amazon listing created:', amazonResult)
+    console.log('✅ Amazon listing created with dynamic attributes:', {
+      sku: amazonResult.sku,
+      feedId: amazonResult.feedId,
+      attributeCount: amazonResult.attributeCount,
+      productType: amazonResult.productType,
+    })
 
     // Save to database
     const { data: publishData, error: publishError } = await supabase
@@ -693,8 +469,10 @@ export async function POST(request: NextRequest) {
           feed_id: amazonResult.feedId,
           sku: amazonResult.sku,
           marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
-          product_type: productData.productType || 'WATCH',
+          product_type: amazonResult.productType,
           status: amazonResult.status,
+          attribute_count: amazonResult.attributeCount,
+          dynamic_generation: true,
         },
         status: amazonResult.status,
         published_at: new Date().toISOString(),
@@ -711,14 +489,17 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Product successfully published to Amazon!',
+      message: `Product successfully published to Amazon with ${amazonResult.attributeCount} dynamic attributes!`,
       data: {
         sku: amazonResult.sku,
         feedId: amazonResult.feedId,
         status: amazonResult.status,
         publishId: publishData?.id,
+        productType: amazonResult.productType,
+        attributeCount: amazonResult.attributeCount,
+        dynamicGeneration: true,
         instructions:
-          'Check your Amazon Seller Central → Manage Inventory in 10-15 minutes to see your new product listing.',
+          'Check your Amazon Seller Central → Manage Inventory in 10-15 minutes to see your new product listing with perfect attributes.',
       },
     })
   } catch (error: any) {

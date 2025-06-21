@@ -103,12 +103,12 @@ export async function POST(req: NextRequest) {
       premium: {
         name: 'Premium',
         priceId: process.env.STRIPE_PREMIUM_PRICE_ID!,
-        price: 79,
+        price: 59,
       },
       enterprise: {
         name: 'Enterprise',
         priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID!,
-        price: 199,
+        price: 99,
       },
     }
 

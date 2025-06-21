@@ -53,7 +53,7 @@ export const PLAN_LIMITS = {
   },
   premium: {
     generations: 2000,
-    price: 79,
+    price: 59,
     priceId: process.env.STRIPE_PREMIUM_PRICE_ID,
     features: [
       'Everything in Business',
@@ -68,7 +68,7 @@ export const PLAN_LIMITS = {
   },
   enterprise: {
     generations: -1, // unlimited
-    price: 199,
+    price: 99,
     priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
     features: [
       'Everything in Premium',

@@ -435,8 +435,8 @@ export default function EnhancedProfilePage() {
 
   const getPlanPrice = (planName: string) => {
     const plan = planName?.toLowerCase()
-    if (plan?.includes('enterprise')) return '$199'
-    if (plan?.includes('premium')) return '$79'
+    if (plan?.includes('enterprise')) return '$99'
+    if (plan?.includes('premium')) return '$59'
     if (plan?.includes('business')) return '$29'
     return 'Free'
   }

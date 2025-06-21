@@ -1,7 +1,7 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient, createServerClient } from '@supabase/ssr'
 import Stripe from 'stripe'
 
-// Client-side Supabase client (singleton pattern to avoid multiple instances)
+// Client-side Supabase client (existing code)
 let supabaseClient: ReturnType<typeof createBrowserClient> | null = null
 
 export function createClient() {
@@ -14,6 +14,29 @@ export function createClient() {
   return supabaseClient
 }
 
+// Server-side Supabase client for API routes
+export async function createServerSideClient() {
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set(name, value, options)
+        },
+        remove(name: string, options: any) {
+          cookieStore.delete(name)
+        },
+      },
+    }
+  )
+}
 // Stripe client configuration
 export const getServerStripe = () => {
   if (!process.env.STRIPE_SECRET_KEY) {

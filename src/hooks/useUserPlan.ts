@@ -42,7 +42,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     name: 'Premium',
     maxBulkProducts: 200,
     monthlyGenerations: 1000,
-    price: '$79/month',
+    price: '$59/month',
     features: [
       'Bulk CSV upload (200 products)',
       'Advanced customization',
@@ -53,7 +53,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     name: 'Enterprise',
     maxBulkProducts: 1000,
     monthlyGenerations: 999999,
-    price: '$199/month',
+    price: '$99/month',
     features: [
       'Bulk CSV upload (1000 products)',
       'Priority phone support',

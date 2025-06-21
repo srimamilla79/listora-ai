@@ -1079,10 +1079,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Enhanced Pricing Section */}
+      {/* Enhanced Pricing Section - Updated Layout */}
       <section id="pricing-section" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20">
+          <div className="text-center mb-16">
             <div className="inline-flex items-center space-x-2 bg-purple-50 border border-purple-200 rounded-full px-4 py-2 mb-6">
               <DollarSign className="h-4 w-4 text-purple-600" />
               <span className="text-sm font-medium text-purple-800">
@@ -1102,7 +1102,8 @@ export default function HomePage() {
               complete feature set with Amazon & Shopify integration.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
             {[
               {
                 name: 'Starter (Free)',
@@ -1110,6 +1111,8 @@ export default function HomePage() {
                 period: 'forever',
                 description: 'Perfect for testing our AI platform',
                 limit: '10 content generations/month',
+                badge: null,
+                topBorderColor: 'bg-gray-300',
                 features: [
                   'Manual content generation (text input)',
                   'Voice-to-content generation (up to 1 minute)',
@@ -1125,7 +1128,9 @@ export default function HomePage() {
                 ],
                 cta: '🚀 Start Free',
                 popular: false,
-                color: 'border-gray-200 bg-white',
+                borderColor: 'border-gray-300',
+                buttonStyle:
+                  'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white',
               },
               {
                 name: 'Business',
@@ -1134,6 +1139,8 @@ export default function HomePage() {
                 description: 'Scale your content creation with bulk processing',
                 limit: '250 content generations/month',
                 badge: 'Most Popular',
+                topBorderColor:
+                  'bg-gradient-to-r from-indigo-400 to-purple-500',
                 features: [
                   'Everything in Starter plan',
                   'Bulk CSV upload (up to 50 products)',
@@ -1148,15 +1155,19 @@ export default function HomePage() {
                 ],
                 cta: '🎯 Start Free Trial',
                 popular: true,
-                color:
-                  'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50',
+                borderColor: 'border-indigo-500',
+                buttonStyle:
+                  'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white',
               },
               {
                 name: 'Premium',
-                price: '$79',
+                price: '$59',
                 period: 'per month',
                 description: 'Professional scale with marketplace integration',
                 limit: '1,000 content generations/month',
+                badge: null,
+                topBorderColor:
+                  'bg-gradient-to-r from-green-400 to-emerald-500',
                 features: [
                   'Everything in Business plan',
                   'Large bulk CSV upload (up to 200 products)',
@@ -1177,15 +1188,18 @@ export default function HomePage() {
                 ],
                 cta: '💎 Start Free Trial',
                 popular: false,
-                color:
-                  'border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50',
+                borderColor: 'border-purple-500',
+                buttonStyle:
+                  'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white',
               },
               {
                 name: 'Enterprise',
-                price: '$199',
+                price: '$99',
                 period: 'per month',
                 description: 'Unlimited scale for enterprise needs',
                 limit: 'Unlimited content generations',
+                badge: null,
+                topBorderColor: 'bg-gradient-to-r from-gray-600 to-gray-800',
                 features: [
                   'Everything in Premium plan',
                   'Enterprise bulk processing (up to 1,000 products)',
@@ -1200,140 +1214,163 @@ export default function HomePage() {
                 ],
                 cta: '🚀 Start Free Trial',
                 popular: false,
-                color:
-                  'border-gray-300 bg-gradient-to-br from-gray-50 to-slate-50',
+                borderColor: 'border-gray-300',
+                buttonStyle:
+                  'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-black text-white',
               },
             ].map((plan, index) => (
               <div
                 key={index}
-                className={`rounded-2xl border-2 p-8 relative transition-all hover:shadow-xl ${plan.color} ${
-                  plan.popular
-                    ? 'scale-105 shadow-2xl'
-                    : 'shadow-lg hover:scale-102'
-                }`}
+                className={`border-2 ${plan.borderColor} bg-white relative overflow-hidden ${
+                  plan.popular ? 'transform scale-105' : ''
+                } h-full flex flex-col`}
               >
+                {/* Top colored border - just color, no text */}
+                <div className={`h-2 ${plan.topBorderColor}`}></div>
+
+                {/* Most Popular Badge - ADD THIS */}
                 {plan.badge && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                      {plan.badge}
-                    </span>
+                  <div className="px-4 py-2 text-center text-white text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600">
+                    {plan.badge}
                   </div>
                 )}
 
-                <div className="text-center mb-8">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    {plan.name}
-                  </h3>
-                  <div className="mb-4">
-                    <span className="text-4xl font-bold text-gray-900">
-                      {plan.price}
-                    </span>
-                    {plan.period && (
-                      <span className="text-gray-600 ml-1">/{plan.period}</span>
-                    )}
+                <div className="p-6 flex-1 flex flex-col">
+                  {/* Plan name and description */}
+                  <div className="text-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      {plan.name}
+                    </h3>
+                    <p className="text-sm text-gray-600">{plan.description}</p>
                   </div>
 
-                  <button
-                    onClick={handleSignup}
-                    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all mb-4 cursor-pointer ${
-                      plan.popular
-                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-                        : 'bg-gray-900 hover:bg-gray-800 text-white hover:shadow-lg'
-                    }`}
-                  >
-                    {plan.cta}
-                  </button>
-
-                  <p className="text-gray-600 mb-2">{plan.description}</p>
-                  <p className="text-sm font-semibold text-indigo-600">
-                    {plan.limit}
-                  </p>
-                </div>
-
-                <div className="space-y-4 mb-8">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                      ✅ Included Features:
-                    </h4>
-                    <ul className="space-y-3">
-                      {plan.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start space-x-3">
-                          <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700 text-sm">
-                            {feature}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                  {/* Price */}
+                  <div className="text-center mb-6">
+                    <div className="mb-1">
+                      <span className="text-3xl font-bold text-gray-900">
+                        {plan.price}
+                      </span>
+                      {plan.period && (
+                        <span className="text-gray-600 ml-1">
+                          /{' '}
+                          {plan.period === 'per month' ? 'month' : plan.period}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      billed annually
+                    </p>
+                    <p className="text-sm font-medium text-gray-800">
+                      {plan.limit}
+                    </p>
                   </div>
 
-                  {plan.limitations && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                        ⚠️ Limitations:
-                      </h4>
-                      <ul className="space-y-2">
-                        {plan.limitations.map((limitation, idx) => (
-                          <li key={idx} className="flex items-start space-x-3">
-                            <span className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
-                              ❌
-                            </span>
-                            <span className="text-gray-600 text-sm">
-                              {limitation}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  {/* CTA Button - This will align across all cards */}
+                  <div className="mb-6">
+                    <button
+                      onClick={handleSignup}
+                      className={`w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer ${plan.buttonStyle}`}
+                    >
+                      {plan.cta}
+                    </button>
+                  </div>
 
-                  {plan.newCapabilities && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                        🚀 New Capabilities:
-                      </h4>
-                      <ul className="space-y-2">
-                        {plan.newCapabilities.map((capability, idx) => (
-                          <li key={idx} className="flex items-start space-x-3">
-                            <Star className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                            <span className="text-blue-700 text-sm font-medium">
-                              {capability}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  {/* Features - Flexible content that grows */}
+                  <div className="flex-1">
+                    <div className="space-y-4">
+                      <div>
+                        <ul className="space-y-2">
+                          {plan.features.map((feature, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-start space-x-2"
+                            >
+                              <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-sm text-gray-700">
+                                {feature}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
 
-                  {plan.futureFeatures && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                        🔮 Future Features (Contact Us):
-                      </h4>
-                      <ul className="space-y-2">
-                        {plan.futureFeatures.map((feature, idx) => (
-                          <li key={idx} className="flex items-start space-x-3">
-                            <span className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5">
-                              🏢
-                            </span>
-                            <span className="text-purple-700 text-sm">
-                              {feature}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+                      {plan.limitations && (
+                        <div>
+                          <ul className="space-y-2">
+                            {plan.limitations.map((limitation, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start space-x-2"
+                              >
+                                <span className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
+                                  ❌
+                                </span>
+                                <span className="text-sm text-gray-600">
+                                  {limitation}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
 
-                <div className="mt-6 text-center text-sm text-gray-500">
-                  {plan.name === 'Starter (Free)'
-                    ? '✓ No credit card required • ✓ Forever free'
-                    : '✓ 14-day free trial • ✓ No setup fees • ✓ Cancel anytime'}
+                      {plan.newCapabilities && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                            🚀 New Capabilities:
+                          </h4>
+                          <ul className="space-y-2">
+                            {plan.newCapabilities.map((capability, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start space-x-2"
+                              >
+                                <Star className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                                <span className="text-sm text-blue-700 font-medium">
+                                  {capability}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {plan.futureFeatures && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                            🔮 Future Features:
+                          </h4>
+                          <ul className="space-y-2">
+                            {plan.futureFeatures.map((feature, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start space-x-2"
+                              >
+                                <span className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5">
+                                  🏢
+                                </span>
+                                <span className="text-sm text-purple-700">
+                                  {feature}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Money back guarantee - Fixed at bottom */}
+                  <div className="mt-6 text-center text-xs text-gray-500">
+                    {plan.name === 'Starter (Free)'
+                      ? '✓ No credit card required • ✓ Forever free'
+                      : '30-Day Money Back Guarantee'}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
+
           <div className="mt-16 text-center">
             <p className="text-gray-600 mb-6">
               Need a custom solution for your enterprise?

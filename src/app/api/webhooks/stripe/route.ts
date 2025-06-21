@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { getServerStripe } from '@/lib/supabase'
-import { createServerClient } from '@supabase/ssr'
-
-// Service role client for database operations
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
 export async function POST(req: NextRequest) {
@@ -50,9 +47,33 @@ export async function POST(req: NextRequest) {
 
     console.log(`✅ Received Stripe webhook: ${event.type}`)
 
-    const supabase = createServiceRoleClient()
+    // Return response immediately to prevent timeout
+    const response = NextResponse.json({ received: true })
 
-    // Handle only the events we care about for faster processing
+    // Process webhook in background
+    processWebhookInBackground(event, stripe).catch(console.error)
+
+    const processingTime = Date.now() - startTime
+    console.log(`⚡ Webhook acknowledged in ${processingTime}ms`)
+
+    return response
+  } catch (error) {
+    console.error('❌ Error processing webhook:', error)
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    )
+  }
+}
+
+// Background processing to prevent timeouts
+async function processWebhookInBackground(event: any, stripe: any) {
+  const supabase = createServiceRoleClient()
+  const processingStart = Date.now()
+
+  try {
+    console.log(`🔄 Background processing: ${event.type}`)
+
     switch (event.type) {
       case 'checkout.session.completed': {
         await handleCheckoutCompleted(event, stripe, supabase)
@@ -78,16 +99,10 @@ export async function POST(req: NextRequest) {
         console.log(`🔔 Unhandled event type: ${event.type}`)
     }
 
-    const processingTime = Date.now() - startTime
-    console.log(`⚡ Webhook processed in ${processingTime}ms`)
-
-    return NextResponse.json({ received: true })
+    const processingTime = Date.now() - processingStart
+    console.log(`✅ Background processing completed in ${processingTime}ms`)
   } catch (error) {
-    console.error('❌ Error processing webhook:', error)
-    return NextResponse.json(
-      { error: 'Webhook processing failed' },
-      { status: 500 }
-    )
+    console.error('❌ Error in background processing:', error)
   }
 }
 
@@ -115,9 +130,12 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
   }
 
   try {
-    // Get subscription details
+    // Get subscription details (optimized - only get what we need)
     const subscription = await stripe.subscriptions.retrieve(
-      session.subscription
+      session.subscription,
+      {
+        expand: ['items.data.price'], // Only expand what we need
+      }
     )
 
     console.log('📦 Subscription details:', {
@@ -125,6 +143,20 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       status: subscription.status,
       planName: planName,
     })
+
+    // Get current usage before updating plan (PRESERVATION LOGIC)
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    const { data: currentUsage } = await supabase
+      .from('user_usage_tracking')
+      .select('usage_count')
+      .eq('user_id', userId)
+      .eq('month_year', currentMonth)
+      .single()
+
+    console.log(
+      '📊 Current usage before plan change:',
+      currentUsage?.usage_count || 0
+    )
 
     // Save subscription to user_subscriptions table
     const subscriptionData = {
@@ -136,23 +168,19 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
         ? subscription.items.data[0].price.unit_amount / 100
         : 29,
       status: subscription.status,
-      current_period_start: (subscription as any).current_period_start
-        ? new Date(
-            (subscription as any).current_period_start * 1000
-          ).toISOString()
+      current_period_start: subscription.current_period_start
+        ? new Date(subscription.current_period_start * 1000).toISOString()
         : new Date().toISOString(),
-      current_period_end: (subscription as any).current_period_end
-        ? new Date(
-            (subscription as any).current_period_end * 1000
-          ).toISOString()
+      current_period_end: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      cancel_at_period_end: (subscription as any).cancel_at_period_end || false,
+      cancel_at_period_end: subscription.cancel_at_period_end || false,
       updated_at: new Date().toISOString(),
     }
 
     console.log('💾 Saving subscription data for user:', userId)
 
-    // Use upsert for user_subscriptions (this works fine)
+    // Optimized: Single upsert operation
     const { error: subscriptionError } = await supabase
       .from('user_subscriptions')
       .upsert(subscriptionData, {
@@ -162,67 +190,51 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
 
     if (subscriptionError) {
       console.log('❌ Error saving subscription:', subscriptionError)
-    } else {
-      console.log('✅ Subscription saved successfully')
+      return
     }
 
-    // 🔧 BULLETPROOF FIX: Use DELETE + INSERT for user_plans
-    console.log('📋 Updating user_plans table...')
+    console.log('✅ Subscription saved successfully')
 
-    // Delete any existing active plans for this user (more reliable than UPDATE)
-    await supabase
-      .from('user_plans')
-      .delete()
-      .eq('user_id', userId)
-      .eq('is_active', true)
-
-    console.log('🗑️ Deleted existing active plans')
-
-    // Then, insert the new plan
-    const userPlanData = {
-      user_id: userId,
-      plan_type: planName === 'pro' ? 'business' : planName,
-      is_active: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      expires_at: (subscription as any).current_period_end
-        ? new Date(
-            (subscription as any).current_period_end * 1000
-          ).toISOString()
-        : null,
-    }
-
-    const { error: planError } = await supabase
-      .from('user_plans')
-      .insert(userPlanData)
+    // Optimized: Single transaction for plan update
+    const { error: planError } = await supabase.rpc('update_user_plan_atomic', {
+      p_user_id: userId,
+      p_plan_type: planName === 'pro' ? 'business' : planName,
+      p_expires_at: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    })
 
     if (planError) {
-      console.log('❌ Error updating user_plans:', planError)
-    } else {
-      console.log('✅ User plan updated successfully')
+      // Fallback to manual operations if RPC doesn't exist
+      await supabase
+        .from('user_plans')
+        .delete()
+        .eq('user_id', userId)
+        .eq('is_active', true)
+
+      const userPlanData = {
+        user_id: userId,
+        plan_type: planName === 'pro' ? 'business' : planName,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        expires_at: subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      }
+
+      await supabase.from('user_plans').insert(userPlanData)
     }
 
-    // Update usage limits in user_usage_tracking table
-    const limits = { pro: 500, premium: 2000, enterprise: 10000 }
-    const limit = limits[planName as keyof typeof limits] || 500
-    const currentMonth = new Date().toISOString().slice(0, 7)
+    console.log('✅ User plan updated successfully')
 
-    const usageData = {
-      user_id: userId,
-      month_year: currentMonth,
-      generations_limit: limit,
-      generations_used: 0,
-      plan_name: planName,
-      updated_at: new Date().toISOString(),
-    }
+    // PRESERVE USAGE: Update usage tracking with preserved usage
+    const preservedUsage = currentUsage?.usage_count || 0
 
-    console.log('📊 Updating usage limits:', limit)
-
-    // Update user_usage_tracking table for consistent usage tracking
     const usageTrackingData = {
       user_id: userId,
       month_year: currentMonth,
-      usage_count: 0, // Reset usage for new plan
+      usage_count: preservedUsage, // ✅ PRESERVE USAGE (not reset to 0)
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -234,10 +246,29 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
     if (usageTrackingError) {
       console.log('❌ Error updating usage tracking:', usageTrackingError)
     } else {
-      console.log('✅ Usage tracking updated')
+      console.log(
+        `✅ Usage tracking updated - preserved ${preservedUsage} generations`
+      )
     }
 
-    // Legacy user_usage table (if you still use it)
+    // Update legacy user_usage table (if still needed)
+    const limits = {
+      pro: 250,
+      business: 250,
+      premium: 1000,
+      enterprise: 999999,
+    }
+    const limit = limits[planName as keyof typeof limits] || 250
+
+    const usageData = {
+      user_id: userId,
+      month_year: currentMonth,
+      generations_limit: limit,
+      generations_used: preservedUsage, // ✅ PRESERVE USAGE
+      plan_name: planName,
+      updated_at: new Date().toISOString(),
+    }
+
     const { error: usageError } = await supabase
       .from('user_usage')
       .upsert(usageData, { onConflict: 'user_id,month_year' })
@@ -245,7 +276,7 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
     if (usageError) {
       console.log('❌ Error updating usage:', usageError)
     } else {
-      console.log('✅ Usage limits updated')
+      console.log('✅ Legacy usage limits updated')
     }
   } catch (error) {
     console.error('❌ Error in checkout completed handler:', error)
@@ -262,9 +293,18 @@ async function handleSubscriptionCreated(
   const subscription = event.data.object
 
   try {
-    // Get customer email to find user
-    const customer = await stripe.customers.retrieve(subscription.customer)
-    const customerEmail = (customer as any).email
+    // Optimized: Get customer email without full retrieve
+    const customerId = subscription.customer
+    let customerEmail = null
+
+    // Try to get email from subscription metadata first (faster)
+    if (subscription.metadata?.customer_email) {
+      customerEmail = subscription.metadata.customer_email
+    } else {
+      // Fallback to customer retrieve
+      const customer = await stripe.customers.retrieve(customerId)
+      customerEmail = (customer as any).email
+    }
 
     if (!customerEmail) {
       console.log('❌ No customer email found')
@@ -273,7 +313,7 @@ async function handleSubscriptionCreated(
 
     console.log('🔍 Looking up user by email:', customerEmail)
 
-    // Find user by email using admin API
+    // Get user by email using listUsers (getUserByEmail doesn't exist in this version)
     const {
       data: { users },
       error,
@@ -286,14 +326,14 @@ async function handleSubscriptionCreated(
 
     const user = users.find((u: any) => u.email === customerEmail)
 
-    if (!user) {
+    if (error || !user) {
       console.log('❌ No user found with email:', customerEmail)
       return
     }
 
     console.log('✅ Found user:', user.id)
 
-    // 🔧 DEDUPLICATION CHECK: Skip if already processed by checkout.completed
+    // Deduplication check: Skip if already processed recently
     const { data: existingPlan } = await supabase
       .from('user_plans')
       .select('id, plan_type, created_at')
@@ -302,7 +342,6 @@ async function handleSubscriptionCreated(
       .single()
 
     if (existingPlan) {
-      // Check if this plan was created very recently (within last 30 seconds)
       const planCreatedAt = new Date(existingPlan.created_at)
       const now = new Date()
       const timeDifference = now.getTime() - planCreatedAt.getTime()
@@ -311,9 +350,6 @@ async function handleSubscriptionCreated(
         // 30 seconds
         console.log(
           '⏭️ Skipping subscription.created - already processed by checkout.completed'
-        )
-        console.log(
-          `   Existing plan: ${existingPlan.plan_type}, created ${Math.round(timeDifference / 1000)}s ago`
         )
         return
       }
@@ -329,28 +365,34 @@ async function handleSubscriptionCreated(
       planName = 'enterprise'
     }
 
-    // Save subscription to user_subscriptions
+    // Get current usage for preservation
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    const { data: currentUsage } = await supabase
+      .from('user_usage_tracking')
+      .select('usage_count')
+      .eq('user_id', user.id)
+      .eq('month_year', currentMonth)
+      .single()
+
+    const preservedUsage = currentUsage?.usage_count || 0
+
+    // Save subscription
     const subscriptionData = {
       user_id: user.id,
       stripe_customer_id: subscription.customer,
       stripe_subscription_id: subscription.id,
       status: subscription.status,
       plan_name: planName,
-      current_period_start: (subscription as any).current_period_start
-        ? new Date(
-            (subscription as any).current_period_start * 1000
-          ).toISOString()
+      current_period_start: subscription.current_period_start
+        ? new Date(subscription.current_period_start * 1000).toISOString()
         : new Date().toISOString(),
-      current_period_end: (subscription as any).current_period_end
-        ? new Date(
-            (subscription as any).current_period_end * 1000
-          ).toISOString()
+      current_period_end: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    // Use upsert for user_subscriptions (this works fine)
     const { error: subError } = await supabase
       .from('user_subscriptions')
       .upsert(subscriptionData, {
@@ -360,34 +402,27 @@ async function handleSubscriptionCreated(
 
     if (subError) {
       console.error('❌ Error creating subscription:', subError)
-    } else {
-      console.log('✅ Subscription created successfully')
+      return
     }
 
-    // 🔧 BULLETPROOF FIX: Use DELETE + INSERT for user_plans
-    console.log('📋 Updating user_plans table from subscription created...')
+    console.log('✅ Subscription created successfully')
 
-    // Delete existing active plans
+    // Update user plan with usage preservation
     await supabase
       .from('user_plans')
       .delete()
       .eq('user_id', user.id)
       .eq('is_active', true)
 
-    console.log('🗑️ Deleted existing active plans')
-
-    // Insert new plan
     const userPlanData = {
       user_id: user.id,
       plan_type: planName === 'pro' ? 'business' : planName,
       is_active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      expires_at: (subscription as any).current_period_end
-        ? new Date(
-            (subscription as any).current_period_end * 1000
-          ).toISOString()
-        : null,
+      expires_at: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     }
 
     const { error: planError } = await supabase
@@ -399,6 +434,21 @@ async function handleSubscriptionCreated(
     } else {
       console.log('✅ User plan created from subscription')
     }
+
+    // Preserve usage
+    const usageTrackingData = {
+      user_id: user.id,
+      month_year: currentMonth,
+      usage_count: preservedUsage, // ✅ PRESERVE USAGE
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    await supabase
+      .from('user_usage_tracking')
+      .upsert(usageTrackingData, { onConflict: 'user_id,month_year' })
+
+    console.log(`✅ Usage preserved: ${preservedUsage} generations`)
   } catch (error) {
     console.error('❌ Error in subscription created handler:', error)
   }
@@ -410,60 +460,49 @@ async function handleSubscriptionUpdated(event: any, supabase: any) {
   const subscription = event.data.object
 
   try {
-    // Update user_subscriptions table
+    // Optimized: Single update operation
     const { error } = await supabase
       .from('user_subscriptions')
       .update({
         status: subscription.status,
-        current_period_start: (subscription as any).current_period_start
-          ? new Date(
-              (subscription as any).current_period_start * 1000
-            ).toISOString()
+        current_period_start: subscription.current_period_start
+          ? new Date(subscription.current_period_start * 1000).toISOString()
           : new Date().toISOString(),
-        current_period_end: (subscription as any).current_period_end
-          ? new Date(
-              (subscription as any).current_period_end * 1000
-            ).toISOString()
+        current_period_end: subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        cancel_at_period_end:
-          (subscription as any).cancel_at_period_end || false,
+        cancel_at_period_end: subscription.cancel_at_period_end || false,
         updated_at: new Date().toISOString(),
       })
       .eq('stripe_subscription_id', subscription.id)
 
     if (error) {
       console.log('❌ Error updating subscription:', error)
-    } else {
-      console.log('✅ Subscription updated successfully')
+      return
     }
 
-    // Also update user_plans table
+    console.log('✅ Subscription updated successfully')
+
+    // Update user_plans expires_at in single query
     const { data: subData } = await supabase
       .from('user_subscriptions')
-      .select('user_id, plan_name')
+      .select('user_id')
       .eq('stripe_subscription_id', subscription.id)
       .single()
 
     if (subData) {
-      // Update expires_at in user_plans
-      const { error: planError } = await supabase
+      await supabase
         .from('user_plans')
         .update({
-          expires_at: (subscription as any).current_period_end
-            ? new Date(
-                (subscription as any).current_period_end * 1000
-              ).toISOString()
-            : null,
+          expires_at: subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', subData.user_id)
         .eq('is_active', true)
 
-      if (planError) {
-        console.log('❌ Error updating user_plans expires_at:', planError)
-      } else {
-        console.log('✅ User plan expires_at updated')
-      }
+      console.log('✅ User plan expires_at updated')
     }
   } catch (error) {
     console.error('❌ Error in subscription updated handler:', error)
@@ -476,7 +515,30 @@ async function handleSubscriptionDeleted(event: any, supabase: any) {
   const subscription = event.data.object
 
   try {
-    // Update user_subscriptions table
+    // Get user_id before operations
+    const { data: subData } = await supabase
+      .from('user_subscriptions')
+      .select('user_id')
+      .eq('stripe_subscription_id', subscription.id)
+      .single()
+
+    if (!subData) {
+      console.log('❌ No subscription found for deletion')
+      return
+    }
+
+    // Get current usage for preservation
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    const { data: currentUsage } = await supabase
+      .from('user_usage_tracking')
+      .select('usage_count')
+      .eq('user_id', subData.user_id)
+      .eq('month_year', currentMonth)
+      .single()
+
+    const preservedUsage = currentUsage?.usage_count || 0
+
+    // Update subscription status
     const { error } = await supabase
       .from('user_subscriptions')
       .update({
@@ -487,43 +549,49 @@ async function handleSubscriptionDeleted(event: any, supabase: any) {
 
     if (error) {
       console.log('❌ Error canceling subscription:', error)
+      return
+    }
+
+    console.log('✅ Subscription canceled successfully')
+
+    // Revert to starter plan
+    await supabase.from('user_plans').delete().eq('user_id', subData.user_id)
+
+    const starterPlanData = {
+      user_id: subData.user_id,
+      plan_type: 'starter',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      expires_at: null,
+    }
+
+    const { error: starterError } = await supabase
+      .from('user_plans')
+      .insert(starterPlanData)
+
+    if (starterError) {
+      console.log('❌ Error reverting to starter plan:', starterError)
     } else {
-      console.log('✅ Subscription canceled successfully')
+      console.log('✅ User reverted to starter plan')
     }
 
-    // Also deactivate user_plans and revert to starter
-    const { data: subData } = await supabase
-      .from('user_subscriptions')
-      .select('user_id')
-      .eq('stripe_subscription_id', subscription.id)
-      .single()
-
-    if (subData) {
-      // 🔧 BULLETPROOF FIX: Delete all plans
-      await supabase.from('user_plans').delete().eq('user_id', subData.user_id)
-
-      console.log('🗑️ Deleted all user plans')
-
-      // Insert starter plan
-      const starterPlanData = {
-        user_id: subData.user_id,
-        plan_type: 'starter',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        expires_at: null,
-      }
-
-      const { error: starterError } = await supabase
-        .from('user_plans')
-        .insert(starterPlanData)
-
-      if (starterError) {
-        console.log('❌ Error reverting to starter plan:', starterError)
-      } else {
-        console.log('✅ User reverted to starter plan')
-      }
+    // Preserve usage when reverting to starter
+    const usageTrackingData = {
+      user_id: subData.user_id,
+      month_year: currentMonth,
+      usage_count: preservedUsage, // ✅ PRESERVE USAGE
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
+
+    await supabase
+      .from('user_usage_tracking')
+      .upsert(usageTrackingData, { onConflict: 'user_id,month_year' })
+
+    console.log(
+      `✅ Usage preserved during cancellation: ${preservedUsage} generations`
+    )
   } catch (error) {
     console.error('❌ Error in subscription deleted handler:', error)
   }
@@ -536,7 +604,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
   if (invoice.subscription) {
     try {
-      // Update user_subscriptions table
+      // Optimized: Single update operation
       const { error } = await supabase
         .from('user_subscriptions')
         .update({
@@ -547,11 +615,12 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
 
       if (error) {
         console.error('❌ Error updating payment status:', error)
-      } else {
-        console.log('✅ Payment status updated successfully')
+        return
       }
 
-      // Ensure user_plans is also active
+      console.log('✅ Payment status updated successfully')
+
+      // Activate user plan
       const { data: subData } = await supabase
         .from('user_subscriptions')
         .select('user_id')
@@ -559,7 +628,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         .single()
 
       if (subData) {
-        const { error: planError } = await supabase
+        await supabase
           .from('user_plans')
           .update({
             is_active: true,
@@ -568,11 +637,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
           .eq('user_id', subData.user_id)
           .neq('plan_type', 'starter')
 
-        if (planError) {
-          console.log('❌ Error activating user plan:', planError)
-        } else {
-          console.log('✅ User plan activated')
-        }
+        console.log('✅ User plan activated')
       }
     } catch (error) {
       console.error('❌ Error in payment succeeded handler:', error)

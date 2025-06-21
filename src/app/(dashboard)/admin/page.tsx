@@ -276,8 +276,8 @@ export default function EnhancedOwnerAdminDashboard() {
       const planPrices = {
         starter: 0,
         business: 29,
-        premium: 49,
-        enterprise: 199,
+        premium: 59,
+        enterprise: 99,
       }
       const activeSubscriptions =
         subscriptions?.filter((s: any) => s.status === 'active') || []
@@ -396,8 +396,8 @@ export default function EnhancedOwnerAdminDashboard() {
         const planPrices = {
           starter: 0,
           business: 29,
-          premium: 49,
-          enterprise: 199,
+          premium: 59,
+          enterprise: 99,
         }
 
         const userStatsData = users

@@ -91,6 +91,32 @@ export default function EnhancedPricingPage() {
 
     try {
       console.log('🚀 Starting upgrade to:', planType)
+      // ADD THIS: Handle downgrade to free plan (cancel subscription)
+      if (planType === 'starter') {
+        const response = await fetch('/api/stripe/cancel-subscription', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to cancel subscription')
+        }
+
+        // Enhanced success message with billing context
+        const preservedUsage = data.preserved_usage || 0
+        const message =
+          preservedUsage > 0
+            ? `✅ Successfully downgraded to free plan!\n💾 Your ${preservedUsage} generations this month have been preserved.\n💳 ${data.billing_note}`
+            : `✅ Successfully downgraded to free plan!\n💳 ${data.billing_note}`
+
+        alert(message)
+        window.location.reload()
+        return
+      }
 
       // Map your planType to the correct plan names that your API expects
       const planMapping = {
@@ -319,7 +345,7 @@ export default function EnhancedPricingPage() {
     },
     {
       name: 'Premium',
-      price: 79,
+      price: 59,
       period: 'month',
       description: 'Professional scale with Amazon & Shopify integration',
       badge: 'Best Value',
@@ -352,7 +378,7 @@ export default function EnhancedPricingPage() {
     },
     {
       name: 'Enterprise',
-      price: 199,
+      price: 99,
       period: 'month',
       description: 'Unlimited scale for enterprise needs',
       badge: 'Maximum Scale',
@@ -642,250 +668,258 @@ export default function EnhancedPricingPage() {
           </div>
         </div>
 
-        {/* Enhanced Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16 items-start">
+        {/* Enhanced Pricing Cards - REDESIGNED TO MATCH HOMEPAGE */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start mb-16">
           {plans.map((plan) => {
             const Icon = plan.icon
             const isCurrentPlan = user && currentPlan === plan.planType
 
+            // Add top border colors for each plan
+            const topBorderColors = {
+              starter: 'bg-gray-300',
+              business: 'bg-gradient-to-r from-indigo-400 to-purple-500',
+              premium: 'bg-gradient-to-r from-green-400 to-emerald-500',
+              enterprise: 'bg-gradient-to-r from-gray-600 to-gray-800',
+            }
+
             return (
               <div
                 key={plan.name}
-                className={`relative bg-white/80 backdrop-blur-xl rounded-2xl p-8 transition-all duration-300 hover:shadow-2xl border-2 ${
+                className={`border-2 ${
                   plan.popular
-                    ? plan.borderColor + ' shadow-xl scale-105'
+                    ? 'border-indigo-500'
                     : isCurrentPlan
-                      ? 'border-green-500 shadow-xl'
-                      : 'border-white/50 hover:border-gray-300'
-                } ${isCurrentPlan ? 'bg-gradient-to-br from-green-50 to-emerald-50' : ''}`}
+                      ? 'border-green-500'
+                      : 'border-gray-300'
+                } bg-white relative overflow-hidden ${
+                  plan.popular ? 'transform scale-105' : ''
+                } h-full flex flex-col`}
               >
-                {/* Badge */}
-                {(plan.popular || isCurrentPlan) && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span
-                      className={`px-4 py-2 rounded-full text-sm font-bold shadow-lg ${
-                        isCurrentPlan
-                          ? 'bg-green-600 text-white'
-                          : plan.popular
-                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                            : 'bg-gray-600 text-white'
-                      }`}
-                    >
-                      {isCurrentPlan ? 'Current Plan' : plan.badge}
-                    </span>
+                {/* Top colored border */}
+                <div
+                  className={`h-2 ${topBorderColors[plan.planType as keyof typeof topBorderColors]}`}
+                ></div>
+
+                {/* Most Popular Badge */}
+                {plan.badge && !isCurrentPlan && (
+                  <div className="px-4 py-2 text-center text-white text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600">
+                    {plan.badge}
                   </div>
                 )}
 
-                <div className="text-center mb-6">
-                  <div
-                    className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-lg ${
-                      isCurrentPlan
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-600'
-                        : plan.popular
-                          ? 'bg-gradient-to-r from-indigo-500 to-purple-600'
-                          : 'bg-gradient-to-r from-gray-500 to-gray-600'
-                    }`}
-                  >
-                    <Icon className="h-8 w-8 text-white" />
+                {/* Current Plan Badge */}
+                {isCurrentPlan && (
+                  <div className="px-4 py-2 text-center text-white text-sm font-medium bg-green-600">
+                    Current Plan
+                  </div>
+                )}
+
+                {/* Main content container */}
+                <div className="flex flex-col h-full">
+                  {/* Fixed height section 1: Plan name and description - EXACTLY ALIGNED */}
+                  <div className="text-center h-24 flex flex-col justify-center px-4">
+                    <h3 className="text-xl font-bold text-gray-900 mb-1">
+                      {plan.name}
+                    </h3>
+                    <p className="text-sm text-gray-600">{plan.description}</p>
                   </div>
 
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    {plan.name}
-                  </h3>
+                  {/* Fixed height section 2: Price - EXACTLY ALIGNED */}
+                  <div className="text-center h-32 flex flex-col justify-center px-4">
+                    <div className="mb-1">
+                      <span className="text-3xl font-bold text-gray-900">
+                        ${plan.price}
+                      </span>
+                      {plan.price > 0 && (
+                        <span className="text-gray-600 ml-1">
+                          /{plan.period}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {plan.price > 0 ? 'billed annually' : 'forever free'}
+                    </p>
+                    <p className="text-sm font-medium text-gray-800">
+                      {plan.planType === 'starter'
+                        ? '10 generations/month'
+                        : plan.planType === 'business'
+                          ? '250 generations/month'
+                          : plan.planType === 'premium'
+                            ? '1,000 generations/month'
+                            : 'Unlimited generations'}
+                    </p>
+                  </div>
 
-                  <div className="mb-4">
-                    <span className="text-5xl font-bold text-gray-900">
-                      ${plan.price}
-                    </span>
-                    {plan.price > 0 && (
-                      <span className="text-gray-600 ml-1">/{plan.period}</span>
+                  {/* Fixed height section 3: CTA Button - EXACTLY ALIGNED */}
+                  <div className="h-16 flex items-center px-6">
+                    {user && (
+                      <>
+                        {plan.planType === currentPlan ? (
+                          <div className="w-full py-3 px-4 rounded-lg text-sm font-semibold bg-green-100 text-green-800 flex items-center justify-center">
+                            <Award className="mr-2 h-4 w-4" />
+                            Current Plan
+                          </div>
+                        ) : (
+                          (() => {
+                            const isUpgrade =
+                              getPlanLimit(plan.planType).generations >
+                              getPlanLimit(currentPlan).generations
+                            const isDowngrade =
+                              getPlanLimit(plan.planType).generations <
+                              getPlanLimit(currentPlan).generations
+
+                            return (
+                              <button
+                                onClick={() => handleUpgrade(plan.planType)}
+                                disabled={loading}
+                                className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center ${
+                                  isUpgrade
+                                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                                    : isDowngrade
+                                      ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
+                                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              >
+                                {loading && processingPlan === plan.planType ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    {isUpgrade ? (
+                                      <ArrowRight className="h-4 w-4 mr-1 rotate-45" />
+                                    ) : isDowngrade ? (
+                                      <ArrowRight className="h-4 w-4 mr-1 rotate-[-135deg]" />
+                                    ) : null}
+                                    {isUpgrade
+                                      ? 'Upgrade'
+                                      : isDowngrade
+                                        ? 'Downgrade'
+                                        : 'Switch'}
+                                  </>
+                                )}
+                              </button>
+                            )
+                          })()
+                        )}
+                      </>
+                    )}
+
+                    {/* Sign in button for non-logged users on paid plans */}
+                    {!user && plan.planType !== 'starter' && (
+                      <button
+                        onClick={handleLogin}
+                        className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gray-900 hover:bg-gray-800 text-white"
+                      >
+                        Sign In to View Plan
+                      </button>
+                    )}
+
+                    {/* Start free button for non-logged users on starter plan */}
+                    {!user && plan.planType === 'starter' && (
+                      <button
+                        onClick={handleLogin}
+                        className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                      >
+                        🚀 Start Free
+                      </button>
                     )}
                   </div>
 
-                  {/* Upgrade/Downgrade Button right under price */}
-                  {user && (
-                    <div className="mb-4">
-                      {plan.planType === currentPlan ? (
-                        <div className="w-full py-2 px-4 rounded-lg text-sm font-semibold bg-green-100 text-green-800 flex items-center justify-center">
-                          <Award className="mr-2 h-4 w-4" />
-                          Current Plan
-                        </div>
-                      ) : (
-                        (() => {
-                          const isUpgrade =
-                            getPlanLimit(plan.planType).generations >
-                            getPlanLimit(currentPlan).generations
-                          const isDowngrade =
-                            getPlanLimit(plan.planType).generations <
-                            getPlanLimit(currentPlan).generations
-
-                          return (
-                            <button
-                              onClick={() => handleUpgrade(plan.planType)}
-                              disabled={loading}
-                              className={`w-full py-2 px-4 rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center ${
-                                isUpgrade
-                                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                                  : isDowngrade
-                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
-                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  {/* Flexible section 4: Features */}
+                  <div className="flex-1 px-6 pb-6">
+                    <div className="space-y-4">
+                      <div>
+                        <ul className="space-y-2">
+                          {plan.features.map((feature, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-start space-x-2"
                             >
-                              {loading && processingPlan === plan.planType ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                  Processing...
-                                </>
-                              ) : (
-                                <>
-                                  {isUpgrade ? (
-                                    <ArrowRight className="h-4 w-4 mr-1 rotate-45" />
-                                  ) : isDowngrade ? (
-                                    <ArrowRight className="h-4 w-4 mr-1 rotate-[-135deg]" />
-                                  ) : null}
-                                  {isUpgrade
-                                    ? 'Upgrade'
-                                    : isDowngrade
-                                      ? 'Downgrade'
-                                      : 'Switch'}
-                                </>
-                              )}
-                            </button>
-                          )
-                        })()
+                              <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-sm text-gray-700">
+                                {feature}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {plan.limitations && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                            ⚠️ Limitations:
+                          </h4>
+                          <ul className="space-y-2">
+                            {plan.limitations.map((limitation, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start space-x-2"
+                              >
+                                <span className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
+                                  ❌
+                                </span>
+                                <span className="text-sm text-gray-600">
+                                  {limitation}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {plan.newCapabilities && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                            🚀 New Capabilities:
+                          </h4>
+                          <ul className="space-y-2">
+                            {plan.newCapabilities.map((capability, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start space-x-2"
+                              >
+                                <Star className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                                <span className="text-sm text-blue-700 font-medium">
+                                  {capability}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {plan.futureFeatures && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                            🔮 Future Features:
+                          </h4>
+                          <ul className="space-y-2">
+                            {plan.futureFeatures.map((feature, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start space-x-2"
+                              >
+                                <Building2 className="h-4 w-4 text-purple-500 flex-shrink-0 mt-0.5" />
+                                <span className="text-sm text-purple-700">
+                                  {feature}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       )}
                     </div>
-                  )}
 
-                  <p className="text-gray-600 mb-4">{plan.description}</p>
-
-                  {/* Plan Highlights */}
-                  <div className="flex flex-wrap gap-2 justify-center mb-6">
-                    {plan.highlights.map((highlight, idx) => (
-                      <span
-                        key={idx}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium"
-                      >
-                        {highlight}
-                      </span>
-                    ))}
+                    {/* Money back guarantee - At bottom */}
+                    <div className="mt-6 text-center text-xs text-gray-500">
+                      {plan.planType === 'starter'
+                        ? '✓ No credit card required • ✓ Forever free'
+                        : '30-Day Money Back Guarantee'}
+                    </div>
                   </div>
                 </div>
-
-                {/* Features List */}
-                <div className="space-y-4 mb-8">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                      ✅ Included Features:
-                    </h4>
-                    <ul className="space-y-2">
-                      {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-start text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700 leading-relaxed">
-                            {feature}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Limitations for Starter */}
-                  {plan.limitations && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                        ⚠️ Limitations:
-                      </h4>
-                      <ul className="space-y-2">
-                        {plan.limitations.map((limitation, index) => (
-                          <li key={index} className="flex items-start text-sm">
-                            <span className="w-4 h-4 text-red-500 mr-3 flex-shrink-0 mt-0.5">
-                              ❌
-                            </span>
-                            <span className="text-gray-600 leading-relaxed">
-                              {limitation}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* New Capabilities */}
-                  {plan.newCapabilities && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                        🚀 New Capabilities:
-                      </h4>
-                      <ul className="space-y-2">
-                        {plan.newCapabilities.map((capability, index) => (
-                          <li key={index} className="flex items-start text-sm">
-                            <Star className="h-4 w-4 text-blue-500 mr-3 flex-shrink-0 mt-0.5" />
-                            <span className="text-blue-700 leading-relaxed font-medium">
-                              {capability}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Future Features for Enterprise */}
-                  {plan.futureFeatures && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                        🔮 Future Features (Contact Us):
-                      </h4>
-                      <ul className="space-y-2">
-                        {plan.futureFeatures.map((feature, index) => (
-                          <li key={index} className="flex items-start text-sm">
-                            <Building2 className="h-4 w-4 text-purple-500 mr-3 flex-shrink-0 mt-0.5" />
-                            <span className="text-purple-700 leading-relaxed">
-                              {feature}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {/* Value indicator for free plan */}
-                {plan.planType === 'starter' && !user && (
-                  <div className="mt-4 text-center">
-                    <p className="text-sm text-green-600 font-medium flex items-center justify-center">
-                      <Sparkles className="h-4 w-4 mr-1" />
-                      No credit card required • Forever free
-                    </p>
-                  </div>
-                )}
-
-                {/* Sign in button for non-logged users on paid plans */}
-                {!user && plan.planType !== 'starter' && (
-                  <div className="mt-6">
-                    <button
-                      onClick={handleLogin}
-                      className="group w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center bg-gray-900 hover:bg-gray-800 text-white shadow-lg hover:shadow-xl"
-                    >
-                      Sign In to View Plan
-                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Start free button for non-logged users on starter plan */}
-                {!user && plan.planType === 'starter' && (
-                  <div className="mt-6">
-                    <button
-                      onClick={handleLogin}
-                      className="group w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
-                    >
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Start Free Forever
-                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </div>
-                )}
               </div>
             )
           })}
