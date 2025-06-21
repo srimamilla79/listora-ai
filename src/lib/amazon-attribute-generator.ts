@@ -1,5 +1,5 @@
 // src/lib/amazon-attribute-generator.ts
-// Enhanced Universal Dynamic Attribute Generator with Complex Field Support
+// Schema-Driven Enhanced Universal Dynamic Attribute Generator with Exact Enum Values
 
 interface ProductData {
   title?: string
@@ -28,7 +28,17 @@ interface AttributeSchema {
   properties?: any
 }
 
-// ✅ ENHANCED UNIVERSAL DYNAMIC ATTRIBUTE GENERATOR
+interface DetailedSchemaProperty {
+  type?: string
+  enum?: string[]
+  properties?: any
+  items?: any
+  oneOf?: any[]
+  anyOf?: any[]
+  allOf?: any[]
+}
+
+// ✅ SCHEMA-DRIVEN ENHANCED UNIVERSAL DYNAMIC ATTRIBUTE GENERATOR
 export async function generateDynamicAttributes(
   productType: string,
   productData: ProductData,
@@ -37,17 +47,14 @@ export async function generateDynamicAttributes(
   imageAttributes: any = {}
 ): Promise<any> {
   try {
-    console.log(
-      '🔧 Enhanced Dynamic Attribute Generator starting for',
-      productType
-    )
+    console.log('🔧 Schema-Driven Enhanced Generator starting for', productType)
 
     // 1. Get detailed schema for this product type
     const schemaData = await getProductTypeSchema(productType)
 
-    if (!schemaData.success) {
+    if (!schemaData.success || !schemaData.detailedSchema) {
       console.log(
-        '⚠️ Schema fetch failed, using enhanced fallback for',
+        '⚠️ Detailed schema unavailable, using enhanced fallback for',
         productType
       )
       return generateEnhancedFallbackAttributes(
@@ -59,25 +66,27 @@ export async function generateDynamicAttributes(
       )
     }
 
-    // 2. Extract required attributes from schema
-    const requiredAttributes = schemaData.analysis.requiredAttributes || []
-    const attributeDetails = schemaData.analysis.attributeDetails || {}
+    // 2. Extract schema properties for enum values
+    const detailedSchema = schemaData.detailedSchema
+    const schemaProperties = detailedSchema.properties || {}
 
     console.log(
-      '📊 Found',
-      requiredAttributes.length,
-      'required attributes for',
-      productType
+      '📊 Using detailed S3 schema with',
+      Object.keys(schemaProperties).length,
+      'properties'
     )
 
-    // 3. Generate ALL required attributes with enhanced complex structures
+    // 3. Generate attributes using exact Amazon schema
     const dynamicAttributes: any = {}
 
+    // Get required attributes from basic analysis
+    const requiredAttributes = schemaData.analysis.requiredAttributes || []
+
     for (const attributeName of requiredAttributes) {
-      const attributeSchema = attributeDetails[attributeName]
-      const value = generateEnhancedAttributeValue(
+      const schemaProperty = schemaProperties[attributeName]
+      const value = generateSchemaBasedAttributeValue(
         attributeName,
-        attributeSchema,
+        schemaProperty,
         productData,
         options,
         sku
@@ -94,13 +103,13 @@ export async function generateDynamicAttributes(
     console.log(
       '✅ Generated',
       Object.keys(dynamicAttributes).length,
-      'enhanced attributes for',
+      'schema-based attributes for',
       productType
     )
 
     return dynamicAttributes
   } catch (error: any) {
-    console.error('❌ Error in enhanced dynamic attribute generation:', error)
+    console.error('❌ Error in schema-driven attribute generation:', error)
     console.log('🔄 Falling back to enhanced static attributes')
     return generateEnhancedFallbackAttributes(
       productType,
@@ -112,19 +121,21 @@ export async function generateDynamicAttributes(
   }
 }
 
-// ✅ ENHANCED SMART ATTRIBUTE VALUE GENERATOR WITH COMPLEX STRUCTURES
-function generateEnhancedAttributeValue(
+// ✅ SCHEMA-BASED ATTRIBUTE VALUE GENERATOR WITH EXACT ENUMS
+function generateSchemaBasedAttributeValue(
   attributeName: string,
-  attributeSchema: AttributeSchema | undefined,
+  schemaProperty: DetailedSchemaProperty | undefined,
   productData: ProductData,
   options: PublishingOptions,
   sku: string
 ): any {
   const marketplaceId = process.env.AMAZON_MARKETPLACE_ID
 
-  // Enhanced attribute mapping with complex structures
+  // First, check if we have schema-defined enums
+  const exactEnums = extractExactEnums(schemaProperty)
+
+  // Core product attributes (always use our smart logic)
   switch (attributeName) {
-    // Core product identity (simple fields)
     case 'item_name':
       return [
         {
@@ -170,7 +181,6 @@ function generateEnhancedAttributeValue(
           marketplace_id: marketplaceId,
         }))
 
-    // Pricing and fulfillment (simple fields)
     case 'list_price':
       return [
         {
@@ -191,7 +201,6 @@ function generateEnhancedAttributeValue(
     case 'condition_type':
       return [{ value: options.condition || 'new_new' }]
 
-    // Product identifiers (simple fields)
     case 'externally_assigned_product_identifier':
       return [
         {
@@ -233,8 +242,263 @@ function generateEnhancedAttributeValue(
           marketplace_id: marketplaceId,
         },
       ]
+  }
 
-    // ✅ ENHANCED: Complex Weight Attributes
+  // ✅ SCHEMA-DRIVEN ENUM ATTRIBUTES
+  if (exactEnums.length > 0) {
+    return generateSchemaEnumValue(
+      attributeName,
+      exactEnums,
+      productData,
+      marketplaceId
+    )
+  }
+
+  // ✅ COMPLEX STRUCTURE ATTRIBUTES WITH SCHEMA GUIDANCE
+  const complexValue = generateComplexSchemaValue(
+    attributeName,
+    schemaProperty,
+    productData,
+    options,
+    sku,
+    marketplaceId
+  )
+  if (complexValue) return complexValue
+
+  // ✅ ENHANCED ATTRIBUTE-SPECIFIC LOGIC
+  return generateEnhancedAttributeValue(
+    attributeName,
+    schemaProperty,
+    productData,
+    options,
+    sku,
+    marketplaceId
+  )
+}
+
+// ✅ EXTRACT EXACT ENUMS FROM AMAZON SCHEMA
+function extractExactEnums(
+  schemaProperty: DetailedSchemaProperty | undefined
+): string[] {
+  if (!schemaProperty) return []
+
+  // Direct enum values
+  if (schemaProperty.enum) {
+    return schemaProperty.enum
+  }
+
+  // Enum in oneOf structure
+  if (schemaProperty.oneOf) {
+    for (const option of schemaProperty.oneOf) {
+      if (option.enum) return option.enum
+    }
+  }
+
+  // Enum in anyOf structure
+  if (schemaProperty.anyOf) {
+    for (const option of schemaProperty.anyOf) {
+      if (option.enum) return option.enum
+    }
+  }
+
+  // Enum in items (for arrays)
+  if (schemaProperty.items?.enum) {
+    return schemaProperty.items.enum
+  }
+
+  // Enum in properties (for objects)
+  if (schemaProperty.properties) {
+    for (const [key, prop] of Object.entries(schemaProperty.properties)) {
+      if ((prop as any).enum) {
+        return (prop as any).enum
+      }
+    }
+  }
+
+  return []
+}
+
+// ✅ GENERATE SCHEMA-BASED ENUM VALUES
+function generateSchemaEnumValue(
+  attributeName: string,
+  exactEnums: string[],
+  productData: ProductData,
+  marketplaceId: string | undefined
+): any {
+  // Smart enum selection based on content and attribute name
+  const smartEnum = selectSmartEnumFromSchema(
+    attributeName,
+    exactEnums,
+    productData
+  )
+
+  return [
+    {
+      value: smartEnum,
+      marketplace_id: marketplaceId,
+    },
+  ]
+}
+
+// ✅ SMART ENUM SELECTION FROM AMAZON'S EXACT VALUES
+function selectSmartEnumFromSchema(
+  attributeName: string,
+  exactEnums: string[],
+  productData: ProductData
+): string {
+  const text =
+    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
+
+  // Attribute-specific smart selection
+  switch (attributeName) {
+    case 'water_resistance_level':
+      // Look for water resistance indicators in content
+      if (text.includes('waterproof'))
+        return findEnumContaining(exactEnums, 'waterproof') || exactEnums[0]
+      if (text.includes('water resistant'))
+        return findEnumContaining(exactEnums, 'resistant') || exactEnums[0]
+      // Default to first available (usually safest option)
+      return exactEnums[0]
+
+    case 'map_policy':
+      // For pricing policy, use the most permissive option
+      return (
+        findEnumContaining(exactEnums, ['none', 'no', 'unrestricted']) ||
+        exactEnums[0]
+      )
+
+    case 'variation_theme':
+      // For variation theme, look for common themes
+      if (text.includes('color'))
+        return findEnumContaining(exactEnums, 'color') || exactEnums[0]
+      if (text.includes('size'))
+        return findEnumContaining(exactEnums, 'size') || exactEnums[0]
+      return exactEnums[0]
+
+    case 'merchant_shipping_group':
+      // For shipping, look for standard/default options
+      return (
+        findEnumContaining(exactEnums, ['default', 'standard', 'normal']) ||
+        exactEnums[0]
+      )
+
+    case 'california_proposition_65':
+      // For compliance, typically want 'no warning' if available
+      return (
+        findEnumContaining(exactEnums, ['no', 'none', 'not_required']) ||
+        exactEnums[0]
+      )
+
+    case 'target_gender':
+      // Smart gender detection
+      const detectedGender = detectGender(productData)
+      if (detectedGender === 'male')
+        return findEnumContaining(exactEnums, 'male') || exactEnums[0]
+      if (detectedGender === 'female')
+        return findEnumContaining(exactEnums, 'female') || exactEnums[0]
+      return (
+        findEnumContaining(exactEnums, ['unisex', 'adult']) || exactEnums[0]
+      )
+
+    case 'parentage_level':
+      // Usually want 'child' for individual products
+      return findEnumContaining(exactEnums, 'child') || exactEnums[0]
+
+    case 'contains_battery_or_cell':
+    case 'batteries_required':
+    case 'batteries_included':
+      // For battery fields, typically false/no
+      return (
+        findEnumContaining(exactEnums, ['false', 'no', 'none']) || exactEnums[0]
+      )
+
+    default:
+      // Content-based matching
+      for (const enumValue of exactEnums) {
+        if (text.includes(enumValue.toLowerCase().replace(/_/g, ' '))) {
+          return enumValue
+        }
+      }
+
+      // Default to first enum (usually safest)
+      return exactEnums[0]
+  }
+}
+
+// ✅ HELPER FUNCTION TO FIND ENUM CONTAINING KEYWORDS
+function findEnumContaining(
+  exactEnums: string[],
+  keywords: string | string[]
+): string | null {
+  const keywordArray = Array.isArray(keywords) ? keywords : [keywords]
+
+  for (const keyword of keywordArray) {
+    for (const enumValue of exactEnums) {
+      if (enumValue.toLowerCase().includes(keyword.toLowerCase())) {
+        return enumValue
+      }
+    }
+  }
+
+  return null
+}
+
+// ✅ GENERATE COMPLEX SCHEMA VALUES
+function generateComplexSchemaValue(
+  attributeName: string,
+  schemaProperty: DetailedSchemaProperty | undefined,
+  productData: ProductData,
+  options: PublishingOptions,
+  sku: string,
+  marketplaceId: string | undefined
+): any {
+  if (!schemaProperty?.properties) return null
+
+  const complexValue: any = { marketplace_id: marketplaceId }
+
+  // Build complex object based on schema properties
+  Object.entries(schemaProperty.properties).forEach(
+    ([key, prop]: [string, any]) => {
+      if (prop.enum && prop.enum.length > 0) {
+        // Use exact enum from schema
+        complexValue[key] = selectSmartEnumFromSchema(
+          `${attributeName}_${key}`,
+          prop.enum,
+          productData
+        )
+      } else if (prop.type === 'string') {
+        complexValue[key] = getSmartDefaultForKey(
+          key,
+          attributeName,
+          productData
+        )
+      } else if (prop.type === 'number') {
+        complexValue[key] = getNumericDefaultForKey(
+          key,
+          attributeName,
+          productData
+        )
+      } else if (prop.type === 'boolean') {
+        complexValue[key] = getBooleanDefaultForKey(key, attributeName)
+      }
+    }
+  )
+
+  return Object.keys(complexValue).length > 1 ? [complexValue] : null
+}
+
+// ✅ ENHANCED ATTRIBUTE VALUE GENERATOR
+function generateEnhancedAttributeValue(
+  attributeName: string,
+  schemaProperty: DetailedSchemaProperty | undefined,
+  productData: ProductData,
+  options: PublishingOptions,
+  sku: string,
+  marketplaceId: string | undefined
+): any {
+  // Enhanced specific attribute handling
+  switch (attributeName) {
+    // Weight attributes with units
     case 'item_weight':
       return [
         {
@@ -255,7 +519,7 @@ function generateEnhancedAttributeValue(
         },
       ]
 
-    // ✅ ENHANCED: Complex Dimension Attributes
+    // Dimension attributes
     case 'item_package_dimensions':
       const dims = extractDimensions(productData)
       return [
@@ -267,145 +531,7 @@ function generateEnhancedAttributeValue(
         },
       ]
 
-    case 'item_display_dimensions':
-      const displayDims = extractDimensions(productData)
-      return [
-        {
-          length: { value: displayDims.length, unit: 'inches' },
-          width: { value: displayDims.width, unit: 'inches' },
-          height: { value: displayDims.height, unit: 'inches' },
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // ✅ ENHANCED: Battery Attributes with Complex Structures
-    case 'batteries_required':
-      return [
-        {
-          value: 'false',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'batteries_included':
-      return [
-        {
-          value: 'false',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'num_batteries':
-      return [
-        {
-          quantity: '0',
-          type: 'no_battery_used',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'number_of_lithium_metal_cells':
-      return [
-        {
-          value: '0',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'number_of_lithium_ion_cells':
-      return [
-        {
-          value: '0',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'contains_battery_or_cell':
-      return [
-        {
-          value: 'false',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'non_lithium_battery_energy_content':
-      return [
-        {
-          value: '0',
-          unit: 'watt_hours',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'non_lithium_battery_packaging':
-      return [
-        {
-          value: 'not_applicable',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // ✅ ENHANCED: Compliance Attributes
-    case 'california_proposition_65':
-      return [
-        {
-          compliance_type: 'not_applicable',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'regulatory_compliance_certification':
-      return [
-        {
-          regulation_type: 'not_applicable',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'compliance_media':
-      return [
-        {
-          content_type: 'not_applicable',
-          content_language: 'english',
-          source_location: 'not_applicable',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'fcc_radio_frequency_emission_compliance':
-      return [
-        {
-          registration_status: 'not_applicable',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'hazmat':
-      return [
-        {
-          aspect: 'not_applicable',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // ✅ ENHANCED: Date Attributes
-    case 'merchant_release_date':
-      return [
-        {
-          value: new Date().toISOString().split('T')[0],
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'product_site_launch_date':
-      return [
-        {
-          value: new Date().toISOString().split('T')[0],
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // ✅ ENHANCED: Watch-Specific Complex Attributes
+    // Watch-specific with units
     case 'dial_size':
       return [
         {
@@ -424,66 +550,40 @@ function generateEnhancedAttributeValue(
         },
       ]
 
-    case 'water_resistance_level':
+    // Date fields
+    case 'merchant_release_date':
+    case 'product_site_launch_date':
       return [
         {
-          value: 'splash_resistant',
+          value: new Date().toISOString().split('T')[0],
           marketplace_id: marketplaceId,
         },
       ]
 
-    // ✅ ENHANCED: Variation Theme
-    case 'variation_theme':
+    // Boolean fields that need string values
+    case 'skip_offer':
+    case 'purchasable_offer':
       return [
         {
-          name: 'Color',
+          value: attributeName === 'purchasable_offer' ? 'true' : 'false',
           marketplace_id: marketplaceId,
         },
       ]
 
-    // ✅ ENHANCED: Merchant Policies
-    case 'map_policy':
-      return [
-        {
-          value: 'no_restrictions',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'merchant_shipping_group':
-      return [
-        {
-          value: 'standard',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // ✅ ENHANCED: Count and Quantity Fields
+    // Count fields
     case 'unit_count':
-      return [
-        {
-          value: '1',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
     case 'number_of_items':
-      return [
-        {
-          value: '1',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
     case 'item_package_quantity':
+    case 'number_of_bands':
+    case 'total_usb_2_0_ports':
       return [
         {
-          value: '1',
+          value: getCountDefault(attributeName),
           marketplace_id: marketplaceId,
         },
       ]
 
-    // Universal attributes with smart content analysis
+    // Simple string fields
     case 'color':
       return [
         {
@@ -492,112 +592,126 @@ function generateEnhancedAttributeValue(
         },
       ]
 
-    case 'target_gender':
+    case 'series_number':
       return [
         {
-          value: detectGender(productData) || 'unisex',
+          value: `SERIES-${sku.slice(-6)}`,
           marketplace_id: marketplaceId,
         },
       ]
 
-    case 'age_range_description':
+    case 'voltage':
       return [
         {
-          value: 'Adult',
+          value: '120',
+          unit: 'volts',
           marketplace_id: marketplaceId,
         },
       ]
 
-    case 'country_of_origin':
+    // Safety and compliance defaults
+    case 'gpsr_safety_attestation':
+    case 'is_oem_sourced_product':
+    case 'has_less_than_30_percent_state_of_charge':
+    case 'ships_globally':
       return [
         {
-          value: 'US',
+          value: 'false',
           marketplace_id: marketplaceId,
         },
       ]
 
-    case 'department':
+    case 'supplier_declared_has_product_identifier_exemption':
       return [
         {
-          value: getDepartment(productData) || 'unisex',
+          value: 'false',
           marketplace_id: marketplaceId,
         },
       ]
 
-    // Watch-specific simple attributes
-    case 'calendar_type':
-      return [
-        {
-          value: detectCalendarType(productData) || 'Analog',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'item_shape':
-      return [
-        {
-          value: extractShape(productData) || 'Round',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'warranty_type':
-      return [
-        {
-          value: 'Limited',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    case 'supplier_declared_dg_hz_regulation':
-      return [
-        {
-          value: 'not_applicable',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // Material and construction
-    case 'material':
-    case 'material_type':
-      return [
-        {
-          value:
-            extractMaterial(productData) || getDefaultMaterial(attributeName),
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // Size and dimensions
-    case 'size':
-      return [
-        {
-          value: extractSize(productData) || 'One Size',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // Style and design
-    case 'style':
-      return [
-        {
-          value: extractStyle(productData) || 'classic',
-          marketplace_id: marketplaceId,
-        },
-      ]
-
-    // Generic fallback for unknown attributes
     default:
-      return generateEnhancedGenericAttributeValue(
-        attributeName,
-        attributeSchema,
-        productData,
-        marketplaceId
-      )
+      // Generic handling
+      return [
+        {
+          value: getGenericDefault(attributeName, productData),
+          marketplace_id: marketplaceId,
+        },
+      ]
   }
 }
 
-// ✅ ENHANCED EXTRACTION FUNCTIONS
+// ✅ ENHANCED HELPER FUNCTIONS
+function getSmartDefaultForKey(
+  key: string,
+  attributeName: string,
+  productData: ProductData
+): string {
+  const keyDefaults: { [key: string]: string } = {
+    unit: attributeName.includes('weight')
+      ? 'pounds'
+      : attributeName.includes('dimension')
+        ? 'inches'
+        : 'units',
+    type: 'standard',
+    compliance_type: 'no_warning_applicable',
+    regulation_type: 'not_regulated',
+    content_type: 'none',
+    content_language: 'en_US',
+    source_location: 'none',
+    registration_status: 'not_required',
+    aspect: 'none',
+    name: 'standard',
+    quantity: '0',
+    value: '0',
+  }
+
+  return keyDefaults[key] || 'standard'
+}
+
+function getNumericDefaultForKey(
+  key: string,
+  attributeName: string,
+  productData: ProductData
+): string {
+  if (key === 'value' && attributeName.includes('weight'))
+    return extractWeight(productData) || '1'
+  if (key === 'value' && attributeName.includes('dimension')) return '10'
+  if (key === 'value' && attributeName.includes('count')) return '1'
+  if (key === 'quantity') return '0'
+  return '1'
+}
+
+function getBooleanDefaultForKey(key: string, attributeName: string): string {
+  // Most boolean compliance fields should be false
+  return 'false'
+}
+
+function getCountDefault(attributeName: string): string {
+  if (attributeName === 'number_of_bands') return '1'
+  if (attributeName === 'total_usb_2_0_ports') return '0'
+  if (attributeName.includes('count') || attributeName.includes('quantity'))
+    return '1'
+  return '1'
+}
+
+function getGenericDefault(
+  attributeName: string,
+  productData: ProductData
+): string {
+  if (attributeName.includes('battery')) return 'false'
+  if (attributeName.includes('count')) return '1'
+  if (attributeName.includes('weight')) return '1'
+  if (attributeName.includes('date'))
+    return new Date().toISOString().split('T')[0]
+  if (attributeName.includes('voltage')) return '120'
+  if (attributeName.includes('ships')) return 'false'
+  if (attributeName.includes('oem')) return 'false'
+  if (attributeName.includes('exempt')) return 'false'
+
+  return 'standard'
+}
+
+// Keep all existing helper functions
 function extractWeight(productData: ProductData): string | null {
   const text =
     `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
@@ -609,7 +723,6 @@ function extractWeight(productData: ProductData): string | null {
     const value = parseFloat(weightMatch[1])
     const unit = weightMatch[2].toLowerCase()
 
-    // Convert to pounds
     if (unit.includes('oz') || unit.includes('ounce')) {
       return (value / 16).toFixed(2)
     } else if (unit.includes('kg')) {
@@ -631,7 +744,6 @@ function extractDimensions(productData: ProductData): {
   const text =
     `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
 
-  // Look for dimension patterns
   const dimMatch = text.match(
     /(\d+\.?\d*)\s*x\s*(\d+\.?\d*)\s*x\s*(\d+\.?\d*)\s*(inch|inches|cm|mm)/i
   )
@@ -643,7 +755,6 @@ function extractDimensions(productData: ProductData): {
     }
   }
 
-  // Default dimensions based on product type
   if (text.includes('watch')) {
     return { length: '1.7', width: '1.7', height: '0.4' }
   }
@@ -663,150 +774,6 @@ function extractDialSize(productData: ProductData): string | null {
   return null
 }
 
-// ✅ ENHANCED GENERIC ATTRIBUTE VALUE GENERATOR
-function generateEnhancedGenericAttributeValue(
-  attributeName: string,
-  attributeSchema: AttributeSchema | undefined,
-  productData: ProductData,
-  marketplaceId: string | undefined
-): any {
-  const marketplace = marketplaceId || process.env.AMAZON_MARKETPLACE_ID
-
-  // Enhanced enum handling
-  if (attributeSchema?.enum && attributeSchema.enum.length > 0) {
-    // Smart enum selection
-    const smartEnum = selectSmartEnum(
-      attributeName,
-      attributeSchema.enum,
-      productData
-    )
-    return [
-      {
-        value: smartEnum,
-        marketplace_id: marketplace,
-      },
-    ]
-  }
-
-  // Enhanced complex structure detection
-  if (attributeSchema?.properties) {
-    const complexValue: any = { marketplace_id: marketplace }
-
-    Object.entries(attributeSchema.properties).forEach(
-      ([key, prop]: [string, any]) => {
-        if (prop.enum && prop.enum.length > 0) {
-          complexValue[key] = prop.enum[0]
-        } else if (prop.type === 'string') {
-          complexValue[key] = getSmartDefaultForKey(key, attributeName)
-        } else if (prop.type === 'number') {
-          complexValue[key] = '0'
-        }
-      }
-    )
-
-    return [complexValue]
-  }
-
-  // Enhanced type-based defaults
-  if (attributeSchema?.type === 'boolean') {
-    return [{ value: 'false' }]
-  }
-
-  if (attributeSchema?.type === 'number') {
-    return [
-      {
-        value: getNumericDefault(attributeName),
-        marketplace_id: marketplace,
-      },
-    ]
-  }
-
-  // Enhanced string fallback
-  return [
-    {
-      value: getEnhancedAttributeDefault(attributeName),
-      marketplace_id: marketplace,
-    },
-  ]
-}
-
-// ✅ HELPER FUNCTIONS FOR ENHANCED LOGIC
-function selectSmartEnum(
-  attributeName: string,
-  enums: string[],
-  productData: ProductData
-): string {
-  const text =
-    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
-
-  // Smart enum selection based on content
-  for (const enumValue of enums) {
-    if (text.includes(enumValue.toLowerCase().replace('_', ' '))) {
-      return enumValue
-    }
-  }
-
-  // Fallback to first enum or smart default
-  return enums[0] || 'not_applicable'
-}
-
-function getSmartDefaultForKey(key: string, attributeName: string): string {
-  const keyDefaults: { [key: string]: string } = {
-    unit: 'pounds',
-    type: 'not_applicable',
-    compliance_type: 'not_applicable',
-    regulation_type: 'not_applicable',
-    content_type: 'not_applicable',
-    content_language: 'english',
-    source_location: 'not_applicable',
-    registration_status: 'not_applicable',
-    aspect: 'not_applicable',
-    name: attributeName.includes('variation') ? 'Color' : 'standard',
-    quantity: '0',
-    value: '0',
-  }
-
-  return keyDefaults[key] || 'not_applicable'
-}
-
-function getNumericDefault(attributeName: string): string {
-  if (attributeName.includes('weight')) return '1'
-  if (attributeName.includes('dimension') || attributeName.includes('size'))
-    return '10'
-  if (attributeName.includes('count') || attributeName.includes('quantity'))
-    return '1'
-  if (attributeName.includes('depth')) return '30'
-  if (attributeName.includes('battery') || attributeName.includes('cell'))
-    return '0'
-  return '1'
-}
-
-function getEnhancedAttributeDefault(attributeName: string): string {
-  // Enhanced attribute name pattern matching
-  if (
-    attributeName.includes('compliance') ||
-    attributeName.includes('regulation')
-  )
-    return 'not_applicable'
-  if (attributeName.includes('battery')) return 'false'
-  if (attributeName.includes('policy')) return 'no_restrictions'
-  if (attributeName.includes('shipping')) return 'standard'
-  if (attributeName.includes('resistance')) return 'splash_resistant'
-  if (attributeName.includes('count') || attributeName.includes('quantity'))
-    return '1'
-  if (attributeName.includes('weight')) return '1'
-  if (attributeName.includes('dimension')) return '10'
-  if (attributeName.includes('date'))
-    return new Date().toISOString().split('T')[0]
-  if (attributeName.includes('color')) return 'Black'
-  if (attributeName.includes('material')) return 'mixed'
-  if (attributeName.includes('style')) return 'classic'
-  if (attributeName.includes('theme')) return 'Color'
-
-  return 'not_applicable'
-}
-
-// Keep all existing helper functions (extractColor, detectGender, etc.) from previous version
 function extractColor(productData: ProductData): string | null {
   const text =
     `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
@@ -855,57 +822,6 @@ function detectGender(productData: ProductData): string | null {
   return null
 }
 
-function extractSize(productData: ProductData): string | null {
-  const text =
-    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
-
-  const sizePatterns = [
-    /size\s*(\w+)/,
-    /(\d+\.?\d*)\s*(inch|cm|mm)/,
-    /(small|medium|large|xl|xs)/,
-  ]
-
-  for (const pattern of sizePatterns) {
-    const match = text.match(pattern)
-    if (match) return match[1] || match[0]
-  }
-
-  return null
-}
-
-function extractMaterial(
-  productData: ProductData,
-  type?: string
-): string | null {
-  const text =
-    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
-
-  const materials = [
-    'leather',
-    'cotton',
-    'polyester',
-    'wool',
-    'silk',
-    'denim',
-    'canvas',
-    'rubber',
-    'plastic',
-    'metal',
-    'steel',
-    'aluminum',
-    'wood',
-    'glass',
-  ]
-
-  for (const material of materials) {
-    if (text.includes(material)) {
-      return material.charAt(0).toUpperCase() + material.slice(1)
-    }
-  }
-
-  return null
-}
-
 function generateUPC(): string {
   return '123456789012'
 }
@@ -929,67 +845,7 @@ function extractModelName(productData: ProductData): string | null {
   return null
 }
 
-function getDefaultMaterial(attributeName: string): string {
-  const materialDefaults: { [key: string]: string } = {
-    sole_material: 'rubber',
-    upper_material: 'synthetic',
-    material_type: 'cotton',
-    material: 'mixed',
-  }
-
-  return materialDefaults[attributeName] || 'synthetic'
-}
-
-function extractStyle(productData: ProductData): string | null {
-  const text =
-    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
-
-  const styles = [
-    'casual',
-    'formal',
-    'sport',
-    'athletic',
-    'vintage',
-    'modern',
-    'classic',
-  ]
-  for (const style of styles) {
-    if (text.includes(style)) return style
-  }
-
-  return null
-}
-
-function getDepartment(productData: ProductData): string {
-  const gender = detectGender(productData)
-  return gender === 'male' ? 'mens' : gender === 'female' ? 'womens' : 'unisex'
-}
-
-function detectCalendarType(productData: ProductData): string {
-  const text =
-    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
-
-  if (text.includes('digital')) return 'Digital'
-  if (text.includes('smart')) return 'Digital'
-
-  return 'Analog'
-}
-
-function extractShape(productData: ProductData): string {
-  const text =
-    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
-
-  const shapes = ['round', 'square', 'rectangular', 'oval']
-  for (const shape of shapes) {
-    if (text.includes(shape)) {
-      return shape.charAt(0).toUpperCase() + shape.slice(1)
-    }
-  }
-
-  return 'Round'
-}
-
-// Schema fetcher and fallback functions remain the same as previous version
+// Schema fetcher and fallback functions
 async function getProductTypeSchema(productType: string): Promise<any> {
   try {
     const response = await fetch(
@@ -1016,7 +872,7 @@ function generateEnhancedFallbackAttributes(
 ): any {
   const marketplaceId = process.env.AMAZON_MARKETPLACE_ID
 
-  // Enhanced fallback with complex structures
+  // Use known working values for fallback
   const baseAttributes = {
     condition_type: [{ value: options.condition || 'new_new' }],
     item_name: [
@@ -1074,12 +930,6 @@ function generateEnhancedFallbackAttributes(
         marketplace_id: marketplaceId,
       },
     ],
-    target_gender: [
-      {
-        value: detectGender(productData) || 'unisex',
-        marketplace_id: marketplaceId,
-      },
-    ],
     country_of_origin: [{ value: 'US', marketplace_id: marketplaceId }],
     externally_assigned_product_identifier: [
       {
@@ -1092,86 +942,15 @@ function generateEnhancedFallbackAttributes(
       { value: 'B000000000', marketplace_id: marketplaceId },
     ],
 
-    // Enhanced complex attributes for fallback
-    item_weight: [
-      { value: '1', unit: 'pounds', marketplace_id: marketplaceId },
+    // Safe defaults for problematic fields
+    parentage_level: [{ value: 'child', marketplace_id: marketplaceId }],
+    skip_offer: [{ value: 'false', marketplace_id: marketplaceId }],
+    supplier_declared_has_product_identifier_exemption: [
+      { value: 'false', marketplace_id: marketplaceId },
     ],
-    item_package_weight: [
-      { value: '1.5', unit: 'pounds', marketplace_id: marketplaceId },
-    ],
-    item_package_dimensions: [
-      {
-        length: { value: '10', unit: 'inches' },
-        width: { value: '8', unit: 'inches' },
-        height: { value: '3', unit: 'inches' },
-        marketplace_id: marketplaceId,
-      },
-    ],
-    batteries_required: [{ value: 'false', marketplace_id: marketplaceId }],
-    batteries_included: [{ value: 'false', marketplace_id: marketplaceId }],
-    unit_count: [{ value: '1', marketplace_id: marketplaceId }],
-    number_of_items: [{ value: '1', marketplace_id: marketplaceId }],
 
     ...imageAttributes,
   }
 
-  // Add product-specific enhanced fallbacks
-  const productSpecific = getEnhancedProductSpecificFallback(
-    productType,
-    productData,
-    sku,
-    marketplaceId
-  )
-
-  return { ...baseAttributes, ...productSpecific }
-}
-
-function getEnhancedProductSpecificFallback(
-  productType: string,
-  productData: ProductData,
-  sku: string,
-  marketplaceId: string | undefined
-): any {
-  const marketplace = marketplaceId || process.env.AMAZON_MARKETPLACE_ID
-
-  switch (productType) {
-    case 'WATCH':
-      return {
-        calendar_type: [{ value: 'Analog', marketplace_id: marketplace }],
-        item_shape: [{ value: 'Round', marketplace_id: marketplace }],
-        warranty_type: [{ value: 'Limited', marketplace_id: marketplace }],
-        part_number: [{ value: `LISTORA-${sku}`, marketplace_id: marketplace }],
-        water_resistance_level: [
-          { value: 'splash_resistant', marketplace_id: marketplace },
-        ],
-        dial_size: [
-          { value: '40', unit: 'millimeters', marketplace_id: marketplace },
-        ],
-      }
-
-    case 'SHOES':
-      return {
-        footwear_size: [{ value: 'One Size', marketplace_id: marketplace }],
-        sole_material: [{ value: 'rubber', marketplace_id: marketplace }],
-        closure: [{ value: 'lace-up', marketplace_id: marketplace }],
-        heel: [{ value: 'flat', marketplace_id: marketplace }],
-      }
-
-    case 'AIR_FRYER':
-      return {
-        capacity: [{ value: '5', unit: 'quarts', marketplace_id: marketplace }],
-        wattage: [{ value: '1500', marketplace_id: marketplace }],
-        model_number: [
-          { value: `LISTORA-${sku}`, marketplace_id: marketplace },
-        ],
-        voltage: [{ value: '120', marketplace_id: marketplace }],
-      }
-
-    default:
-      return {
-        model_number: [
-          { value: `LISTORA-${sku}`, marketplace_id: marketplace },
-        ],
-      }
-  }
+  return baseAttributes
 }
