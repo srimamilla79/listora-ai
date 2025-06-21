@@ -225,7 +225,7 @@ async function createAmazonListing(
       }
     }
 
-    // Prepare image attributes for Amazon - ULTRA SAFE (MAIN IMAGE ONLY)
+    // Prepare image attributes for Amazon - FIXED FORMAT
     const imageAttributes: any = {}
 
     if (amazonImages.length > 0) {
@@ -235,7 +235,7 @@ async function createAmazonListing(
         'images for Amazon listing'
       )
 
-      // ✅ ONLY add main image, absolutely no additional images
+      // ✅ ONLY add main image with correct format
       if (
         amazonImages[0] &&
         amazonImages[0].trim() &&
@@ -243,11 +243,11 @@ async function createAmazonListing(
       ) {
         imageAttributes.main_product_image_locator = [
           {
-            value: amazonImages[0],
+            media_location: amazonImages[0], // ✅ Changed from 'value' to 'media_location'
             marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
           },
         ]
-        console.log('📸 Added ONLY main image:', amazonImages[0])
+        console.log('📸 Added main image with correct format:', amazonImages[0])
       }
     } else {
       console.log('📸 No images available for this product')
