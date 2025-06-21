@@ -225,7 +225,7 @@ async function createAmazonListing(
       }
     }
 
-    // Prepare image attributes for Amazon - SIMPLIFIED PROCESSING
+    // Prepare image attributes for Amazon - ULTRA SAFE (MAIN IMAGE ONLY)
     const imageAttributes: any = {}
 
     if (amazonImages.length > 0) {
@@ -235,7 +235,7 @@ async function createAmazonListing(
         'images for Amazon listing'
       )
 
-      // ✅ Only add main image, no additional images to avoid ps03 errors
+      // ✅ ONLY add main image, absolutely no additional images
       if (
         amazonImages[0] &&
         amazonImages[0].trim() &&
@@ -247,13 +247,13 @@ async function createAmazonListing(
             marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
           },
         ]
-        console.log('📸 Added main image only:', amazonImages[0])
-      } else {
-        console.log('📸 Main image URL invalid, skipping images')
+        console.log('📸 Added ONLY main image:', amazonImages[0])
       }
     } else {
       console.log('📸 No images available for this product')
     }
+
+    console.log('📸 Final image attributes:', Object.keys(imageAttributes))
 
     // ✅ ENHANCED: Validate user-selected product type
     const validProductTypes = [
