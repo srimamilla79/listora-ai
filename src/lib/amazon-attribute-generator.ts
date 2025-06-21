@@ -222,6 +222,14 @@ export async function generateDynamicAttributes(
         { value: 'not_applicable', marketplace_id: marketplaceId },
       ],
       parentage_level: [{ value: 'child', marketplace_id: marketplaceId }],
+      child_parent_sku_relationship: [
+        {
+          child_sku: sku,
+          parent_sku: sku,
+          relationship_type: 'standalone',
+          marketplace_id: marketplaceId,
+        },
+      ],
 
       // Images
       ...imageAttributes,

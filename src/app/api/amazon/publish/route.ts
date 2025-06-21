@@ -225,7 +225,7 @@ async function createAmazonListing(
       }
     }
 
-    // Prepare image attributes for Amazon - SAFE PROCESSING
+    // Prepare image attributes for Amazon - SIMPLIFIED PROCESSING
     const imageAttributes: any = {}
 
     if (amazonImages.length > 0) {
@@ -235,7 +235,7 @@ async function createAmazonListing(
         'images for Amazon listing'
       )
 
-      // ✅ Only add main image if URL is valid
+      // ✅ Only add main image, no additional images to avoid ps03 errors
       if (
         amazonImages[0] &&
         amazonImages[0].trim() &&
@@ -247,7 +247,7 @@ async function createAmazonListing(
             marketplace_id: process.env.AMAZON_MARKETPLACE_ID,
           },
         ]
-        console.log('📸 Added main image:', amazonImages[0])
+        console.log('📸 Added main image only:', amazonImages[0])
       } else {
         console.log('📸 Main image URL invalid, skipping images')
       }
