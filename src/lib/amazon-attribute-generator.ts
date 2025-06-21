@@ -198,7 +198,7 @@ export async function generateDynamicAttributes(
 
     // Get the detailed schema for this product type
     const schemaResponse = await fetch(
-      `/api/amazon/product-types/${productType}?detailed=true`
+      `${process.env.NEXT_PUBLIC_SITE_URL || 'https://listora.ai'}/api/amazon/product-types/${productType}?detailed=true`
     )
     const schemaData = await schemaResponse.json()
 
