@@ -478,6 +478,31 @@ async function createAmazonListing(
       '📊 Feed document preview - Attributes count:',
       Object.keys(finalAttributes).length
     )
+    // ✅ ADD THESE DEBUG LOGS HERE:
+    console.log(
+      '🔍 First 10 attributes being sent:',
+      JSON.stringify(Object.entries(finalAttributes).slice(0, 10), null, 2)
+    )
+    console.log('🔍 Missing attributes check:', {
+      item_type_keyword: !!finalAttributes.item_type_keyword,
+      product_description: !!finalAttributes.product_description,
+      manufacturer: !!finalAttributes.manufacturer,
+      color: !!finalAttributes.color,
+      age_range_description: !!finalAttributes.age_range_description,
+      country_of_origin: !!finalAttributes.country_of_origin,
+      bullet_point: !!finalAttributes.bullet_point,
+      externally_assigned_product_identifier:
+        !!finalAttributes.externally_assigned_product_identifier,
+      part_number: !!finalAttributes.part_number,
+      department: !!finalAttributes.department,
+      merchant_suggested_asin: !!finalAttributes.merchant_suggested_asin,
+      supplier_declared_dg_hz_regulation:
+        !!finalAttributes.supplier_declared_dg_hz_regulation,
+    })
+    console.log(
+      '🔍 Water resistance level value:',
+      finalAttributes.water_resistance_level
+    )
 
     // STEP 1: Create feed document
     console.log('📄 Step 1: Creating feed document...')
