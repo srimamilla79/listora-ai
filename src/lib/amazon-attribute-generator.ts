@@ -703,6 +703,12 @@ class UniversalAttributeGenerator {
       return [{ value: 'Unisex', marketplace_id: marketplaceId }]
     }
 
+    // Category-specific exclusions
+    if (productType === 'SHOES' && lowerAttr.includes('dg_hz_regulation')) {
+      // Skip this attribute for shoes - doesn't apply
+      return null
+    }
+
     // Safe fallback
     return [{ value: 'Standard', marketplace_id: marketplaceId }]
   }
