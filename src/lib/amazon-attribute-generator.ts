@@ -393,6 +393,15 @@ function convertTemplateToAPIFormat(
             marketplace_id: marketplaceId,
           },
         ]
+      } else if (apiField === 'capacity') {
+        // Handle capacity with separate value and unit
+        apiAttributes[apiField] = [
+          {
+            value: 5,
+            unit: 'quarts',
+            marketplace_id: marketplaceId,
+          },
+        ]
       } else {
         apiAttributes[apiField] = [
           {
