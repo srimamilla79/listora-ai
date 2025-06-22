@@ -16,7 +16,6 @@ interface PublishingOptions {
   productType?: string
 }
 
-// Type definitions for template mapping configurations
 interface TemplateFieldConfig {
   value?: string | number
   source?: string
@@ -28,12 +27,10 @@ interface TemplateFieldConfig {
 
 type TemplateMapping = Record<string, TemplateFieldConfig>
 
-// Amazon's official template field mappings (from the 758-column template)
+// Amazon's official template field mappings
 const AMAZON_TEMPLATE_MAPPINGS: Record<string, TemplateMapping> = {
   AIR_FRYER: {
-    // Core product identification
     'Product Type': { value: 'AIR_FRYER' },
-    'Seller SKU': { source: 'sku' },
     'Brand Name': { source: 'brand', fallback: 'Listora AI' },
     'Product Name': { source: 'title' },
     'Product Description': { source: 'description' },
@@ -42,8 +39,6 @@ const AMAZON_TEMPLATE_MAPPINGS: Record<string, TemplateMapping> = {
     'Item Type Keyword': { value: 'air fryer' },
     model: { source: 'sku', prefix: 'MODEL-' },
     'Model Name': { source: 'title', suffix: ' Pro' },
-
-    // Fields that were causing validation errors
     'Material Type': { value: 'Stainless Steel' },
     Wattage: { value: '1500' },
     Color: {
@@ -51,53 +46,44 @@ const AMAZON_TEMPLATE_MAPPINGS: Record<string, TemplateMapping> = {
       analyzer: 'extractColor',
       fallback: 'Black',
     },
-    Capacity: { value: '5' },
-
-    // Pricing and inventory
+    Capacity: { value: '5 quarts' },
     'List Price': { source: 'price' },
     'Quantity (US, CA, MX)': { source: 'quantity' },
-
-    // Product ID Exemption (safer than invalid UPCs)
     'Product Exemption Reason': { value: 'Generic product' },
-    'Update Delete': { value: '' }, // Empty for new products
+    'Update Delete': { value: '' },
     'Care Instructions': { value: 'Follow manufacturer instructions' },
     'Model Year': { value: new Date().getFullYear().toString() },
-
-    // Safety and compliance
     'Age Range Description': { value: 'Adult' },
     'Safety Warning': { value: 'Read all instructions before use' },
     'Warranty Description': { value: '1 Year Limited Warranty' },
-
-    // Physical attributes
     'Package Quantity': { value: '1' },
     'Item Weight': { value: '10' },
     'Item Weight Unit Of Measure': { value: 'pounds' },
     'Item Dimensions': { value: '12 x 12 x 14' },
     'Item Dimensions Unit Of Measure': { value: 'inches' },
-
-    // Features and benefits
     'Special Features': { value: 'Digital Display, Timer, Non-stick Coating' },
     'Recommended Uses For Product': {
       value: 'Frying, Baking, Roasting, Reheating',
     },
     'Included Components': { value: 'Air Fryer, Basket, Manual, Recipe Book' },
     'Number Of Items': { value: '1' },
-    'Assembly Required': { value: 'No' },
-
-    // Country and origin
+    'Required Assembly': { value: 'No' },
+    'Output Wattage': { value: '1500' },
+    Size: { value: 'Medium' },
+    'Item Dimensions D x W x H': { value: '12 x 12 x 14 inches' },
+    'Bullet Point': {
+      source: 'features',
+      fallback: 'High quality air fryer with digital controls',
+    },
     'Country Of Origin': { value: 'US' },
     'Harmonized System Code': { value: '8516719000' },
-
-    // Images (to be added dynamically)
     'Main Image URL': { source: 'main_image' },
     'Other Image URL1': { source: 'image_2' },
     'Other Image URL2': { source: 'image_3' },
   },
 
   WATCH: {
-    // Core fields (similar structure but watch-specific values)
     'Product Type': { value: 'WATCH' },
-    'Seller SKU': { source: 'sku' },
     'Brand Name': { source: 'brand', fallback: 'Listora AI' },
     'Product Name': { source: 'title' },
     'Product Description': { source: 'description' },
@@ -105,8 +91,6 @@ const AMAZON_TEMPLATE_MAPPINGS: Record<string, TemplateMapping> = {
     'Item Type Keyword': { value: 'watch' },
     model: { source: 'sku', prefix: 'WATCH-' },
     'Model Name': { source: 'title', suffix: ' Edition' },
-
-    // Watch-specific fields
     'Material Type': {
       source: 'content_analysis',
       analyzer: 'extractMaterial',
@@ -132,14 +116,12 @@ const AMAZON_TEMPLATE_MAPPINGS: Record<string, TemplateMapping> = {
     'Watch Movement Type': { value: 'Quartz' },
     'Item Shape': { value: 'Round' },
     'Warranty Type': { value: 'Limited' },
-
-    // Pricing and inventory
     'List Price': { source: 'price' },
     'Quantity (US, CA, MX)': { source: 'quantity' },
   },
 }
 
-// Content analysis functions for extracting attributes from product data
+// Content analysis functions
 function extractColorFromContent(content: string): string {
   const colors = [
     'black',
@@ -226,7 +208,6 @@ function extractDepartmentFromContent(content: string): string {
   return gender === 'Male' ? 'Mens' : gender === 'Female' ? 'Womens' : 'Unisex'
 }
 
-// Content analyzers mapping
 const CONTENT_ANALYZERS: Record<string, (content: string) => string> = {
   extractColor: extractColorFromContent,
   extractMaterial: extractMaterialFromContent,
@@ -234,7 +215,6 @@ const CONTENT_ANALYZERS: Record<string, (content: string) => string> = {
   extractDepartment: extractDepartmentFromContent,
 }
 
-// Generate template-based attributes for Amazon feed
 function generateTemplateBasedAttributes(
   productType: string,
   productData: ProductData,
@@ -242,7 +222,6 @@ function generateTemplateBasedAttributes(
   sku: string,
   imageUrls: string[] = []
 ): Record<string, string> {
-  // Get the template mapping for this product type
   const templateMapping = AMAZON_TEMPLATE_MAPPINGS[productType]
 
   if (!templateMapping) {
@@ -255,15 +234,12 @@ function generateTemplateBasedAttributes(
   const fullContent =
     `${productData.title} ${productData.description} ${productData.features}`.toLowerCase()
 
-  // Process each field in the template mapping
   for (const [amazonField, config] of Object.entries(templateMapping)) {
     let value = ''
 
     if (config.value !== undefined) {
-      // Static value
       value = config.value.toString()
     } else if (config.source) {
-      // Dynamic value from our data
       switch (config.source) {
         case 'sku':
           value = sku
@@ -290,6 +266,9 @@ function generateTemplateBasedAttributes(
         case 'quantity':
           value = options.quantity || '10'
           break
+        case 'features':
+          value = productData.features || config.fallback || ''
+          break
         case 'main_image':
           value = imageUrls[0] || ''
           break
@@ -310,26 +289,22 @@ function generateTemplateBasedAttributes(
           value = config.fallback || ''
       }
 
-      // Apply prefix/suffix if specified
       if (config.prefix) value = config.prefix + value
       if (config.suffix) value = value + config.suffix
     }
 
-    // Store the value (Amazon template expects simple field mapping)
     result[amazonField] = value
   }
 
   return result
 }
 
-// Convert template-based attributes to Amazon API format
 function convertTemplateToAPIFormat(
   templateAttributes: Record<string, string>,
   marketplaceId: string
 ): any {
   const apiAttributes: any = {}
 
-  // Map common template fields to API field names
   const fieldMapping: Record<string, string> = {
     'Product Name': 'item_name',
     'Brand Name': 'brand',
@@ -344,6 +319,15 @@ function convertTemplateToAPIFormat(
     'Item Type Keyword': 'item_type_keyword',
     model: 'model_number',
     'Model Name': 'model_name',
+    'Required Assembly': 'is_assembly_required',
+    'Output Wattage': 'output_wattage',
+    Size: 'size',
+    'Item Dimensions D x W x H': 'item_depth_width_height',
+    'Bullet Point': 'bullet_point',
+    'Special Features': 'special_feature',
+    'Recommended Uses For Product': 'recommended_uses_for_product',
+    'Included Components': 'included_components',
+    'Number Of Items': 'number_of_items',
     'Target Gender': 'target_gender',
     Department: 'department',
     'Calendar Type': 'calendar_type',
@@ -354,7 +338,6 @@ function convertTemplateToAPIFormat(
     'Main Image URL': 'main_product_image_locator',
   }
 
-  // Convert template attributes to API format
   for (const [templateField, apiField] of Object.entries(fieldMapping)) {
     const value = templateAttributes[templateField]
 
@@ -383,6 +366,33 @@ function convertTemplateToAPIFormat(
             },
           ]
         }
+      } else if (apiField === 'is_assembly_required') {
+        apiAttributes[apiField] = [
+          {
+            value: value.toLowerCase() === 'no' ? false : true,
+            marketplace_id: marketplaceId,
+          },
+        ]
+      } else if (apiField === 'bullet_point') {
+        const bulletPoints = value
+          .split('\n')
+          .filter((point: string) => point.trim())
+          .slice(0, 5)
+        if (bulletPoints.length > 0) {
+          apiAttributes[apiField] = bulletPoints.map((point: string) => ({
+            value: point.trim(),
+            marketplace_id: marketplaceId,
+          }))
+        }
+      } else if (apiField === 'item_depth_width_height') {
+        apiAttributes[apiField] = [
+          {
+            depth: { value: 12, unit: 'inches' },
+            width: { value: 12, unit: 'inches' },
+            height: { value: 14, unit: 'inches' },
+            marketplace_id: marketplaceId,
+          },
+        ]
       } else {
         apiAttributes[apiField] = [
           {
@@ -409,6 +419,16 @@ function convertTemplateToAPIFormat(
     { value: 'child', marketplace_id: marketplaceId },
   ]
 
+  // Add child_parent_sku_relationship
+  apiAttributes.child_parent_sku_relationship = [
+    {
+      child_sku: templateAttributes['Seller SKU'] || 'UNKNOWN',
+      parent_sku: templateAttributes['Seller SKU'] || 'UNKNOWN',
+      relationship_type: 'standalone',
+      marketplace_id: marketplaceId,
+    },
+  ]
+
   // Add product exemption instead of invalid UPC
   apiAttributes.supplier_declared_has_product_identifier_exemption = [
     {
@@ -420,7 +440,6 @@ function convertTemplateToAPIFormat(
   return apiAttributes
 }
 
-// Main function: Generate Amazon attributes using template approach
 export async function generateDynamicAttributes(
   productType: string,
   productData: ProductData,
@@ -433,7 +452,6 @@ export async function generateDynamicAttributes(
 
     const marketplaceId = process.env.AMAZON_MARKETPLACE_ID || 'ATVPDKIKX0DER'
 
-    // Extract image URLs from imageAttributes
     const imageUrls: string[] = []
     if (imageAttributes.main_product_image_locator) {
       const mainImage = imageAttributes.main_product_image_locator[0]
@@ -442,7 +460,6 @@ export async function generateDynamicAttributes(
       }
     }
 
-    // Generate attributes using Amazon's template structure
     const templateAttributes = generateTemplateBasedAttributes(
       productType,
       productData,
@@ -451,13 +468,11 @@ export async function generateDynamicAttributes(
       imageUrls
     )
 
-    // Convert template format to API format
     const apiAttributes = convertTemplateToAPIFormat(
       templateAttributes,
       marketplaceId
     )
 
-    // Add any additional image attributes
     Object.assign(apiAttributes, imageAttributes)
 
     console.log(
@@ -478,7 +493,6 @@ export async function generateDynamicAttributes(
   } catch (error) {
     console.error('❌ Error in template-based generation:', error)
 
-    // Fallback to minimal working set
     const marketplaceId = process.env.AMAZON_MARKETPLACE_ID || 'ATVPDKIKX0DER'
     return {
       condition_type: [{ value: 'new_new' }],
