@@ -48,14 +48,10 @@ const UNIVERSAL_CORE_ATTRIBUTES: Record<string, UniversalAttributeConfig> = {
     required: true,
   },
 
-  // Universal compliance
+  // Universal compliance (category-specific)
   condition_type: { value: 'new_new', required: true },
   country_of_origin: { value: 'US', required: true },
   age_range_description: { value: 'Adult', required: true },
-  supplier_declared_dg_hz_regulation: {
-    value: 'not_applicable',
-    required: true,
-  },
   parentage_level: { value: 'child', required: true },
   supplier_declared_has_product_identifier_exemption: {
     value: true,
@@ -382,7 +378,8 @@ class UniversalAttributeGenerator {
       productData,
       options,
       sku,
-      marketplaceId
+      marketplaceId,
+      productType
     )
 
     // Step 2: Get Amazon's schema requirements
@@ -430,7 +427,8 @@ class UniversalAttributeGenerator {
     productData: ProductData,
     options: PublishingOptions,
     sku: string,
-    marketplaceId: string
+    marketplaceId: string,
+    productType: string // Add productType parameter
   ): any {
     const attributes: any = {}
 
@@ -501,6 +499,14 @@ class UniversalAttributeGenerator {
           ]
         }
       }
+    }
+
+    // Add category-specific compliance attributes
+    if (productType !== 'SHOES') {
+      // Add dg_hz_regulation for non-shoe products
+      attributes['supplier_declared_dg_hz_regulation'] = [
+        { value: 'not_applicable', marketplace_id: marketplaceId },
+      ]
     }
 
     return attributes
