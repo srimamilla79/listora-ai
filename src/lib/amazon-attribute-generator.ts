@@ -331,7 +331,6 @@ function convertTemplateToAPIFormat(
 
   // Map common template fields to API field names
   const fieldMapping: Record<string, string> = {
-    'Seller SKU': 'sku',
     'Product Name': 'item_name',
     'Brand Name': 'brand',
     'Product Description': 'product_description',
