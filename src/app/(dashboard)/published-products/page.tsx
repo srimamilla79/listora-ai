@@ -1,4 +1,4 @@
-// src/app/(dashboard)/published-products/page.tsx - With Platform Filter
+// src/app/(dashboard)/published-products/page.tsx - Complete 4-Platform Support
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -28,6 +28,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Download,
 } from 'lucide-react'
 
 interface PublishedProduct {
@@ -48,6 +49,7 @@ interface PublishedProduct {
   published_at: string
   updated_at: string
   last_synced_at: string
+  method?: string // For Amazon template vs API
 }
 
 interface DashboardStats {
@@ -55,6 +57,7 @@ interface DashboardStats {
   activeListings: number
   totalRevenue: number
   pendingListings: number
+  platformBreakdown: Record<string, number>
 }
 
 export default function PublishedProductsPage() {
@@ -64,6 +67,7 @@ export default function PublishedProductsPage() {
     activeListings: 0,
     totalRevenue: 0,
     pendingListings: 0,
+    platformBreakdown: {},
   })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -134,25 +138,39 @@ export default function PublishedProductsPage() {
     }
   }
 
-  // Calculate dashboard stats
+  // Calculate enhanced dashboard stats
   const calculateStats = (productList: PublishedProduct[]) => {
     const totalProducts = productList.length
 
     const activeListings = productList.filter(
-      (p) => p.status === 'published'
+      (p) => p.status === 'published' || p.status === 'ACTIVE'
     ).length
 
     const pendingListings = productList.filter(
-      (p) => p.status === 'pending' || p.status === 'draft'
+      (p) =>
+        p.status === 'pending' ||
+        p.status === 'draft' ||
+        p.status === 'SUBMITTED' ||
+        p.status === 'PENDING'
     ).length
 
     const totalRevenue = productList.reduce((sum, p) => sum + (p.price || 0), 0)
+
+    // Platform breakdown
+    const platformBreakdown = productList.reduce(
+      (acc, product) => {
+        acc[product.platform] = (acc[product.platform] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
 
     setStats({
       totalProducts,
       activeListings,
       pendingListings,
       totalRevenue,
+      platformBreakdown,
     })
   }
 
@@ -179,63 +197,80 @@ export default function PublishedProductsPage() {
     }
   }
 
-  // Get status badge styling with new statuses
+  // Get status badge styling with enhanced statuses
   const getStatusBadge = (status: string) => {
     const statusConfig = {
+      // New standardized statuses
       published: {
         bg: 'bg-green-50',
         text: 'text-green-700',
         border: 'border-green-200',
         icon: CheckCircle,
+        label: 'Published',
       },
       pending: {
         bg: 'bg-blue-50',
         text: 'text-blue-700',
         border: 'border-blue-200',
         icon: Clock,
+        label: 'Pending',
       },
       draft: {
         bg: 'bg-yellow-50',
         text: 'text-yellow-700',
         border: 'border-yellow-200',
         icon: AlertTriangle,
+        label: 'Draft',
       },
       error: {
         bg: 'bg-red-50',
         text: 'text-red-700',
         border: 'border-red-200',
         icon: AlertCircle,
+        label: 'Error',
       },
-      // Keep old statuses for backward compatibility
+      template: {
+        bg: 'bg-purple-50',
+        text: 'text-purple-700',
+        border: 'border-purple-200',
+        icon: Download,
+        label: 'Template',
+      },
+      // Legacy Amazon statuses (backward compatibility)
       ACTIVE: {
         bg: 'bg-green-50',
         text: 'text-green-700',
         border: 'border-green-200',
         icon: CheckCircle,
+        label: 'Active',
       },
       SUBMITTED: {
         bg: 'bg-blue-50',
         text: 'text-blue-700',
         border: 'border-blue-200',
         icon: Clock,
+        label: 'Submitted',
       },
       PENDING: {
         bg: 'bg-yellow-50',
         text: 'text-yellow-700',
         border: 'border-yellow-200',
         icon: AlertTriangle,
+        label: 'Pending',
       },
       INACTIVE: {
         bg: 'bg-gray-50',
         text: 'text-gray-700',
         border: 'border-gray-200',
         icon: AlertCircle,
+        label: 'Inactive',
       },
       ERROR: {
         bg: 'bg-red-50',
         text: 'text-red-700',
         border: 'border-red-200',
         icon: AlertCircle,
+        label: 'Error',
       },
     }
 
@@ -248,23 +283,73 @@ export default function PublishedProductsPage() {
         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${config.bg} ${config.text} ${config.border}`}
       >
         <Icon className="w-3 h-3 mr-1.5" />
-        {status}
+        {config.label}
       </span>
     )
   }
 
-  // Get platform icon
-  const getPlatformIcon = (platform: string) => {
-    switch (platform) {
-      case 'amazon':
-        return '📦'
-      case 'shopify':
-        return '🛍️'
-      case 'etsy':
-        return '🎨'
-      default:
-        return '📱'
+  // Get platform icon and details
+  const getPlatformInfo = (platform: string) => {
+    const platformConfig = {
+      amazon: {
+        icon: '📦',
+        name: 'Amazon',
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50',
+        borderColor: 'border-orange-200',
+      },
+      shopify: {
+        icon: '🛍️',
+        name: 'Shopify',
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200',
+      },
+      ebay: {
+        icon: '🔨',
+        name: 'eBay',
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50',
+        borderColor: 'border-blue-200',
+      },
+      etsy: {
+        icon: '🎨',
+        name: 'Etsy',
+        color: 'text-purple-600',
+        bgColor: 'bg-purple-50',
+        borderColor: 'border-purple-200',
+      },
     }
+
+    return (
+      platformConfig[platform as keyof typeof platformConfig] || {
+        icon: '📱',
+        name: platform,
+        color: 'text-gray-600',
+        bgColor: 'bg-gray-50',
+        borderColor: 'border-gray-200',
+      }
+    )
+  }
+
+  // Get method badge for Amazon
+  const getMethodBadge = (product: PublishedProduct) => {
+    if (product.platform !== 'amazon' || !product.method) return null
+
+    if (product.method === 'template') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 ml-2">
+          <Download className="w-3 h-3 mr-1" />
+          Template
+        </span>
+      )
+    }
+
+    return (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 ml-2">
+        API
+      </span>
+    )
   }
 
   // Filter and sort products
@@ -325,7 +410,7 @@ export default function PublishedProductsPage() {
               Published Products
             </h1>
             <p className="text-gray-600 mt-2 text-lg">
-              Manage your listings and track performance across all marketplaces
+              Manage your listings across Amazon, Shopify, eBay, and Etsy
             </p>
           </div>
 
@@ -364,7 +449,7 @@ export default function PublishedProductsPage() {
           </div>
         )}
 
-        {/* Enhanced Stats Cards */}
+        {/* Enhanced Stats Cards with Platform Breakdown */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all hover:scale-105">
             <div className="flex items-center justify-between">
@@ -382,7 +467,7 @@ export default function PublishedProductsPage() {
             </div>
             <div className="mt-4 flex items-center text-sm text-gray-600">
               <TrendingUp className="h-4 w-4 mr-1 text-blue-500" />
-              <span>All platforms</span>
+              <span>4 platforms</span>
             </div>
           </div>
 
@@ -441,7 +526,39 @@ export default function PublishedProductsPage() {
           </div>
         </div>
 
-        {/* Enhanced Filters and Search with Platform Filter */}
+        {/* Platform Breakdown Card */}
+        {Object.keys(stats.platformBreakdown).length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Platform Distribution
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(stats.platformBreakdown).map(
+                ([platform, count]) => {
+                  const platformInfo = getPlatformInfo(platform)
+                  return (
+                    <div
+                      key={platform}
+                      className={`${platformInfo.bgColor} ${platformInfo.borderColor} border rounded-lg p-4 text-center`}
+                    >
+                      <div className="text-2xl mb-2">{platformInfo.icon}</div>
+                      <div
+                        className={`text-lg font-bold ${platformInfo.color}`}
+                      >
+                        {count}
+                      </div>
+                      <div className="text-sm text-gray-600 capitalize">
+                        {platformInfo.name}
+                      </div>
+                    </div>
+                  )
+                }
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Enhanced Filters and Search with All Platforms */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
@@ -456,7 +573,7 @@ export default function PublishedProductsPage() {
                 />
               </div>
 
-              {/* Platform Filter */}
+              {/* Enhanced Platform Filter */}
               <select
                 value={platformFilter}
                 onChange={(e) => setPlatformFilter(e.target.value)}
@@ -465,10 +582,11 @@ export default function PublishedProductsPage() {
                 <option value="all">All Platforms</option>
                 <option value="amazon">📦 Amazon</option>
                 <option value="shopify">🛍️ Shopify</option>
+                <option value="ebay">🔨 eBay</option>
                 <option value="etsy">🎨 Etsy</option>
               </select>
 
-              {/* Status Filter */}
+              {/* Enhanced Status Filter */}
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -476,9 +594,12 @@ export default function PublishedProductsPage() {
               >
                 <option value="all">All Status</option>
                 <option value="published">Published</option>
+                <option value="ACTIVE">Active</option>
                 <option value="pending">Pending</option>
+                <option value="SUBMITTED">Submitted</option>
                 <option value="draft">Draft</option>
                 <option value="error">Error</option>
+                <option value="template">Template</option>
               </select>
             </div>
 
@@ -527,7 +648,7 @@ export default function PublishedProductsPage() {
             </h3>
             <p className="text-gray-600 mb-8 max-w-md mx-auto">
               {products.length === 0
-                ? 'Start by generating content and publishing your first product. Our AI will help you create professional listings in minutes.'
+                ? 'Start by generating content and publishing your first product to Amazon, Shopify, eBay, or Etsy. Our AI will help you create professional listings in minutes.'
                 : "Try adjusting your search terms or filters to find the products you're looking for."}
             </p>
             {products.length === 0 && (
@@ -570,96 +691,110 @@ export default function PublishedProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-50">
-                  {filteredProducts.map((product) => (
-                    <tr
-                      key={product.id}
-                      className="hover:bg-blue-50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-12 w-12">
-                            <div className="h-12 w-12 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
-                              <Package className="h-6 w-6 text-white" />
-                            </div>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900 max-w-xs">
-                              {product.title}
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              ID:{' '}
-                              {product.platform_product_id || (
-                                <span className="text-yellow-600 font-medium">
-                                  Pending Assignment
+                  {filteredProducts.map((product) => {
+                    const platformInfo = getPlatformInfo(product.platform)
+                    return (
+                      <tr
+                        key={product.id}
+                        className="hover:bg-blue-50 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-12 w-12">
+                              <div
+                                className={`h-12 w-12 rounded-lg ${platformInfo.bgColor} ${platformInfo.borderColor} border flex items-center justify-center shadow-sm`}
+                              >
+                                <span className="text-lg">
+                                  {platformInfo.icon}
                                 </span>
-                              )}
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900 max-w-xs">
+                                {product.title}
+                              </div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                ID:{' '}
+                                {product.platform_product_id || (
+                                  <span className="text-yellow-600 font-medium">
+                                    Pending Assignment
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-lg">
-                            {getPlatformIcon(product.platform)}
-                          </span>
-                          <span className="text-sm font-medium text-gray-900 capitalize">
-                            {product.platform}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(product.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-gray-900">
-                          ${product.price?.toFixed(2) || '0.00'}
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          Qty: {product.quantity || 0}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded border">
-                          {product.sku}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 font-medium">
-                          {new Date(product.published_at).toLocaleDateString()}
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          {new Date(product.published_at).toLocaleTimeString()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                            title="Edit Product"
-                          >
-                            <Edit3 className="h-4 w-4" />
-                          </button>
-                          {product.platform_url && (
-                            <a
-                              href={product.platform_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors"
-                              title={`View on ${product.platform}`}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">{platformInfo.icon}</span>
+                            <div>
+                              <span
+                                className={`text-sm font-medium ${platformInfo.color}`}
+                              >
+                                {platformInfo.name}
+                              </span>
+                              {getMethodBadge(product)}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getStatusBadge(product.status)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-gray-900">
+                            ${product.price?.toFixed(2) || '0.00'}
+                          </div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            Qty: {product.quantity || 0}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded border">
+                            {product.sku}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900 font-medium">
+                            {new Date(
+                              product.published_at
+                            ).toLocaleDateString()}
+                          </div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            {new Date(
+                              product.published_at
+                            ).toLocaleTimeString()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="View Details"
                             >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button
+                              className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                              title="Edit Product"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            {product.platform_url && (
+                              <a
+                                href={product.platform_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`p-2 hover:bg-gray-50 rounded-lg transition-colors ${platformInfo.color}`}
+                                title={`View on ${platformInfo.name}`}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -686,7 +821,7 @@ export default function PublishedProductsPage() {
             </div>
             <div className="flex items-center space-x-2 text-blue-600">
               <Sparkles className="h-4 w-4" />
-              <span className="font-medium">Multi-platform dashboard</span>
+              <span className="font-medium">4-Platform Dashboard</span>
             </div>
           </div>
         </div>

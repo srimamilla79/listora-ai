@@ -1,4 +1,4 @@
-// src/components/UnifiedPublisher.tsx - Fixed Connection Detection
+// src/components/UnifiedPublisher.tsx - Complete with eBay + Etsy Support
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Globe,
   Store,
+  Download,
 } from 'lucide-react'
 
 interface Platform {
@@ -55,21 +56,28 @@ export default function UnifiedPublisher({
       name: 'Amazon',
       icon: '📦',
       color: 'orange',
-      connected: false, // ✅ Start with false, detect from database
+      connected: false,
     },
     {
       id: 'shopify',
       name: 'Shopify',
       icon: '🛍️',
       color: 'green',
-      connected: false, // ✅ Start with false, detect from database
+      connected: false,
+    },
+    {
+      id: 'ebay',
+      name: 'eBay',
+      icon: '🔨',
+      color: 'blue',
+      connected: false,
     },
     {
       id: 'etsy',
       name: 'Etsy',
       icon: '🎨',
-      color: 'orange',
-      connected: false, // ✅ Etsy always false for now
+      color: 'purple',
+      connected: false,
     },
   ])
 
@@ -82,15 +90,15 @@ export default function UnifiedPublisher({
   const [publishedProducts, setPublishedProducts] = useState<{
     [key: string]: any
   }>({})
-  const [loading, setLoading] = useState(true) // ✅ Add loading state
+  const [loading, setLoading] = useState(true)
 
-  // ✅ Updated publishingOptions to include productType
   const [publishingOptions, setPublishingOptions] = useState({
     price: '',
     quantity: '1',
     sku: '',
     condition: 'new',
-    productType: '', // ✅ NEW: Amazon Product Type field
+    productType: '',
+    amazonMethod: 'api',
   })
 
   const [supabase, setSupabase] = useState<any>(null)
@@ -109,7 +117,6 @@ export default function UnifiedPublisher({
     }
   }, [passedUser?.id, supabase])
 
-  // ✅ Use the SAME logic as MarketplaceConnections
   const loadPlatformConnections = async () => {
     if (!passedUser?.id || !supabase) {
       setLoading(false)
@@ -123,7 +130,7 @@ export default function UnifiedPublisher({
     setLoading(true)
 
     try {
-      // ✅ SAME QUERIES as MarketplaceConnections
+      // Query Amazon connections
       console.log('🔍 UnifiedPublisher: Querying Amazon connections...')
       const { data: amazonConnections, error: amazonError } = await supabase
         .from('amazon_connections')
@@ -144,6 +151,7 @@ export default function UnifiedPublisher({
         )
       }
 
+      // Query Shopify connections
       console.log('🔍 UnifiedPublisher: Querying Shopify connections...')
       const { data: shopifyConnections, error: shopifyError } = await supabase
         .from('platform_connections')
@@ -165,7 +173,43 @@ export default function UnifiedPublisher({
         )
       }
 
-      // ✅ SAME FILTERING as MarketplaceConnections
+      // Query eBay connections
+      console.log('🔍 UnifiedPublisher: Querying eBay connections...')
+      const { data: ebayConnections, error: ebayError } = await supabase
+        .from('ebay_connections')
+        .select('*')
+        .eq('user_id', passedUser.id)
+        .eq('status', 'active')
+
+      if (ebayError) {
+        console.error('❌ UnifiedPublisher: eBay connection error:', ebayError)
+      } else {
+        console.log(
+          '✅ UnifiedPublisher: eBay query successful, found:',
+          ebayConnections?.length || 0,
+          'connections'
+        )
+      }
+
+      // ✅ NEW: Query Etsy connections
+      console.log('🔍 UnifiedPublisher: Querying Etsy connections...')
+      const { data: etsyConnections, error: etsyError } = await supabase
+        .from('etsy_connections')
+        .select('*')
+        .eq('user_id', passedUser.id)
+        .eq('status', 'active')
+
+      if (etsyError) {
+        console.error('❌ UnifiedPublisher: Etsy connection error:', etsyError)
+      } else {
+        console.log(
+          '✅ UnifiedPublisher: Etsy query successful, found:',
+          etsyConnections?.length || 0,
+          'connections'
+        )
+      }
+
+      // Filter valid connections
       const validAmazonConnection =
         amazonConnections?.find(
           (conn: any) => conn.access_token && conn.access_token.trim() !== ''
@@ -176,6 +220,17 @@ export default function UnifiedPublisher({
           ? shopifyConnections[0]
           : null
 
+      const validEbayConnection =
+        ebayConnections?.find(
+          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
+        ) || null
+
+      // ✅ NEW: Filter valid Etsy connections
+      const validEtsyConnection =
+        etsyConnections?.find(
+          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
+        ) || null
+
       console.log(
         '🔍 UnifiedPublisher: Valid Amazon connection:',
         !!validAmazonConnection
@@ -184,8 +239,16 @@ export default function UnifiedPublisher({
         '🔍 UnifiedPublisher: Valid Shopify connection:',
         !!validShopifyConnection
       )
+      console.log(
+        '🔍 UnifiedPublisher: Valid eBay connection:',
+        !!validEbayConnection
+      )
+      console.log(
+        '🔍 UnifiedPublisher: Valid Etsy connection:',
+        !!validEtsyConnection
+      )
 
-      // ✅ Update platforms with CORRECT connection status
+      // Update platforms with connection status
       const updatedPlatforms = platforms.map((platform) => {
         let isConnected = false
 
@@ -193,8 +256,10 @@ export default function UnifiedPublisher({
           isConnected = !!validAmazonConnection?.access_token
         } else if (platform.id === 'shopify') {
           isConnected = !!validShopifyConnection
+        } else if (platform.id === 'ebay') {
+          isConnected = !!validEbayConnection?.access_token
         } else if (platform.id === 'etsy') {
-          isConnected = false // Etsy not implemented yet
+          isConnected = !!validEtsyConnection?.access_token
         }
 
         console.log(
@@ -209,7 +274,7 @@ export default function UnifiedPublisher({
 
       setPlatforms(updatedPlatforms)
 
-      // ✅ Set first connected platform as default
+      // Set first connected platform as default
       const connectedPlatform = updatedPlatforms.find((p) => p.connected)
       if (connectedPlatform) {
         setSelectedPlatform(connectedPlatform.id)
@@ -224,7 +289,7 @@ export default function UnifiedPublisher({
     } catch (error) {
       console.error('❌ UnifiedPublisher: Error loading connections:', error)
 
-      // ✅ Graceful fallback - all platforms disconnected
+      // Graceful fallback - all platforms disconnected
       setPlatforms((prev) =>
         prev.map((platform) => ({
           ...platform,
@@ -271,7 +336,6 @@ export default function UnifiedPublisher({
       return
     }
 
-    // NEW: Validation check for product content ID
     if (!productContent?.id) {
       setPublishError(
         'Product content ID is missing. Please generate content first.'
@@ -284,11 +348,34 @@ export default function UnifiedPublisher({
     setPublishSuccess(null)
 
     try {
-      // ✅ PLATFORM-SPECIFIC PAYLOAD
+      let endpoint = `/api/${selectedPlatform}/publish`
       let requestPayload
 
-      if (selectedPlatform === 'amazon') {
-        // Amazon format
+      // Handle Amazon template generation
+      if (
+        selectedPlatform === 'amazon' &&
+        publishingOptions.amazonMethod === 'template'
+      ) {
+        endpoint = '/api/amazon/template/generate'
+
+        requestPayload = {
+          contentId: productContent?.id,
+          userId: passedUser?.id,
+          productData: {
+            id: productContent?.id,
+            title: productContent.product_name,
+            product_name: productContent.product_name,
+            features: productContent.features,
+            content: productContent.content,
+            description: productContent.content,
+            brand: extractBrand(productContent),
+          },
+          options: publishingOptions,
+          images: images,
+          platform: selectedPlatform,
+        }
+      } else if (selectedPlatform === 'amazon') {
+        // Existing Amazon API method
         requestPayload = {
           contentId: productContent?.id,
           userId: passedUser?.id,
@@ -303,6 +390,25 @@ export default function UnifiedPublisher({
           options: publishingOptions,
           images: images,
           platform: selectedPlatform,
+        }
+      } else if (selectedPlatform === 'ebay' || selectedPlatform === 'etsy') {
+        // eBay and Etsy format (similar to Shopify)
+        requestPayload = {
+          productContent: {
+            id: productContent?.id,
+            product_name: productContent.product_name,
+            features: productContent.features,
+            content: productContent.content,
+          },
+          images: images,
+          publishingOptions: {
+            ...publishingOptions,
+            price: parseFloat(publishingOptions.price),
+            quantity: parseInt(publishingOptions.quantity),
+            sku: publishingOptions.sku || generateSKU(),
+          },
+          platform: selectedPlatform,
+          userId: passedUser?.id,
         }
       } else {
         // Shopify format (original working format)
@@ -325,39 +431,86 @@ export default function UnifiedPublisher({
         }
       }
 
-      const response = await fetch(`/api/${selectedPlatform}/publish`, {
+      console.log('🚀 Publishing request:', {
+        endpoint,
+        method: publishingOptions.amazonMethod,
+      })
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestPayload),
       })
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(
-          errorData.error || `Failed to publish to ${selectedPlatform}`
+          errorData.error ||
+            `Failed to publish to ${selectedPlatformData?.name}`
         )
       }
 
       const result = await response.json()
 
-      // ✅ Enhanced success message with platform-specific info
-      const successMessage =
-        selectedPlatform === 'amazon'
-          ? `✅ Successfully published to ${selectedPlatformData?.name}! Feed ID: ${result.data?.feedId || result.data?.productId || 'Processing'}`
-          : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.data?.productId || 'N/A'}`
+      // Handle template generation success
+      if (
+        selectedPlatform === 'amazon' &&
+        publishingOptions.amazonMethod === 'template'
+      ) {
+        setPublishSuccess(
+          `✅ Amazon template generated successfully! Download and upload to Seller Central.`
+        )
 
-      setPublishSuccess(successMessage)
+        // Store template info for download
+        setPublishedProducts((prev) => ({
+          ...prev,
+          [selectedPlatform]: {
+            ...result,
+            publishedAt: new Date().toISOString(),
+            downloadUrl: result.data?.downloadUrl,
+            templateId: result.data?.templateId,
+            method: 'template',
+          },
+        }))
+      } else {
+        // Success handling for all platforms including eBay and Etsy
+        let successMessage = ''
 
-      // ✅ Store the published product details for this platform
-      setPublishedProducts((prev) => ({
-        ...prev,
-        [selectedPlatform]: {
-          ...result,
-          publishedAt: new Date().toISOString(),
-          productUrl:
-            result.productUrl || result.listing_url || result.product_url,
-          productId: result.listingId || result.productId || result.id || 'N/A',
-        },
-      }))
+        if (selectedPlatform === 'amazon') {
+          successMessage = `✅ Successfully published to ${selectedPlatformData?.name}! Feed ID: ${result.data?.feedId || result.data?.productId || 'Processing'}`
+        } else if (selectedPlatform === 'ebay') {
+          successMessage = `✅ Successfully listed on ${selectedPlatformData?.name}! Item ID: ${result.data?.itemId || 'N/A'}`
+        } else if (selectedPlatform === 'etsy') {
+          // ✅ NEW: Etsy success message
+          successMessage = `✅ Successfully listed on ${selectedPlatformData?.name}! Listing ID: ${result.data?.listingId || 'N/A'}`
+        } else {
+          // Shopify and others
+          successMessage = `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.data?.productId || 'N/A'}`
+        }
+
+        setPublishSuccess(successMessage)
+
+        setPublishedProducts((prev) => ({
+          ...prev,
+          [selectedPlatform]: {
+            ...result,
+            publishedAt: new Date().toISOString(),
+            productUrl:
+              result.data?.listingUrl ||
+              result.productUrl ||
+              result.listing_url ||
+              result.product_url,
+            productId:
+              result.data?.listingId ||
+              result.data?.itemId ||
+              result.listingId ||
+              result.productId ||
+              result.id ||
+              'N/A',
+            method: 'api',
+          },
+        }))
+      }
 
       if (onPublishSuccess) {
         onPublishSuccess({
@@ -365,6 +518,7 @@ export default function UnifiedPublisher({
           platform: selectedPlatform,
         })
       }
+
       // Mark platform as published
       setPublishedPlatforms((prev) => [...prev, selectedPlatform])
     } catch (error) {
@@ -375,6 +529,26 @@ export default function UnifiedPublisher({
     } finally {
       setIsPublishing(false)
     }
+  }
+
+  // Helper function to extract brand from content
+  function extractBrand(productContent: any): string {
+    const content =
+      `${productContent.product_name || ''} ${productContent.content || ''}`.toLowerCase()
+
+    // Common brand extraction patterns
+    if (content.includes('nike')) return 'Nike'
+    if (content.includes('apple')) return 'Apple'
+    if (content.includes('samsung')) return 'Samsung'
+    if (content.includes('sony')) return 'Sony'
+
+    // Try to extract from title (first word if it looks like a brand)
+    const words = (productContent.product_name || '').split(' ')
+    if (words[0] && words[0].length > 2 && /^[A-Z]/.test(words[0])) {
+      return words[0]
+    }
+
+    return 'Generic'
   }
 
   const generateSKU = () => {
@@ -389,7 +563,7 @@ export default function UnifiedPublisher({
   const selectedPlatformData = platforms.find((p) => p.id === selectedPlatform)
   const connectedPlatforms = platforms.filter((p) => p.connected)
 
-  // ✅ Show loading state
+  // Show loading state
   if (loading) {
     return (
       <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
@@ -422,7 +596,7 @@ export default function UnifiedPublisher({
         </div>
       </div>
 
-      {/* ✅ Show message when no platforms are connected */}
+      {/* Show message when no platforms are connected */}
       {connectedPlatforms.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -445,7 +619,11 @@ export default function UnifiedPublisher({
                     ? 'bg-orange-600 hover:bg-orange-700'
                     : platform.id === 'shopify'
                       ? 'bg-green-600 hover:bg-green-700'
-                      : 'bg-blue-600 hover:bg-blue-700'
+                      : platform.id === 'ebay'
+                        ? 'bg-blue-600 hover:bg-blue-700'
+                        : platform.id === 'etsy'
+                          ? 'bg-purple-600 hover:bg-purple-700'
+                          : 'bg-gray-600 hover:bg-gray-700'
                 }`}
               >
                 {platform.icon} {platform.name}
@@ -455,12 +633,12 @@ export default function UnifiedPublisher({
         </div>
       ) : (
         <>
-          {/* ✅ Only show connected platforms */}
+          {/* Only show connected platforms */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Select Publishing Platform
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {connectedPlatforms.map((platform) => (
                 <div
                   key={platform.id}
@@ -478,6 +656,17 @@ export default function UnifiedPublisher({
                         {platform.name}
                       </h4>
                       <p className="text-xs text-green-600">✓ Connected</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {platform.id === 'amazon'
+                          ? 'Sell to millions of Amazon customers worldwide'
+                          : platform.id === 'shopify'
+                            ? 'Publish directly to your Shopify store'
+                            : platform.id === 'ebay'
+                              ? "List on the world's largest auction marketplace"
+                              : platform.id === 'etsy'
+                                ? 'Perfect for handmade & creative products'
+                                : 'Marketplace integration'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -507,7 +696,7 @@ export default function UnifiedPublisher({
                 </button>
               </div>
 
-              {/* ✅ Updated Publishing Options Form with Amazon Product Type */}
+              {/* Publishing Options Form */}
               {showOptions && (
                 <div className="bg-gray-50 rounded-lg p-6 mb-6 border border-gray-200">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -598,7 +787,7 @@ export default function UnifiedPublisher({
                       </select>
                     </div>
 
-                    {/* ✅ NEW: Amazon Product Type - Only shows for Amazon platform */}
+                    {/* Amazon Product Type - Only shows for Amazon platform */}
                     {selectedPlatform === 'amazon' && (
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -633,6 +822,89 @@ export default function UnifiedPublisher({
                         </p>
                       </div>
                     )}
+
+                    {/* Amazon Publishing Method - Only shows for Amazon platform */}
+                    {selectedPlatform === 'amazon' && (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <Package className="h-4 w-4 inline mr-1 text-orange-600" />
+                          Amazon Publishing Method
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div
+                            className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                              publishingOptions.amazonMethod === 'api'
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            onClick={() =>
+                              setPublishingOptions((prev) => ({
+                                ...prev,
+                                amazonMethod: 'api',
+                              }))
+                            }
+                          >
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                checked={
+                                  publishingOptions.amazonMethod === 'api'
+                                }
+                                readOnly
+                                className="text-blue-600"
+                              />
+                              <div>
+                                <h4 className="font-medium text-gray-900">
+                                  Direct API (Current)
+                                </h4>
+                                <p className="text-xs text-gray-600">
+                                  Automatic publishing via Amazon SP-API
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                              publishingOptions.amazonMethod === 'template'
+                                ? 'border-green-500 bg-green-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            onClick={() =>
+                              setPublishingOptions((prev) => ({
+                                ...prev,
+                                amazonMethod: 'template',
+                              }))
+                            }
+                          >
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                checked={
+                                  publishingOptions.amazonMethod === 'template'
+                                }
+                                readOnly
+                                className="text-green-600"
+                              />
+                              <div>
+                                <h4 className="font-medium text-gray-900">
+                                  Template Download ⭐
+                                </h4>
+                                <p className="text-xs text-gray-600">
+                                  Generate Amazon template (guaranteed to
+                                  appear)
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {publishingOptions.amazonMethod === 'template'
+                            ? '✅ Template method ensures products appear in Seller Central'
+                            : '⚠️ API method may have visibility issues in Seller Central'}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -663,7 +935,6 @@ export default function UnifiedPublisher({
               )}
 
               {/* Publish Button */}
-              {/* ✅ Show different button if already published to this platform */}
               {publishedProducts[selectedPlatform] ? (
                 <div className="space-y-3">
                   {/* Success message */}
@@ -671,68 +942,175 @@ export default function UnifiedPublisher({
                     <div className="flex items-center space-x-2">
                       <CheckCircle className="h-5 w-5 text-green-600" />
                       <p className="text-green-800 font-medium">
-                        ✅ Successfully published to{' '}
+                        ✅ Successfully{' '}
+                        {publishedProducts[selectedPlatform].method ===
+                        'template'
+                          ? 'generated template for'
+                          : 'published to'}{' '}
                         {selectedPlatformData?.name}!
                       </p>
                     </div>
                     <p className="text-green-700 text-sm mt-1">
-                      {selectedPlatform === 'amazon'
-                        ? `Feed ID: ${publishedProducts[selectedPlatform].productId}`
+                      {publishedProducts[selectedPlatform].method === 'template'
+                        ? `Template ready for download • SKU: ${publishedProducts[selectedPlatform].data?.sku}`
                         : `Product ID: ${publishedProducts[selectedPlatform].productId}`}
                     </p>
                   </div>
 
-                  {/* View Product Button */}
-                  <button
-                    onClick={() => {
-                      const publishedProduct =
-                        publishedProducts[selectedPlatform]
-                      if (publishedProduct?.productUrl) {
-                        window.open(publishedProduct.productUrl, '_blank')
-                      } else if (
-                        selectedPlatform === 'shopify' &&
-                        selectedPlatformData
-                      ) {
-                        // Fallback for Shopify - go to admin
-                        const shopifyConnection = platforms.find(
-                          (p) => p.id === 'shopify'
-                        )
-                        if (shopifyConnection) {
-                          window.open('https://admin.shopify.com/', '_blank')
-                        }
-                      } else if (selectedPlatform === 'amazon') {
-                        // Fallback for Amazon - go to seller central
-                        window.open(
-                          'https://sellercentral.amazon.com/',
-                          '_blank'
-                        )
-                      }
-                    }}
-                    className="w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
-                  >
-                    <ExternalLink className="h-5 w-5 mr-2" />
-                    View Product on {selectedPlatformData?.name}
-                  </button>
+                  {/* Template Download Button OR Product View Button */}
+                  {publishedProducts[selectedPlatform].method === 'template' ? (
+                    <>
+                      {/* Download Template Button */}
+                      <button
+                        onClick={() => {
+                          const downloadUrl =
+                            publishedProducts[selectedPlatform].data
+                              ?.downloadUrl
+                          if (downloadUrl) {
+                            window.open(downloadUrl, '_blank')
+                          }
+                        }}
+                        className="w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+                      >
+                        <Download className="h-5 w-5 mr-2" />
+                        Download Amazon Template
+                      </button>
 
-                  {/* Publish Again Button (smaller) */}
-                  <button
-                    onClick={() => {
-                      // Clear the published state for this platform to allow republishing
-                      setPublishedProducts((prev) => {
-                        const updated = { ...prev }
-                        delete updated[selectedPlatform]
-                        return updated
-                      })
-                      setPublishedPlatforms((prev) =>
-                        prev.filter((p) => p !== selectedPlatform)
-                      )
-                      setPublishSuccess(null)
-                    }}
-                    className="w-full flex items-center justify-center px-4 py-2 rounded-lg font-medium text-sm transition-all bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Publish Again
-                  </button>
+                      {/* Instructions */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-medium text-blue-900 mb-2">
+                          📋 Next Steps:
+                        </h4>
+                        <ol className="text-sm text-blue-800 space-y-1">
+                          <li>1. Download the template file above</li>
+                          <li>
+                            2. Go to{' '}
+                            <a
+                              href="https://sellercentral.amazon.com/listing/cards"
+                              target="_blank"
+                              className="underline font-medium"
+                            >
+                              Amazon Seller Central → Add Products via Upload
+                            </a>
+                          </li>
+                          <li>3. Upload the template file</li>
+                          <li>
+                            4. Your product will appear in Seller Central within
+                            15 minutes ✅
+                          </li>
+                        </ol>
+                      </div>
+
+                      {/* Secondary buttons */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() =>
+                            window.open(
+                              'https://sellercentral.amazon.com/listing/cards',
+                              '_blank'
+                            )
+                          }
+                          className="flex items-center justify-center px-4 py-2 rounded-lg font-medium text-sm transition-all bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-300"
+                        >
+                          <Globe className="h-4 w-4 mr-2" />
+                          Open Seller Central
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setPublishedProducts((prev) => {
+                              const updated = { ...prev }
+                              delete updated[selectedPlatform]
+                              return updated
+                            })
+                            setPublishedPlatforms((prev) =>
+                              prev.filter((p) => p !== selectedPlatform)
+                            )
+                            setPublishSuccess(null)
+                          }}
+                          className="flex items-center justify-center px-4 py-2 rounded-lg font-medium text-sm transition-all bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Generate Again
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Regular View Product Button for API methods */}
+                      <button
+                        onClick={() => {
+                          const publishedProduct =
+                            publishedProducts[selectedPlatform]
+                          if (publishedProduct?.productUrl) {
+                            window.open(publishedProduct.productUrl, '_blank')
+                          } else if (selectedPlatform === 'shopify') {
+                            window.open('https://admin.shopify.com/', '_blank')
+                          } else if (selectedPlatform === 'amazon') {
+                            window.open(
+                              'https://sellercentral.amazon.com/',
+                              '_blank'
+                            )
+                          } else if (selectedPlatform === 'ebay') {
+                            // eBay seller hub or direct item link
+                            const itemId = publishedProduct?.productId
+                            if (itemId && itemId !== 'N/A') {
+                              window.open(
+                                `https://www.ebay.com/itm/${itemId}`,
+                                '_blank'
+                              )
+                            } else {
+                              window.open(
+                                'https://www.ebay.com/sh/ovw',
+                                '_blank'
+                              )
+                            }
+                          } else if (selectedPlatform === 'etsy') {
+                            // ✅ NEW: Etsy listing or shop manager
+                            const listingId = publishedProduct?.productId
+                            if (listingId && listingId !== 'N/A') {
+                              window.open(
+                                `https://www.etsy.com/listing/${listingId}`,
+                                '_blank'
+                              )
+                            } else {
+                              window.open(
+                                'https://www.etsy.com/your/shops/me',
+                                '_blank'
+                              )
+                            }
+                          }
+                        }}
+                        className="w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+                      >
+                        <Globe className="h-5 w-5 mr-2" />
+                        {selectedPlatform === 'ebay'
+                          ? 'View Listing on eBay'
+                          : selectedPlatform === 'etsy'
+                            ? 'View Listing on Etsy'
+                            : `View Product on ${selectedPlatformData?.name}`}
+                      </button>
+
+                      {/* Publish Again Button */}
+                      <button
+                        onClick={() => {
+                          setPublishedProducts((prev) => {
+                            const updated = { ...prev }
+                            delete updated[selectedPlatform]
+                            return updated
+                          })
+                          setPublishedPlatforms((prev) =>
+                            prev.filter((p) => p !== selectedPlatform)
+                          )
+                          setPublishSuccess(null)
+                        }}
+                        className="w-full flex items-center justify-center px-4 py-2 rounded-lg font-medium text-sm transition-all bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Publish Again
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : (
                 <button
@@ -747,12 +1125,18 @@ export default function UnifiedPublisher({
                   {isPublishing ? (
                     <>
                       <Loader className="h-5 w-5 mr-2 animate-spin" />
-                      Publishing to {selectedPlatformData?.name}...
+                      {selectedPlatform === 'amazon' &&
+                      publishingOptions.amazonMethod === 'template'
+                        ? 'Generating Amazon Template...'
+                        : `Publishing to ${selectedPlatformData?.name}...`}
                     </>
                   ) : (
                     <>
                       <Upload className="h-5 w-5 mr-2" />
-                      Publish to {selectedPlatformData?.name}
+                      {selectedPlatform === 'amazon' &&
+                      publishingOptions.amazonMethod === 'template'
+                        ? 'Generate Amazon Template'
+                        : `Publish to ${selectedPlatformData?.name}`}
                     </>
                   )}
                 </button>
