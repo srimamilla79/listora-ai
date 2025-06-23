@@ -8,7 +8,7 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('📋 Amazon Template Generation Started')
+    console.log('📋 Amazon Universal Template Generation Started')
 
     const body = await request.json()
     const { contentId, userId, productData, options, images } = body
@@ -50,33 +50,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Price is required' }, { status: 400 })
     }
 
-    // ✅ Use productData directly instead of querying database
+    // ✅ Use productData directly
     console.log('✅ Using provided product data:', {
       title: productData.product_name || productData.title,
       hasContent: !!(productData.content || productData.description),
       hasFeatures: !!productData.features,
     })
 
-    // Generate Amazon template data
-    const templateData = generateAmazonTemplate(productData, options, images)
+    // 🎯 DETECT PRODUCT CATEGORY AUTOMATICALLY
+    const detectedCategory = detectProductCategory(productData)
+    console.log('🔍 Detected category:', detectedCategory)
+
+    // Generate template data based on detected category
+    const templateData = generateUniversalTemplate(
+      productData,
+      options,
+      images,
+      detectedCategory
+    )
 
     console.log('📊 Template data generated:', {
       title: templateData.title,
       price: templateData.price,
       sku: templateData.sku,
+      category: templateData.category,
     })
 
-    // Convert to CSV format
-    const csvData = convertToCSV(templateData)
+    // Convert to appropriate CSV format
+    const csvData = convertToUniversalCSV(templateData, detectedCategory)
 
-    // Generate unique filename
+    // Generate filename based on category
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const filename = `amazon-template-${timestamp}.csv`
+    const filename = `amazon-${detectedCategory.toLowerCase()}-template-${timestamp}.csv`
 
-    // Create download URL (for now, we'll return the CSV data directly)
+    // Create download URL
     const downloadUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csvData)}`
 
-    // Save template to database (optional - for tracking)
+    // Save template to database
     try {
       const { data: savedTemplate, error: saveError } = await supabase
         .from('amazon_templates')
@@ -93,13 +103,11 @@ export async function POST(request: NextRequest) {
 
       if (saveError) {
         console.warn('⚠️ Failed to save template to database:', saveError)
-        // Don't fail the request, template generation still works
       } else {
         console.log('✅ Template saved to database:', savedTemplate.id)
       }
     } catch (dbError) {
       console.warn('⚠️ Database save error:', dbError)
-      // Continue without database save
     }
 
     const response = {
@@ -112,8 +120,9 @@ export async function POST(request: NextRequest) {
         sku: templateData.sku,
         title: templateData.title,
         price: templateData.price,
+        category: detectedCategory,
       },
-      message: 'Amazon template generated successfully',
+      message: `Amazon ${detectedCategory} template generated successfully`,
     }
 
     console.log('✅ Template generation completed:', response.data.templateId)
@@ -132,11 +141,112 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Generate Amazon template data structure
-function generateAmazonTemplate(
+// 🎯 SMART CATEGORY DETECTION
+function detectProductCategory(productData: any): string {
+  const content = cleanText(
+    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
+  ).toLowerCase()
+
+  // Electronics
+  if (
+    content.match(
+      /\b(phone|laptop|computer|tablet|headphone|speaker|camera|tv|monitor|electronics|gadget|device|smartphone|smartwatch|bluetooth|wifi|usb|hdmi)\b/
+    )
+  ) {
+    return 'Electronics'
+  }
+
+  // Clothing, Shoes & Jewelry
+  if (
+    content.match(
+      /\b(watch|jewelry|necklace|ring|earring|bracelet|shoe|boot|sneaker|shirt|dress|pants|jacket|hat|clothing|apparel|fashion)\b/
+    )
+  ) {
+    return 'Clothing'
+  }
+
+  // Home & Kitchen
+  if (
+    content.match(
+      /\b(kitchen|cookware|pot|pan|knife|plate|cup|mug|furniture|chair|table|bed|lamp|home|decor|cleaning|storage)\b/
+    )
+  ) {
+    return 'Home'
+  }
+
+  // Health & Personal Care
+  if (
+    content.match(
+      /\b(vitamin|supplement|skincare|lotion|shampoo|soap|toothbrush|health|beauty|cosmetic|makeup|perfume)\b/
+    )
+  ) {
+    return 'Health'
+  }
+
+  // Sports & Outdoors
+  if (
+    content.match(
+      /\b(sport|fitness|gym|exercise|outdoor|camping|hiking|bike|ball|equipment|athletic|workout)\b/
+    )
+  ) {
+    return 'Sports'
+  }
+
+  // Toys & Games
+  if (
+    content.match(
+      /\b(toy|game|puzzle|doll|action figure|board game|card game|kids|children|play)\b/
+    )
+  ) {
+    return 'Toys'
+  }
+
+  // Books
+  if (
+    content.match(
+      /\b(book|novel|guide|manual|textbook|ebook|author|publisher|isbn|pages)\b/
+    )
+  ) {
+    return 'Books'
+  }
+
+  // Automotive
+  if (
+    content.match(
+      /\b(car|auto|vehicle|tire|motor|engine|brake|automotive|truck|motorcycle)\b/
+    )
+  ) {
+    return 'Automotive'
+  }
+
+  // Pet Supplies
+  if (
+    content.match(
+      /\b(pet|dog|cat|bird|fish|animal|collar|leash|food|treat|toy|cage)\b/
+    )
+  ) {
+    return 'Pet'
+  }
+
+  // Office Products
+  if (
+    content.match(
+      /\b(office|pen|paper|notebook|printer|desk|chair|stapler|folder|business)\b/
+    )
+  ) {
+    return 'Office'
+  }
+
+  // Default to General (safest option)
+  return 'General'
+}
+
+// 🎯 UNIVERSAL TEMPLATE GENERATOR
+function generateUniversalTemplate(
   productData: any,
   options: any,
-  images: string[] = []
+  images: string[] = [],
+  category: string
 ) {
   const title = productData.product_name || productData.title || 'Product Title'
   const description =
@@ -144,31 +254,26 @@ function generateAmazonTemplate(
   const features = productData.features || ''
   const brand = extractBrand(productData)
 
-  return {
-    // Required Amazon fields
-    title: cleanAndTruncateTitle(title, 200), // Amazon title limit with cleaning
+  const baseTemplate = {
+    // Core fields (all categories)
+    title: cleanAndTruncateTitle(title, 200),
     description: formatAmazonDescription(description, features),
     brand: brand,
     manufacturer: brand,
-
-    // Pricing and inventory
     price: parseFloat(options.price),
     quantity: parseInt(options.quantity) || 1,
     sku: options.sku || generateSKU(title),
-    condition: mapCondition(options.condition || 'new'),
+    condition: 'New',
+    category: category,
 
-    // Product classification
-    product_type: options.productType || detectAmazonCategory(productData),
-    department: detectDepartment(productData),
-
-    // Images
+    // Images (all categories)
     main_image_url: images[0] || '',
     other_image_url1: images[1] || '',
     other_image_url2: images[2] || '',
     other_image_url3: images[3] || '',
     other_image_url4: images[4] || '',
 
-    // Additional fields
+    // Marketing (all categories)
     keywords: generateCleanKeywords(productData),
     bullet_point1: extractCleanBulletPoints(features)[0] || '',
     bullet_point2: extractCleanBulletPoints(features)[1] || '',
@@ -176,60 +281,211 @@ function generateAmazonTemplate(
     bullet_point4: extractCleanBulletPoints(features)[3] || '',
     bullet_point5: extractCleanBulletPoints(features)[4] || '',
   }
+
+  // Add category-specific fields
+  return addCategorySpecificFields(baseTemplate, productData, category)
 }
 
-// Convert template data to CSV format with EXACT Amazon headers
-function convertToCSV(templateData: any): string {
-  // ✅ AMAZON'S EXACT INVENTORY LOADER HEADERS (from search results)
-  const headers = [
+// 🎯 ADD CATEGORY-SPECIFIC FIELDS
+function addCategorySpecificFields(
+  template: any,
+  productData: any,
+  category: string
+): any {
+  const content = cleanText(
+    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
+  ).toLowerCase()
+
+  switch (category) {
+    case 'Clothing':
+      return {
+        ...template,
+        item_type: detectItemType(content),
+        department: detectDepartment(productData),
+        target_gender: detectTargetGender(productData),
+        material_type: detectMaterialType(productData),
+        color_name: detectColor(content),
+        size_name: detectSize(content),
+      }
+
+    case 'Electronics':
+      return {
+        ...template,
+        item_type: 'Electronics',
+        product_type: 'Electronics',
+        model_name: extractModel(content),
+        color_name: detectColor(content),
+        connectivity: detectConnectivity(content),
+      }
+
+    case 'Home':
+      return {
+        ...template,
+        item_type: 'Home',
+        product_type: 'Home & Kitchen',
+        material_type: detectMaterialType(productData),
+        color_name: detectColor(content),
+        room_type: detectRoomType(content),
+      }
+
+    case 'Health':
+      return {
+        ...template,
+        item_type: 'Health',
+        product_type: 'Health & Personal Care',
+        scent_name: detectScent(content),
+        size_name: detectSize(content),
+        age_range: detectAgeRange(content),
+      }
+
+    case 'Sports':
+      return {
+        ...template,
+        item_type: 'Sports',
+        product_type: 'Sports & Outdoors',
+        sport_type: detectSportType(content),
+        target_gender: detectTargetGender(productData),
+        color_name: detectColor(content),
+      }
+
+    case 'Toys':
+      return {
+        ...template,
+        item_type: 'Toy',
+        product_type: 'Toys & Games',
+        age_range: detectAgeRange(content),
+        target_gender: detectTargetGender(productData),
+        material_type: detectMaterialType(productData),
+      }
+
+    case 'Books':
+      return {
+        ...template,
+        item_type: 'Book',
+        product_type: 'Books',
+        author: extractAuthor(content),
+        binding: 'Paperback',
+        language: 'English',
+      }
+
+    default: // General
+      return {
+        ...template,
+        item_type: 'General',
+        product_type: 'General',
+        material_type: detectMaterialType(productData),
+        color_name: detectColor(content),
+      }
+  }
+}
+
+// 🎯 UNIVERSAL CSV GENERATOR
+function convertToUniversalCSV(templateData: any, category: string): string {
+  // Universal headers that work for most categories
+  const baseHeaders = [
     'sku',
     'product-id',
     'product-id-type',
-    'price',
-    'minimum-seller-allowed-price',
-    'maximum-seller-allowed-price',
+    'item-name',
+    'external-product-id',
+    'external-product-id-type',
+    'brand-name',
+    'product-description',
+    'item-type',
+    'product-type',
     'item-condition',
+    'standard-price',
     'quantity',
-    'add-delete',
-    'will-ship-internationally',
-    'expedited-shipping',
-    'standard-plus',
-    'item-note',
+    'main-image-url',
+    'other-image-url1',
+    'other-image-url2',
+    'other-image-url3',
+    'other-image-url4',
+    'search-terms',
+    'bullet-point1',
+    'bullet-point2',
+    'bullet-point3',
+    'bullet-point4',
+    'bullet-point5',
+    'manufacturer',
+    'part-number',
+    'model-name',
+    'model-number',
+    'color-name',
+    'size-name',
+    'material-type',
+    'department-name',
+    'target-gender',
+    'special-features',
+    'item-weight',
+    'item-dimensions-length',
+    'item-dimensions-width',
+    'item-dimensions-height',
+    'package-weight',
+    'warranty-description',
     'fulfillment-center-id',
-    'product-tax-code',
-    'launch-date',
+    'max-order-quantity',
     'sale-price',
-    'sale-start-date',
+    'sale-from-date',
     'sale-end-date',
-    'leadtime-to-ship',
-    'optional-payment-type-exclusion',
   ]
 
-  const row = [
+  // Add category-specific headers
+  const headers = [...baseHeaders, ...getCategorySpecificHeaders(category)]
+
+  // Base row data
+  const baseRow = [
     cleanText(templateData.sku), // sku
-    '', // product-id (empty for new)
-    '', // product-id-type (empty for new)
-    templateData.price, // price
-    '', // minimum-seller-allowed-price
-    '', // maximum-seller-allowed-price
-    '11', // item-condition (11 = New)
+    '', // product-id
+    '', // product-id-type
+    escapeCSVField(templateData.title), // item-name
+    '', // external-product-id
+    '', // external-product-id-type
+    cleanText(templateData.brand), // brand-name
+    escapeCSVField(templateData.description), // product-description
+    cleanText(templateData.item_type || 'General'), // item-type
+    cleanText(templateData.product_type || 'General'), // product-type
+    cleanText(templateData.condition), // item-condition
+    templateData.price, // standard-price
     templateData.quantity, // quantity
-    'a', // add-delete (a = add/update)
-    '6', // will-ship-internationally (6 = Worldwide)
-    '', // expedited-shipping
-    '', // standard-plus
-    '', // item-note
+    cleanText(templateData.main_image_url), // main-image-url
+    cleanText(templateData.other_image_url1), // other-image-url1
+    cleanText(templateData.other_image_url2), // other-image-url2
+    cleanText(templateData.other_image_url3), // other-image-url3
+    cleanText(templateData.other_image_url4), // other-image-url4
+    escapeCSVField(templateData.keywords), // search-terms
+    escapeCSVField(templateData.bullet_point1), // bullet-point1
+    escapeCSVField(templateData.bullet_point2), // bullet-point2
+    escapeCSVField(templateData.bullet_point3), // bullet-point3
+    escapeCSVField(templateData.bullet_point4), // bullet-point4
+    escapeCSVField(templateData.bullet_point5), // bullet-point5
+    cleanText(templateData.manufacturer), // manufacturer
+    '', // part-number
+    cleanText(templateData.model_name || ''), // model-name
+    '', // model-number
+    cleanText(templateData.color_name || ''), // color-name
+    cleanText(templateData.size_name || ''), // size-name
+    cleanText(templateData.material_type || ''), // material-type
+    cleanText(templateData.department || ''), // department-name
+    cleanText(templateData.target_gender || ''), // target-gender
+    cleanText(templateData.special_features || ''), // special-features
+    '', // item-weight
+    '', // item-dimensions-length
+    '', // item-dimensions-width
+    '', // item-dimensions-height
+    '', // package-weight
+    '', // warranty-description
     '', // fulfillment-center-id
-    '', // product-tax-code
-    '', // launch-date
+    '', // max-order-quantity
     '', // sale-price
-    '', // sale-start-date
+    '', // sale-from-date
     '', // sale-end-date
-    '', // leadtime-to-ship
-    '', // optional-payment-type-exclusion
   ]
 
-  // ✅ USE TAB-SEPARATED FORMAT (Amazon requirement)
+  // Add category-specific data
+  const row = [...baseRow, ...getCategorySpecificData(templateData, category)]
+
+  // Use tab-separated format
   return (
     headers.join('\t') +
     '\n' +
@@ -237,67 +493,302 @@ function convertToCSV(templateData: any): string {
   )
 }
 
-// ✅ NEW: Clean text function to fix encoding issues
+// 🎯 CATEGORY-SPECIFIC HEADERS
+function getCategorySpecificHeaders(category: string): string[] {
+  switch (category) {
+    case 'Clothing':
+      return [
+        'watch-movement-type',
+        'band-material-type',
+        'occasion-lifestyle',
+        'pattern-name',
+      ]
+    case 'Electronics':
+      return [
+        'connectivity',
+        'display-size',
+        'battery-type',
+        'operating-system',
+      ]
+    case 'Home':
+      return ['room-type', 'assembly-required', 'care-instructions', 'style']
+    case 'Health':
+      return ['scent-name', 'age-range-description', 'volume', 'ingredients']
+    case 'Sports':
+      return ['sport-type', 'activity-type', 'skill-level', 'season']
+    case 'Toys':
+      return [
+        'age-range-description',
+        'educational-objective',
+        'assembly-required',
+        'battery-required',
+      ]
+    case 'Books':
+      return ['author', 'binding', 'language', 'publication-date']
+    default:
+      return []
+  }
+}
+
+// 🎯 CATEGORY-SPECIFIC DATA
+function getCategorySpecificData(
+  templateData: any,
+  category: string
+): string[] {
+  switch (category) {
+    case 'Clothing':
+      return [
+        templateData.watch_movement_type || '',
+        templateData.band_material_type || templateData.material_type || '',
+        templateData.occasion_lifestyle || 'Casual',
+        '',
+      ]
+    case 'Electronics':
+      return [templateData.connectivity || '', '', '', '']
+    case 'Home':
+      return [templateData.room_type || '', '', '', '']
+    case 'Health':
+      return [
+        templateData.scent_name || '',
+        templateData.age_range || '',
+        '',
+        '',
+      ]
+    case 'Sports':
+      return [templateData.sport_type || '', '', '', '']
+    case 'Toys':
+      return [templateData.age_range || '', '', '', '']
+    case 'Books':
+      return [templateData.author || '', 'Paperback', 'English', '']
+    default:
+      return []
+  }
+}
+
+// 🎯 DETECTION HELPER FUNCTIONS
+function detectItemType(content: string): string {
+  if (content.includes('watch')) return 'Watch'
+  if (content.includes('shoe') || content.includes('boot')) return 'Shoes'
+  if (content.includes('shirt') || content.includes('top')) return 'Shirts'
+  if (content.includes('pants') || content.includes('jeans')) return 'Pants'
+  if (content.includes('dress')) return 'Dresses'
+  if (content.includes('jewelry') || content.includes('necklace'))
+    return 'Jewelry'
+  return 'Apparel'
+}
+
+function detectTargetGender(productData: any): string {
+  const content = cleanText(
+    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
+  ).toLowerCase()
+
+  if (content.match(/\b(ladies|women|female|her|womens)\b/)) return 'womens'
+  if (content.match(/\b(men|male|him|mens|gentleman)\b/)) return 'mens'
+  if (content.match(/\b(kids|children|child|boys|girls)\b/)) return 'kids'
+  return 'unisex'
+}
+
+function detectMaterialType(productData: any): string {
+  const content = cleanText(
+    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
+  ).toLowerCase()
+
+  if (content.includes('wood') || content.includes('wooden')) return 'Wood'
+  if (
+    content.includes('metal') ||
+    content.includes('steel') ||
+    content.includes('aluminum')
+  )
+    return 'Metal'
+  if (content.includes('plastic')) return 'Plastic'
+  if (content.includes('leather')) return 'Leather'
+  if (content.includes('cotton')) return 'Cotton'
+  if (content.includes('polyester')) return 'Polyester'
+  if (content.includes('glass')) return 'Glass'
+  if (content.includes('ceramic')) return 'Ceramic'
+  return 'Other'
+}
+
+function detectColor(content: string): string {
+  const colors = [
+    'black',
+    'white',
+    'red',
+    'blue',
+    'green',
+    'yellow',
+    'purple',
+    'pink',
+    'orange',
+    'brown',
+    'gray',
+    'silver',
+    'gold',
+    'navy',
+    'natural',
+  ]
+  for (const color of colors) {
+    if (content.includes(color)) {
+      return color.charAt(0).toUpperCase() + color.slice(1)
+    }
+  }
+  return ''
+}
+
+function detectSize(content: string): string {
+  if (content.match(/\b(small|medium|large|xl|xxl|s|m|l)\b/i)) {
+    const match = content.match(/\b(small|medium|large|xl|xxl|s|m|l)\b/i)
+    return match ? match[0].toUpperCase() : ''
+  }
+  if (content.match(/\b\d+(\.\d+)?\s*(oz|ml|lb|kg|inch|cm|ft|mm)\b/i)) {
+    const match = content.match(
+      /\b\d+(\.\d+)?\s*(oz|ml|lb|kg|inch|cm|ft|mm)\b/i
+    )
+    return match ? match[0] : ''
+  }
+  return 'One Size'
+}
+
+function detectDepartment(productData: any): string {
+  return detectTargetGender(productData)
+}
+
+// Additional detection functions
+function extractModel(content: string): string {
+  const modelMatch = content.match(/model\s+([a-zA-Z0-9\-]+)/i)
+  return modelMatch ? modelMatch[1] : ''
+}
+
+function detectConnectivity(content: string): string {
+  if (content.includes('bluetooth')) return 'Bluetooth'
+  if (content.includes('wifi') || content.includes('wireless'))
+    return 'Wireless'
+  if (content.includes('usb')) return 'USB'
+  return ''
+}
+
+function detectRoomType(content: string): string {
+  const rooms = [
+    'kitchen',
+    'bedroom',
+    'bathroom',
+    'living room',
+    'dining room',
+    'office',
+  ]
+  for (const room of rooms) {
+    if (content.includes(room)) {
+      return room.charAt(0).toUpperCase() + room.slice(1)
+    }
+  }
+  return ''
+}
+
+function detectScent(content: string): string {
+  const scents = [
+    'lavender',
+    'vanilla',
+    'citrus',
+    'mint',
+    'rose',
+    'coconut',
+    'unscented',
+  ]
+  for (const scent of scents) {
+    if (content.includes(scent)) {
+      return scent.charAt(0).toUpperCase() + scent.slice(1)
+    }
+  }
+  return ''
+}
+
+function detectAgeRange(content: string): string {
+  if (content.match(/\b(baby|infant|0-12 months)\b/i)) return '0-12 months'
+  if (content.match(/\b(toddler|1-3 years)\b/i)) return '1-3 years'
+  if (content.match(/\b(kids|children|3-8 years)\b/i)) return '3-8 years'
+  if (content.match(/\b(teen|8-13 years)\b/i)) return '8-13 years'
+  if (content.match(/\b(adult|18\+)\b/i)) return 'Adult'
+  return ''
+}
+
+function detectSportType(content: string): string {
+  const sports = [
+    'football',
+    'basketball',
+    'tennis',
+    'golf',
+    'running',
+    'cycling',
+    'swimming',
+    'yoga',
+    'fitness',
+  ]
+  for (const sport of sports) {
+    if (content.includes(sport)) {
+      return sport.charAt(0).toUpperCase() + sport.slice(1)
+    }
+  }
+  return ''
+}
+
+function extractAuthor(content: string): string {
+  const authorMatch = content.match(/by\s+([a-zA-Z\s]+)/i)
+  return authorMatch ? authorMatch[1].trim() : ''
+}
+
+// Core helper functions remain the same
 function cleanText(text: string): string {
   if (!text) return ''
 
-  return (
-    text
-      // Fix common UTF-8 encoding issues
-      .replace(/â€™/g, "'") // Smart apostrophe
-      .replace(/â€œ/g, '"') // Smart quote open
-      .replace(/â€\x9D/g, '"') // Smart quote close
-      .replace(/â€"/g, '—') // Em dash
-      .replace(/â€\x93/g, '–') // En dash
-      .replace(/Â/g, '') // Non-breaking space artifacts
-      // Fix other common issues
-      .replace(/'/g, "'") // Curly apostrophe
-      .replace(/"/g, '"') // Curly quote left
-      .replace(/"/g, '"') // Curly quote right
-      .replace(/—/g, '-') // Em dash to regular dash
-      .replace(/–/g, '-') // En dash to regular dash
-      // Remove or fix problematic characters
-      .replace(/[^\x00-\x7F]/g, (char) => {
-        // Replace non-ASCII characters with ASCII equivalents
-        const replacements: { [key: string]: string } = {
-          é: 'e',
-          è: 'e',
-          ê: 'e',
-          ë: 'e',
-          á: 'a',
-          à: 'a',
-          â: 'a',
-          ä: 'a',
-          í: 'i',
-          ì: 'i',
-          î: 'i',
-          ï: 'i',
-          ó: 'o',
-          ò: 'o',
-          ô: 'o',
-          ö: 'o',
-          ú: 'u',
-          ù: 'u',
-          û: 'u',
-          ü: 'u',
-          ñ: 'n',
-          ç: 'c',
-        }
-        return replacements[char] || ''
-      })
-      .trim()
-  )
+  return text
+    .replace(/â€™/g, "'")
+    .replace(/â€œ/g, '"')
+    .replace(/â€\x9D/g, '"')
+    .replace(/â€"/g, '—')
+    .replace(/â€\x93/g, '–')
+    .replace(/Â/g, '')
+    .replace(/'/g, "'")
+    .replace(/"/g, '"')
+    .replace(/"/g, '"')
+    .replace(/—/g, '-')
+    .replace(/–/g, '-')
+    .replace(/[^\x00-\x7F]/g, (char) => {
+      const replacements: { [key: string]: string } = {
+        é: 'e',
+        è: 'e',
+        ê: 'e',
+        ë: 'e',
+        á: 'a',
+        à: 'a',
+        â: 'a',
+        ä: 'a',
+        í: 'i',
+        ì: 'i',
+        î: 'i',
+        ï: 'i',
+        ó: 'o',
+        ò: 'o',
+        ô: 'o',
+        ö: 'o',
+        ú: 'u',
+        ù: 'u',
+        û: 'u',
+        ü: 'u',
+        ñ: 'n',
+        ç: 'c',
+      }
+      return replacements[char] || ''
+    })
+    .trim()
 }
 
-// ✅ NEW: Escape CSV fields properly
 function escapeCSVField(text: string): string {
   if (!text) return ''
 
   const cleaned = cleanText(text)
 
-  // If field contains comma, quote, or newline, wrap in quotes and escape internal quotes
   if (
-    cleaned.includes(',') ||
+    cleaned.includes('\t') ||
     cleaned.includes('"') ||
     cleaned.includes('\n')
   ) {
@@ -307,37 +798,30 @@ function escapeCSVField(text: string): string {
   return cleaned
 }
 
-// ✅ ENHANCED: Clean and truncate title with duplicate word removal
 function cleanAndTruncateTitle(title: string, maxLength: number): string {
   const cleaned = cleanText(title)
 
-  // Remove markdown/formatting
   let withoutFormatting = cleaned
-    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
-    .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
-    .replace(/#{1,6}\s/g, '') // Remove # headers
-    .replace(/^\d+\.\s*/g, '') // Remove numbered lists
-    .replace(/^-\s*/g, '') // Remove bullet points
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/^\d+\.\s*/g, '')
+    .replace(/^-\s*/g, '')
     .trim()
 
-  // ✅ AMAZON TITLE ENHANCEMENT
-  // If title is too simple (like "wooden watch"), make it more descriptive
   if (withoutFormatting.length < 20) {
-    // Extract key info to build better title
     const words = withoutFormatting.toLowerCase().split(' ')
 
-    if (words.includes('watch')) {
-      withoutFormatting = `Premium ${withoutFormatting} - Natural Design with Luxury Accents`
-    } else if (words.includes('shoe') || words.includes('shoes')) {
-      withoutFormatting = `Premium ${withoutFormatting} - Comfortable Athletic Footwear`
-    } else if (words.includes('shirt')) {
-      withoutFormatting = `Premium ${withoutFormatting} - Comfortable Casual Apparel`
+    if (
+      words.some((w) => ['watch', 'shoe', 'shirt', 'phone', 'book'].includes(w))
+    ) {
+      withoutFormatting = `Premium ${withoutFormatting} - High Quality Design`
     } else {
-      withoutFormatting = `Premium ${withoutFormatting} - High Quality Product`
+      withoutFormatting = `Premium ${withoutFormatting} - Excellent Quality`
     }
   }
 
-  // ✅ REMOVE DUPLICATE WORDS (Amazon requirement)
+  // Remove duplicate words
   const titleWords = withoutFormatting.split(' ')
   const seenWords = new Set()
   const uniqueWords = []
@@ -356,129 +840,54 @@ function cleanAndTruncateTitle(title: string, maxLength: number): string {
   return finalTitle.substring(0, maxLength - 3) + '...'
 }
 
-// ✅ FINAL FIX: Format Amazon description with SUPER AGGRESSIVE cleaning
 function formatAmazonDescription(
   description: string,
   features: string
 ): string {
   let cleaned = cleanText(description)
 
-  // ✅ NUCLEAR OPTION - Remove ALL possible formatting artifacts
   cleaned = cleaned
-    .replace(/PRODUCT TITLE\/HEADLINE:\s*/gi, '') // Remove headers
-    .replace(/KEY SELLING POINTS:\s*/gi, '') // Remove headers
-    .replace(/DETAILED PRODUCT DESCRIPTION:\s*/gi, '') // Remove headers
-    .replace(/^\d+\.\s*/gm, '') // Remove numbered lists from line starts
-    .replace(/\s+\d+\.\s+/g, '. ') // Remove numbers in middle like " 2. "
-    .replace(/\b\d+\.\s+/g, '. ') // Remove any "number. " patterns
-    .replace(/^-\s*/gm, '') // Remove bullet points
-    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
-    .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
-    .replace(/#{1,6}\s/g, '') // Remove # headers
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/\n{3,}/g, '\n\n') // Collapse multiple newlines
-    .replace(/\|\s*/g, '. ') // Replace | with periods
-    .replace(/&\s*/g, '. ') // Replace & with periods
+    .replace(/PRODUCT TITLE\/HEADLINE:\s*/gi, '')
+    .replace(/KEY SELLING POINTS:\s*/gi, '')
+    .replace(/DETAILED PRODUCT DESCRIPTION:\s*/gi, '')
+    .replace(/^\d+\.\s*/gm, '')
+    .replace(/\s+\d+\.\s+/g, '. ')
+    .replace(/\b\d+\.\s+/g, '. ')
+    .replace(/^-\s*/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\|\s*/g, '. ')
+    .replace(/&\s*/g, '. ')
     .trim()
 
-  // Extract only the cleanest sentences
   const sentences = cleaned
     .split(/[.!?]+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 15) // Only meaningful sentences
-    .filter((s) => !s.match(/^\d+/)) // Remove any starting with numbers
-    .filter((s) => !s.toLowerCase().includes('headline')) // Remove headline refs
-    .filter((s) => !s.toLowerCase().includes('selling')) // Remove selling points refs
-    .filter((s) => !s.toLowerCase().includes('key')) // Remove "key" refs
-    .slice(0, 2) // Take only first 2 clean sentences
+    .filter((s) => s.length > 15)
+    .filter((s) => !s.match(/^\d+/))
+    .filter((s) => !s.toLowerCase().includes('headline'))
+    .filter((s) => !s.toLowerCase().includes('selling'))
+    .filter((s) => !s.toLowerCase().includes('key'))
+    .slice(0, 2)
 
   let result = sentences.join('. ').trim()
   if (result && !result.endsWith('.')) {
     result += '.'
   }
 
-  // Conservative length limit for Amazon CSV
   if (result.length > 250) {
     result = result.substring(0, 247) + '...'
   }
 
   return (
     result ||
-    'High-quality wooden watch with natural wood design and premium craftsmanship.'
+    'High-quality product with excellent features and reliable performance.'
   )
 }
 
-// ✅ UPDATED: Detect Amazon category with simpler categories
-function detectAmazonCategory(productData: any): string {
-  const content = cleanText(
-    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
-  ).toLowerCase()
-
-  // ✅ USE SIMPLER CATEGORIES THAT HAVE FEWER REQUIREMENTS
-  if (
-    content.includes('watch') ||
-    content.includes('watches') ||
-    content.includes('timepiece') ||
-    content.includes('jewelry') ||
-    content.includes('jewellery') ||
-    content.includes('necklace') ||
-    content.includes('bracelet') ||
-    content.includes('ring') ||
-    content.includes('earring')
-  ) {
-    return 'Sports & Outdoors' // Simpler category with fewer requirements
-  }
-
-  // Other categories
-  if (
-    content.includes('shoes') ||
-    content.includes('sneakers') ||
-    content.includes('boots') ||
-    content.includes('sandals') ||
-    content.includes('footwear')
-  ) {
-    return 'Sports & Outdoors' // Avoid complex Shoes category
-  }
-
-  if (
-    content.includes('electronics') ||
-    content.includes('phone') ||
-    content.includes('computer')
-  ) {
-    return 'Sports & Outdoors' // Avoid complex Electronics category
-  }
-  if (
-    content.includes('clothing') ||
-    content.includes('shirt') ||
-    content.includes('dress')
-  ) {
-    return 'Sports & Outdoors' // Avoid complex Clothing category
-  }
-  if (content.includes('book')) {
-    return 'Books' // Books category is simple
-  }
-  if (content.includes('home') || content.includes('kitchen')) {
-    return 'Sports & Outdoors' // Simpler than Home & Kitchen
-  }
-
-  return 'Sports & Outdoors' // Default to simplest category
-}
-
-// ✅ NEW: Map condition to Amazon accepted values
-function mapCondition(condition: string): string {
-  const conditionMap: { [key: string]: string } = {
-    new: 'New',
-    used_like_new: 'Used - Like New',
-    used_very_good: 'Used - Very Good',
-    used_good: 'Used - Good',
-    used_acceptable: 'Used - Acceptable',
-    refurbished: 'Refurbished',
-  }
-
-  return conditionMap[condition] || 'New' // Default to New for safety
-}
-
-// ✅ UPDATED: Generate clean keywords without duplication
 function generateCleanKeywords(productData: any): string {
   const content = cleanText(
     `${productData.product_name || productData.title || ''} ${productData.features || ''} ${productData.content || productData.description || ''}`
@@ -486,7 +895,7 @@ function generateCleanKeywords(productData: any): string {
 
   const words = content
     .toLowerCase()
-    .replace(/[^\w\s]/g, ' ') // Remove punctuation
+    .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter((word) => word.length > 2 && word.length < 20)
     .filter(
@@ -518,17 +927,15 @@ function generateCleanKeywords(productData: any): string {
           'premium',
           'quality',
           'design',
-          'luxury', // Remove common enhancement words
+          'luxury',
         ].includes(word)
     )
 
-  // Remove duplicates and take first 6 keywords (fewer to avoid repetition)
   const uniqueKeywords = [...new Set(words)].slice(0, 6)
 
   return uniqueKeywords.join(', ')
 }
 
-// ✅ UPDATED: Extract clean bullet points
 function extractCleanBulletPoints(features: string): string[] {
   if (!features)
     return [
@@ -541,18 +948,16 @@ function extractCleanBulletPoints(features: string): string[] {
 
   const cleaned = cleanText(features)
 
-  // Extract sentences from the features/content
   const sentences = cleaned
-    .replace(/PRODUCT TITLE\/HEADLINE:\s*/gi, '') // Remove headers
-    .replace(/KEY SELLING POINTS:\s*/gi, '') // Remove headers
-    .replace(/\d+\.\s*/g, '') // Remove all numbers
+    .replace(/PRODUCT TITLE\/HEADLINE:\s*/gi, '')
+    .replace(/KEY SELLING POINTS:\s*/gi, '')
+    .replace(/\d+\.\s*/g, '')
     .split(/[.!?]+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 15) // Meaningful sentences
-    .filter((s) => !s.toLowerCase().includes('headline')) // Remove header refs
+    .filter((s) => s.length > 15)
+    .filter((s) => !s.toLowerCase().includes('headline'))
     .slice(0, 5)
 
-  // Fill with defaults if needed
   const defaults = [
     'High-quality construction and materials',
     'Excellent performance and reliability',
@@ -572,33 +977,30 @@ function extractCleanBulletPoints(features: string): string[] {
   return bullets
 }
 
-// ✅ ENHANCED: Extract brand with UWOOD detection
 function extractBrand(productData: any): string {
   const content = cleanText(
     `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
   )
 
-  // Look for UWOOD specifically
-  if (content.toLowerCase().includes('uwood')) return 'UWOOD'
-
-  // Other brand patterns
-  const brandMatches = content.match(
-    /\b([A-Z][a-z]+)\s+(watch|brand|company|inc|corp|ltd)\b/gi
-  )
-  if (brandMatches && brandMatches[0]) {
-    return brandMatches[0].split(' ')[0]
-  }
-
-  // Common brands
+  // Look for specific brands
   const lowerContent = content.toLowerCase()
-  if (lowerContent.includes('nike')) return 'Nike'
-  if (lowerContent.includes('apple')) return 'Apple'
-  if (lowerContent.includes('samsung')) return 'Samsung'
-  if (lowerContent.includes('sony')) return 'Sony'
-  if (lowerContent.includes('adidas')) return 'Adidas'
-  if (lowerContent.includes('rolex')) return 'Rolex'
-  if (lowerContent.includes('casio')) return 'Casio'
-  if (lowerContent.includes('seiko')) return 'Seiko'
+  const brandKeywords = [
+    'uwood',
+    'nike',
+    'apple',
+    'samsung',
+    'sony',
+    'adidas',
+    'rolex',
+    'casio',
+    'seiko',
+  ]
+
+  for (const brand of brandKeywords) {
+    if (lowerContent.includes(brand)) {
+      return brand.charAt(0).toUpperCase() + brand.slice(1)
+    }
+  }
 
   // Try to extract from title
   const title = productData.product_name || productData.title || ''
@@ -617,6 +1019,9 @@ function extractBrand(productData: any): string {
         'Kids',
         'Ladies',
         'Mens',
+        'Premium',
+        'High',
+        'Quality',
       ].includes(word)
     ) {
       return cleanText(word)
@@ -624,29 +1029,6 @@ function extractBrand(productData: any): string {
   }
 
   return 'Premium'
-}
-
-function detectDepartment(productData: any): string {
-  const content = cleanText(
-    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
-  ).toLowerCase()
-
-  if (content.includes('men') || content.includes('male')) return 'mens'
-  if (
-    content.includes('women') ||
-    content.includes('female') ||
-    content.includes('ladies')
-  )
-    return 'womens'
-  if (
-    content.includes('kids') ||
-    content.includes('children') ||
-    content.includes('child')
-  )
-    return 'kids'
-  if (content.includes('baby') || content.includes('infant')) return 'baby'
-
-  return 'unisex'
 }
 
 function generateSKU(title: string): string {
