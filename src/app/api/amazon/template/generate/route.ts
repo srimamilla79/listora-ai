@@ -65,15 +65,15 @@ export async function POST(request: NextRequest) {
       sku: amazonData.sku,
     })
 
-    // Generate instructions HTML file
-    const instructionsHTML = generateInstructionsHTML(amazonData)
+    // Generate instructions as plain text (more compatible)
+    const instructionsText = generateInstructionsText(amazonData)
 
     // Generate filename
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const filename = `amazon-listing-instructions-${timestamp}.html`
+    const filename = `amazon-listing-instructions-${timestamp}.txt`
 
-    // Create download URL
-    const downloadUrl = `data:text/html;charset=utf-8,${encodeURIComponent(instructionsHTML)}`
+    // Create download URL for text file
+    const downloadUrl = `data:text/plain;charset=utf-8,${encodeURIComponent(instructionsText)}`
 
     // Save data to database
     try {
@@ -182,370 +182,187 @@ function generateAmazonData(
   }
 }
 
-// 🎯 GENERATE INSTRUCTIONS HTML
-function generateInstructionsHTML(amazonData: any): string {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amazon Listing Instructions - ${amazonData.title}</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        .container {
-            background: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #232F3E;
-            border-bottom: 3px solid #FF9900;
-            padding-bottom: 10px;
-            margin-bottom: 30px;
-        }
-        h2 {
-            color: #146EB4;
-            margin-top: 30px;
-            margin-bottom: 15px;
-        }
-        .step {
-            background: #f8f9fa;
-            border-left: 4px solid #FF9900;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 5px;
-        }
-        .field {
-            background: #e8f4fd;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 8px;
-            border: 1px solid #b3d8f2;
-        }
-        .field-name {
-            font-weight: bold;
-            color: #146EB4;
-            margin-bottom: 8px;
-        }
-        .field-value {
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-            font-family: monospace;
-            word-break: break-all;
-        }
-        .copy-btn {
-            background: #FF9900;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-left: 10px;
-        }
-        .copy-btn:hover {
-            background: #e68900;
-        }
-        .warning {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }
-        .success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }
-        .bullet-points {
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .category-info {
-            background: #e1f5fe;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎯 Amazon Listing Instructions</h1>
-        
-        <div class="success">
-            <strong>✅ Your product data has been optimized for Amazon!</strong><br>
-            Follow the steps below to add your product to Amazon using their official template.
-        </div>
+// 🎯 GENERATE INSTRUCTIONS AS PLAIN TEXT
+function generateInstructionsText(amazonData: any): string {
+  return `AMAZON LISTING INSTRUCTIONS
+==========================
 
-        <div class="category-info">
-            <strong>📂 Detected Category:</strong> ${amazonData.category}<br>
-            <strong>🏷️ SKU:</strong> ${amazonData.sku}<br>
-            <strong>💰 Price:</strong> $${amazonData.price}
-        </div>
+Product: ${amazonData.title}
+Category: ${amazonData.category}
+SKU: ${amazonData.sku}
+Price: $${amazonData.price}
 
-        <h2>📋 Step-by-Step Instructions</h2>
+STEP-BY-STEP INSTRUCTIONS:
+=========================
 
-        <div class="step">
-            <strong>Step 1: Download Amazon's Official Template</strong>
-            <ol>
-                <li>Go to Amazon Seller Central</li>
-                <li>Navigate to: <strong>Catalog → Add Products via Upload</strong></li>
-                <li>Click: <strong>"Download an Inventory File"</strong></li>
-                <li>Select your product category: <strong>"${amazonData.category}"</strong></li>
-                <li>Choose your marketplace and click <strong>"Generate Template"</strong></li>
-                <li>Download the official Amazon template file</li>
-            </ol>
-        </div>
+Step 1: Download Amazon's Official Template
+-------------------------------------------
+1. Go to Amazon Seller Central
+2. Navigate to: Catalog → Add Products via Upload
+3. Click: "Download an Inventory File"
+4. Select your product category: "${amazonData.category}"
+5. Choose your marketplace and click "Generate Template"
+6. Download the official Amazon template file
 
-        <div class="step">
-            <strong>Step 2: Fill in Your Product Data</strong>
-            <p>Open the downloaded template in Excel and fill in the following optimized data:</p>
-        </div>
+Step 2: Fill in Your Product Data
+---------------------------------
+Open the downloaded template in Excel and fill in the following optimized data:
 
-        <h2>🎯 Your Optimized Product Data</h2>
+PRODUCT INFORMATION:
+===================
 
-        <div class="field">
-            <div class="field-name">SKU (Seller SKU) <button class="copy-btn" onclick="copyToClipboard('${amazonData.sku}')">Copy</button></div>
-            <div class="field-value">${amazonData.sku}</div>
-        </div>
+SKU (Seller SKU):
+${amazonData.sku}
 
-        <div class="field">
-            <div class="field-name">Product Name (Item Name) <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(amazonData.title)}')">Copy</button></div>
-            <div class="field-value">${escapeHtml(amazonData.title)}</div>
-        </div>
+Product Name (Item Name):
+${amazonData.title}
 
-        <div class="field">
-            <div class="field-name">Product Description <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(amazonData.description)}')">Copy</button></div>
-            <div class="field-value">${escapeHtml(amazonData.description)}</div>
-        </div>
+Product Description:
+${amazonData.description}
 
-        <div class="field">
-            <div class="field-name">Brand Name <button class="copy-btn" onclick="copyToClipboard('${amazonData.brand}')">Copy</button></div>
-            <div class="field-value">${amazonData.brand}</div>
-        </div>
+Brand Name:
+${amazonData.brand}
 
-        <div class="field">
-            <div class="field-name">Manufacturer <button class="copy-btn" onclick="copyToClipboard('${amazonData.manufacturer}')">Copy</button></div>
-            <div class="field-value">${amazonData.manufacturer}</div>
-        </div>
+Manufacturer:
+${amazonData.manufacturer}
 
-        <div class="field">
-            <div class="field-name">Price <button class="copy-btn" onclick="copyToClipboard('${amazonData.price}')">Copy</button></div>
-            <div class="field-value">${amazonData.price}</div>
-        </div>
+Price:
+${amazonData.price}
 
-        <div class="field">
-            <div class="field-name">Quantity <button class="copy-btn" onclick="copyToClipboard('${amazonData.quantity}')">Copy</button></div>
-            <div class="field-value">${amazonData.quantity}</div>
-        </div>
+Quantity:
+${amazonData.quantity}
 
-        <div class="field">
-            <div class="field-name">Condition <button class="copy-btn" onclick="copyToClipboard('${amazonData.condition}')">Copy</button></div>
-            <div class="field-value">${amazonData.condition}</div>
-        </div>
+Condition:
+${amazonData.condition}
 
-        <h2>🖼️ Images</h2>
-        ${
-          amazonData.main_image_url
-            ? `
-        <div class="field">
-            <div class="field-name">Main Image URL <button class="copy-btn" onclick="copyToClipboard('${amazonData.main_image_url}')">Copy</button></div>
-            <div class="field-value">${amazonData.main_image_url}</div>
-        </div>
-        `
-            : ''
-        }
-        
-        ${
-          amazonData.other_image_url1
-            ? `
-        <div class="field">
-            <div class="field-name">Other Image URL 1 <button class="copy-btn" onclick="copyToClipboard('${amazonData.other_image_url1}')">Copy</button></div>
-            <div class="field-value">${amazonData.other_image_url1}</div>
-        </div>
-        `
-            : ''
-        }
+IMAGES:
+======
+${
+  amazonData.main_image_url
+    ? `
+Main Image URL:
+${amazonData.main_image_url}
+`
+    : ''
+}
+${
+  amazonData.other_image_url1
+    ? `
+Other Image URL 1:
+${amazonData.other_image_url1}
+`
+    : ''
+}
+${
+  amazonData.other_image_url2
+    ? `
+Other Image URL 2:
+${amazonData.other_image_url2}
+`
+    : ''
+}
 
-        ${
-          amazonData.other_image_url2
-            ? `
-        <div class="field">
-            <div class="field-name">Other Image URL 2 <button class="copy-btn" onclick="copyToClipboard('${amazonData.other_image_url2}')">Copy</button></div>
-            <div class="field-value">${amazonData.other_image_url2}</div>
-        </div>
-        `
-            : ''
-        }
+KEYWORDS & MARKETING:
+====================
 
-        <h2>🎯 Keywords & Marketing</h2>
+Search Terms (Keywords):
+${amazonData.keywords}
 
-        <div class="field">
-            <div class="field-name">Search Terms (Keywords) <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(amazonData.keywords)}')">Copy</button></div>
-            <div class="field-value">${escapeHtml(amazonData.keywords)}</div>
-        </div>
+BULLET POINTS:
+=============
+${
+  amazonData.bullet_point1
+    ? `
+Bullet Point 1:
+${amazonData.bullet_point1}
+`
+    : ''
+}
+${
+  amazonData.bullet_point2
+    ? `
+Bullet Point 2:
+${amazonData.bullet_point2}
+`
+    : ''
+}
+${
+  amazonData.bullet_point3
+    ? `
+Bullet Point 3:
+${amazonData.bullet_point3}
+`
+    : ''
+}
+${
+  amazonData.bullet_point4
+    ? `
+Bullet Point 4:
+${amazonData.bullet_point4}
+`
+    : ''
+}
+${
+  amazonData.bullet_point5
+    ? `
+Bullet Point 5:
+${amazonData.bullet_point5}
+`
+    : ''
+}
 
-        <h2>📝 Bullet Points</h2>
-        <div class="bullet-points">
-            ${
-              amazonData.bullet_point1
-                ? `
-            <div class="field">
-                <div class="field-name">Bullet Point 1 <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(amazonData.bullet_point1)}')">Copy</button></div>
-                <div class="field-value">${escapeHtml(amazonData.bullet_point1)}</div>
-            </div>
-            `
-                : ''
-            }
-            
-            ${
-              amazonData.bullet_point2
-                ? `
-            <div class="field">
-                <div class="field-name">Bullet Point 2 <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(amazonData.bullet_point2)}')">Copy</button></div>
-                <div class="field-value">${escapeHtml(amazonData.bullet_point2)}</div>
-            </div>
-            `
-                : ''
-            }
-            
-            ${
-              amazonData.bullet_point3
-                ? `
-            <div class="field">
-                <div class="field-name">Bullet Point 3 <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(amazonData.bullet_point3)}')">Copy</button></div>
-                <div class="field-value">${escapeHtml(amazonData.bullet_point3)}</div>
-            </div>
-            `
-                : ''
-            }
-            
-            ${
-              amazonData.bullet_point4
-                ? `
-            <div class="field">
-                <div class="field-name">Bullet Point 4 <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(amazonData.bullet_point4)}')">Copy</button></div>
-                <div class="field-value">${escapeHtml(amazonData.bullet_point4)}</div>
-            </div>
-            `
-                : ''
-            }
-            
-            ${
-              amazonData.bullet_point5
-                ? `
-            <div class="field">
-                <div class="field-name">Bullet Point 5 <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(amazonData.bullet_point5)}')">Copy</button></div>
-                <div class="field-value">${escapeHtml(amazonData.bullet_point5)}</div>
-            </div>
-            `
-                : ''
-            }
-        </div>
+ADDITIONAL FIELDS (If Available in Template):
+============================================
+${
+  amazonData.department
+    ? `
+Department: ${amazonData.department}
+`
+    : ''
+}
+${
+  amazonData.target_gender
+    ? `
+Target Gender: ${amazonData.target_gender}
+`
+    : ''
+}
+${
+  amazonData.material_type
+    ? `
+Material Type: ${amazonData.material_type}
+`
+    : ''
+}
+${
+  amazonData.color_name
+    ? `
+Color: ${amazonData.color_name}
+`
+    : ''
+}
 
-        <h2>🔧 Additional Fields (If Available in Template)</h2>
+Step 3: Upload Your Completed Template
+--------------------------------------
+1. Save your completed template file
+2. Go back to: Catalog → Add Products via Upload
+3. Click: "Upload your inventory file"
+4. Select your file type and upload your completed template
+5. Wait for Amazon to process your file
+6. Check the processing report for any errors
 
-        ${
-          amazonData.department
-            ? `
-        <div class="field">
-            <div class="field-name">Department <button class="copy-btn" onclick="copyToClipboard('${amazonData.department}')">Copy</button></div>
-            <div class="field-value">${amazonData.department}</div>
-        </div>
-        `
-            : ''
-        }
+IMPORTANT NOTES:
+===============
+⚠️  Use Amazon's official template - never modify the headers
+⚠️  Copy the data exactly as shown above
+⚠️  Some fields may not be available in all templates
+⚠️  Amazon may suggest additional required fields for your category
+⚠️  Review Amazon's processing report carefully
 
-        ${
-          amazonData.target_gender
-            ? `
-        <div class="field">
-            <div class="field-name">Target Gender <button class="copy-btn" onclick="copyToClipboard('${amazonData.target_gender}')">Copy</button></div>
-            <div class="field-value">${amazonData.target_gender}</div>
-        </div>
-        `
-            : ''
-        }
+🎉 That's it! Your product should now be listed on Amazon with optimized, 
+   clean data that complies with all Amazon requirements.
 
-        ${
-          amazonData.material_type
-            ? `
-        <div class="field">
-            <div class="field-name">Material Type <button class="copy-btn" onclick="copyToClipboard('${amazonData.material_type}')">Copy</button></div>
-            <div class="field-value">${amazonData.material_type}</div>
-        </div>
-        `
-            : ''
-        }
-
-        ${
-          amazonData.color_name
-            ? `
-        <div class="field">
-            <div class="field-name">Color <button class="copy-btn" onclick="copyToClipboard('${amazonData.color_name}')">Copy</button></div>
-            <div class="field-value">${amazonData.color_name}</div>
-        </div>
-        `
-            : ''
-        }
-
-        <div class="step">
-            <strong>Step 3: Upload Your Completed Template</strong>
-            <ol>
-                <li>Save your completed template file</li>
-                <li>Go back to: <strong>Catalog → Add Products via Upload</strong></li>
-                <li>Click: <strong>"Upload your inventory file"</strong></li>
-                <li>Select your file type and upload your completed template</li>
-                <li>Wait for Amazon to process your file</li>
-                <li>Check the processing report for any errors</li>
-            </ol>
-        </div>
-
-        <div class="warning">
-            <strong>⚠️ Important Notes:</strong>
-            <ul>
-                <li>Use Amazon's official template - never modify the headers</li>
-                <li>Copy the data exactly as shown above</li>
-                <li>Some fields may not be available in all templates</li>
-                <li>Amazon may suggest additional required fields for your category</li>
-                <li>Review Amazon's processing report carefully</li>
-            </ul>
-        </div>
-
-        <div class="success">
-            <strong>🎉 That's it!</strong> Your product should now be listed on Amazon with optimized, clean data that complies with all Amazon requirements.
-        </div>
-    </div>
-
-    <script>
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(function() {
-                // Success feedback could be added here
-                console.log('Copied to clipboard:', text);
-            }, function(err) {
-                console.error('Could not copy text: ', err);
-            });
-        }
-    </script>
-</body>
-</html>
-  `.trim()
+Generated by Listora AI - ${new Date().toISOString()}`
 }
 
 // Helper functions for data processing
@@ -577,16 +394,6 @@ function detectProductCategory(productData: any): string {
   if (content.includes('office')) return 'Office Products'
 
   return 'Home & Kitchen'
-}
-
-function escapeHtml(text: string): string {
-  if (!text) return ''
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 }
 
 function cleanText(text: string): string {
