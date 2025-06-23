@@ -42,9 +42,10 @@ export async function POST(request: NextRequest) {
     // Generate CSV content with proper formatting
     const csvContent = generateCleanCSV(templateData)
 
-    // Create download URL (simplified)
+    // Create download filename
     const timestamp = Date.now()
     const templateId = `template-${timestamp}`
+    const filename = `amazon-template-${templateData.sku}-${timestamp}.csv`
 
     // Try to save to database (optional - don't fail if it doesn't work)
     try {
@@ -54,6 +55,8 @@ export async function POST(request: NextRequest) {
         content_id: contentId,
         sku: templateData.sku,
         template_data: templateData,
+        csv_content: csvContent, // Store CSV content
+        filename: filename,
         status: 'generated',
         created_at: new Date().toISOString(),
       })
@@ -64,11 +67,13 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Template generation completed:', templateId)
 
+    // Return CSV content directly for immediate download
     return NextResponse.json({
       success: true,
       templateId,
-      downloadUrl: `/api/amazon/template/download/${templateId}`,
       csvContent,
+      filename,
+      downloadUrl: `/api/amazon/template/download/${templateId}`,
       message: 'Amazon template generated successfully!',
     })
   } catch (error: any) {
@@ -120,14 +125,30 @@ function generateTemplateData(productData: any, options: any) {
 }
 
 function cleanTitle(title: string): string {
-  // Remove common formatting issues
-  return title
+  if (!title || title.trim() === '') return 'Product'
+
+  // Remove common formatting issues and improve title
+  let cleaned = title
     .replace(/^\d+\.\s*/, '') // Remove "1. " from beginning
     .replace(/PRODUCT TITLE\/HEADLINE:\s*/i, '') // Remove header text
     .replace(/[""'']/g, '"') // Fix quotes
     .replace(/[–—]/g, '-') // Fix dashes
     .trim()
-    .substring(0, 200) // Amazon title limit
+
+  // If title is too simple like "men shoes", try to enhance it
+  if (
+    cleaned.length < 20 &&
+    /^(men|women|kids?)\s+(shoe|shirt|pant|dress)/i.test(cleaned)
+  ) {
+    const words = cleaned.split(' ')
+    const category = words.pop() || 'Product' // last word (shoes, shirt, etc.)
+    const demographic = words.join(' ') || 'Premium' // men, women, etc.
+
+    // Create a more descriptive title
+    cleaned = `${demographic.charAt(0).toUpperCase() + demographic.slice(1)} ${category.charAt(0).toUpperCase() + category.slice(1)} - Premium Quality`
+  }
+
+  return cleaned.substring(0, 200) // Amazon title limit
 }
 
 function cleanDescription(content: string): string {
@@ -173,7 +194,14 @@ function cleanDescription(content: string): string {
 }
 
 function extractFeatures(content: string): string[] {
-  if (!content) return []
+  if (!content)
+    return [
+      'High-quality construction',
+      'Excellent performance',
+      'Great value',
+      'Customer satisfaction guaranteed',
+      'Fast shipping available',
+    ]
 
   // Look for bullet points or numbered lists
   const bulletPoints = content.match(/[-*•]\s*([^-*•\n]+)/g) || []
@@ -191,7 +219,23 @@ function extractFeatures(content: string): string[] {
     .filter((point) => point.length > 10 && point.length < 200)
     .slice(0, 5) // Max 5 bullet points
 
-  return features
+  // If no features found, generate default ones
+  if (features.length === 0) {
+    features = [
+      'High-quality construction and materials',
+      'Excellent performance and reliability',
+      'Great value for money',
+      'Customer satisfaction guaranteed',
+      'Fast shipping available',
+    ]
+  }
+
+  // Ensure we have exactly 5 features
+  while (features.length < 5) {
+    features.push('')
+  }
+
+  return features.slice(0, 5)
 }
 
 function generateKeywords(title: string, description: string): string {
@@ -215,6 +259,10 @@ function generateKeywords(title: string, description: string): string {
     'but',
     'all',
     'more',
+    'high',
+    'quality',
+    'excellent',
+    'great',
   ]
 
   const words = text.match(/\b[a-z]{3,}\b/g) || []
@@ -222,13 +270,13 @@ function generateKeywords(title: string, description: string): string {
     .filter((word) => !commonWords.includes(word))
     .slice(0, 10)
 
-  return uniqueWords.join(', ')
+  return uniqueWords.join(', ') || 'product, quality, value'
 }
 
 function extractBrand(content: string, title: string): string {
   // Common brand patterns
   const brandPatterns = [
-    /\b(Nike|Adidas|Apple|Samsung|Sony|LG|HP|Dell|Microsoft|Google)\b/i,
+    /\b(Nike|Adidas|Apple|Samsung|Sony|LG|HP|Dell|Microsoft|Google|Amazon|Shopify)\b/i,
     /\b([A-Z][a-z]+)\s+(brand|company|inc|corp|ltd)\b/i,
   ]
 
@@ -247,13 +295,13 @@ function extractBrand(content: string, title: string): string {
     if (
       word.length > 2 &&
       /^[A-Z]/.test(word) &&
-      !['The', 'For', 'With', 'And'].includes(word)
+      !['The', 'For', 'With', 'And', 'Men', 'Women', 'Kids'].includes(word)
     ) {
       return word
     }
   }
 
-  return 'Generic'
+  return 'Premium'
 }
 
 function extractImages(productData: any): string[] {
@@ -267,6 +315,11 @@ function extractImages(productData: any): string[] {
 
   if (productData.imageUrl) {
     images.push(productData.imageUrl)
+  }
+
+  // Ensure we have at least one image (even if empty)
+  while (images.length < 5) {
+    images.push('')
   }
 
   return images.slice(0, 5) // Max 5 images for Amazon
@@ -373,22 +426,10 @@ function generateCleanCSV(data: any): string {
     data.features[4] || '',
   ]
 
-  // Generate CSV with proper escaping
+  // Generate CSV with tab separation (like original working version)
   const csvRows = [
-    headers.join('\t'), // Use tabs for better Excel compatibility
-    row
-      .map((field) => {
-        // Escape fields that contain commas or quotes
-        if (
-          field.includes(',') ||
-          field.includes('"') ||
-          field.includes('\n')
-        ) {
-          return `"${field.replace(/"/g, '""')}"`
-        }
-        return field
-      })
-      .join('\t'),
+    headers.join('\t'), // Use tabs like the working version
+    row.map((field) => String(field || '')).join('\t'),
   ]
 
   return csvRows.join('\n')
