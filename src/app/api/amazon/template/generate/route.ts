@@ -320,19 +320,21 @@ function cleanAndTruncateTitle(title: string, maxLength: number): string {
   return withoutFormatting.substring(0, maxLength - 3) + '...'
 }
 
-// ✅ UPDATED: Format Amazon description with length limit
+// ✅ FINAL FIX: Format Amazon description with SUPER AGGRESSIVE cleaning
 function formatAmazonDescription(
   description: string,
   features: string
 ): string {
   let cleaned = cleanText(description)
 
-  // ✅ AGGRESSIVE REMOVAL of formatting headers
+  // ✅ NUCLEAR OPTION - Remove ALL possible formatting artifacts
   cleaned = cleaned
-    .replace(/PRODUCT TITLE\/HEADLINE:\s*/gi, '') // Remove this header
-    .replace(/KEY SELLING POINTS:\s*/gi, '') // Remove this header
-    .replace(/DETAILED PRODUCT DESCRIPTION:\s*/gi, '') // Remove this header
-    .replace(/^\d+\.\s*/gm, '') // Remove numbered lists
+    .replace(/PRODUCT TITLE\/HEADLINE:\s*/gi, '') // Remove headers
+    .replace(/KEY SELLING POINTS:\s*/gi, '') // Remove headers
+    .replace(/DETAILED PRODUCT DESCRIPTION:\s*/gi, '') // Remove headers
+    .replace(/^\d+\.\s*/gm, '') // Remove numbered lists from line starts
+    .replace(/\s+\d+\.\s+/g, '. ') // Remove numbers in middle like " 2. "
+    .replace(/\b\d+\.\s+/g, '. ') // Remove any "number. " patterns
     .replace(/^-\s*/gm, '') // Remove bullet points
     .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
     .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
@@ -340,38 +342,43 @@ function formatAmazonDescription(
     .replace(/<[^>]*>/g, '') // Remove HTML tags
     .replace(/\n{3,}/g, '\n\n') // Collapse multiple newlines
     .replace(/\|\s*/g, '. ') // Replace | with periods
+    .replace(/&\s*/g, '. ') // Replace & with periods
     .trim()
 
-  // Extract meaningful sentences only
+  // Extract only the cleanest sentences
   const sentences = cleaned
     .split(/[.!?]+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 20) // Only meaningful sentences
-    .slice(0, 3) // Take first 3 sentences
+    .filter((s) => s.length > 15) // Only meaningful sentences
+    .filter((s) => !s.match(/^\d+/)) // Remove any starting with numbers
+    .filter((s) => !s.toLowerCase().includes('headline')) // Remove headline refs
+    .filter((s) => !s.toLowerCase().includes('selling')) // Remove selling points refs
+    .filter((s) => !s.toLowerCase().includes('key')) // Remove "key" refs
+    .slice(0, 2) // Take only first 2 clean sentences
 
   let result = sentences.join('. ').trim()
   if (result && !result.endsWith('.')) {
     result += '.'
   }
 
-  // If too long, truncate to Amazon's CSV limit (400 chars for safety)
-  if (result.length > 400) {
-    result = result.substring(0, 397) + '...'
+  // Conservative length limit for Amazon CSV
+  if (result.length > 250) {
+    result = result.substring(0, 247) + '...'
   }
 
   return (
     result ||
-    'High-quality product with excellent features and reliable performance.'
+    'High-quality wooden watch with natural wood design and premium craftsmanship.'
   )
 }
 
-// ✅ UPDATED: Detect Amazon category with "shoes" fix
+// ✅ UPDATED: Detect Amazon category with watch detection
 function detectAmazonCategory(productData: any): string {
   const content = cleanText(
     `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
   ).toLowerCase()
 
-  // ✅ WATCH/JEWELRY DETECTION
+  // ✅ WATCH/JEWELRY DETECTION FIRST
   if (
     content.includes('watch') ||
     content.includes('watches') ||
@@ -391,7 +398,7 @@ function detectAmazonCategory(productData: any): string {
     return 'Jewelry'
   }
 
-  // ✅ FIX: Detect shoes/footwear
+  // Other categories
   if (
     content.includes('shoes') ||
     content.includes('sneakers') ||
@@ -423,7 +430,7 @@ function detectAmazonCategory(productData: any): string {
     return 'Home & Kitchen'
   }
 
-  return 'Sports & Outdoors' // ✅ Changed from "Miscellaneous"
+  return 'Sports & Outdoors'
 }
 
 // ✅ NEW: Map condition to Amazon accepted values
@@ -499,41 +506,18 @@ function extractCleanBulletPoints(features: string): string[] {
 
   const cleaned = cleanText(features)
 
-  // ✅ BETTER BULLET POINT EXTRACTION
-  // Look for sentences that start with descriptive words
+  // Extract sentences from the features/content
   const sentences = cleaned
     .replace(/PRODUCT TITLE\/HEADLINE:\s*/gi, '') // Remove headers
     .replace(/KEY SELLING POINTS:\s*/gi, '') // Remove headers
+    .replace(/\d+\.\s*/g, '') // Remove all numbers
     .split(/[.!?]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 15) // Meaningful sentences
+    .filter((s) => !s.toLowerCase().includes('headline')) // Remove header refs
     .slice(0, 5)
 
-  // If we have good sentences, use them
-  if (sentences.length >= 3) {
-    const bullets = ['', '', '', '', '']
-    for (let i = 0; i < sentences.length; i++) {
-      bullets[i] = sentences[i].substring(0, 250) // Amazon bullet point limit
-    }
-    return bullets
-  }
-
-  // Fallback: Split by common separators and clean
-  const points = cleaned
-    .split(/[•\-\n]/)
-    .map((point) => point.trim())
-    .map((point) => point.replace(/^\d+\.\s*/, '')) // Remove numbering
-    .map((point) => point.replace(/^\*+\s*/, '')) // Remove asterisks
-    .filter((point) => point.length > 10) // Only meaningful points
-    .slice(0, 5) // Max 5 points
-
-  // Ensure we have 5 bullet points, pad with defaults
-  const bullets = ['', '', '', '', '']
-  for (let i = 0; i < points.length; i++) {
-    bullets[i] = points[i].substring(0, 250) // Amazon bullet point limit
-  }
-
-  // Fill empty slots with defaults
+  // Fill with defaults if needed
   const defaults = [
     'High-quality construction and materials',
     'Excellent performance and reliability',
@@ -542,23 +526,27 @@ function extractCleanBulletPoints(features: string): string[] {
     'Fast shipping available',
   ]
 
+  const bullets = ['', '', '', '', '']
   for (let i = 0; i < 5; i++) {
-    if (!bullets[i]) {
-      bullets[i] = defaults[i] || ''
+    bullets[i] = sentences[i] || defaults[i] || ''
+    if (bullets[i].length > 250) {
+      bullets[i] = bullets[i].substring(0, 247) + '...'
     }
   }
 
   return bullets
 }
 
-// Helper functions (unchanged)
+// ✅ ENHANCED: Extract brand with UWOOD detection
 function extractBrand(productData: any): string {
   const content = cleanText(
     `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
-  ).toLowerCase()
+  )
 
-  // ✅ ENHANCED BRAND DETECTION
-  // Look for brand patterns in content
+  // Look for UWOOD specifically
+  if (content.toLowerCase().includes('uwood')) return 'UWOOD'
+
+  // Other brand patterns
   const brandMatches = content.match(
     /\b([A-Z][a-z]+)\s+(watch|brand|company|inc|corp|ltd)\b/gi
   )
@@ -566,18 +554,18 @@ function extractBrand(productData: any): string {
     return brandMatches[0].split(' ')[0]
   }
 
-  // Common brand extraction patterns
-  if (content.includes('uwood')) return 'UWOOD'
-  if (content.includes('nike')) return 'Nike'
-  if (content.includes('apple')) return 'Apple'
-  if (content.includes('samsung')) return 'Samsung'
-  if (content.includes('sony')) return 'Sony'
-  if (content.includes('adidas')) return 'Adidas'
-  if (content.includes('rolex')) return 'Rolex'
-  if (content.includes('casio')) return 'Casio'
-  if (content.includes('seiko')) return 'Seiko'
+  // Common brands
+  const lowerContent = content.toLowerCase()
+  if (lowerContent.includes('nike')) return 'Nike'
+  if (lowerContent.includes('apple')) return 'Apple'
+  if (lowerContent.includes('samsung')) return 'Samsung'
+  if (lowerContent.includes('sony')) return 'Sony'
+  if (lowerContent.includes('adidas')) return 'Adidas'
+  if (lowerContent.includes('rolex')) return 'Rolex'
+  if (lowerContent.includes('casio')) return 'Casio'
+  if (lowerContent.includes('seiko')) return 'Seiko'
 
-  // Try to extract from title (first capitalized word that looks like a brand)
+  // Try to extract from title
   const title = productData.product_name || productData.title || ''
   const words = title.split(' ')
   for (const word of words) {
@@ -600,7 +588,7 @@ function extractBrand(productData: any): string {
     }
   }
 
-  return 'Premium' // Better than "Generic"
+  return 'Premium'
 }
 
 function detectDepartment(productData: any): string {
