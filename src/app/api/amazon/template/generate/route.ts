@@ -180,15 +180,9 @@ function generateAmazonTemplate(
 
 // Convert template data to CSV format
 function convertToCSV(templateData: any): string {
-  // ✅ AMAZON REQUIRED: Template info header row
-  const templateInfoRow =
-    'TemplateType=Inventory\tVersion=2014.1119\tThe top 3 rows are for Amazon.com use only. Do not modify or delete the top 3 rows.\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t'
+  // ✅ SIMPLE APPROACH: Use basic CSV format that Amazon accepts for inventory files
+  // Amazon's "Add Products via Upload" accepts simple CSV format without complex template headers
 
-  // ✅ Second row - Amazon instruction row
-  const instructionRow =
-    'Product Type\tSeller SKU\tBrand Name\tProduct Name\tProduct Description\tListing Price\tQuantity\tProduct ID\tProduct ID Type\tCondition Type\tCondition Note\tMain Image URL\tSwatch Image URL\tOther Image URL1\tOther Image URL2\tOther Image URL3\tOther Image URL4\tOther Image URL5\tOther Image URL6\tOther Image URL7\tOther Image URL8\tParent SKU'
-
-  // ✅ Third row - Our actual headers
   const headers = [
     'sku',
     'product-id',
@@ -239,13 +233,12 @@ function convertToCSV(templateData: any): string {
     escapeCSVField(templateData.bullet_point5),
   ]
 
-  // ✅ AMAZON FORMAT: Use tabs and include required template rows
-  return [
-    templateInfoRow,
-    instructionRow,
-    headers.join('\t'),
-    row.map((field) => String(field || '')).join('\t'),
-  ].join('\n')
+  // ✅ USE TAB-SEPARATED FORMAT (Amazon prefers tabs)
+  return (
+    headers.join('\t') +
+    '\n' +
+    row.map((field) => String(field || '')).join('\t')
+  )
 }
 
 // ✅ NEW: Clean text function to fix encoding issues
