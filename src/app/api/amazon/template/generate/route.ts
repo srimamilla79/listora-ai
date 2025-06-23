@@ -72,9 +72,6 @@ export async function POST(request: NextRequest) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filename = `amazon-listing-instructions-${timestamp}.txt`
 
-    // Create download URL for text file
-    const downloadUrl = `data:text/plain;charset=utf-8,${encodeURIComponent(instructionsText)}`
-
     // Save data to database
     try {
       const { data: savedTemplate, error: saveError } = await supabase
@@ -104,7 +101,7 @@ export async function POST(request: NextRequest) {
       method: 'amazon_template',
       data: {
         templateId: `template-${Date.now()}`,
-        downloadUrl: downloadUrl,
+        textContent: instructionsText, // Return text content directly
         filename: filename,
         sku: amazonData.sku,
         title: amazonData.title,
