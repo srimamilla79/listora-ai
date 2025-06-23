@@ -1,6 +1,3 @@
-// src/app/api/amazon/template/generate/route.ts
-// Fixed Amazon Template Generation - All Issues Resolved
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -14,175 +11,317 @@ export async function POST(request: NextRequest) {
     console.log('📋 Amazon Template Generation Started')
 
     const body = await request.json()
-    const { contentId, userId, productData, options, images } = body
-
     console.log('🔍 Request data:', {
-      contentId,
-      userId,
-      hasProductData: !!productData,
-      optionsPrice: options?.price,
+      contentId: body.contentId,
+      userId: body.userId,
+      hasProductData: !!body.productData,
+      optionsPrice: body.options?.price,
     })
 
-    // Validate required fields
-    if (!userId) {
-      console.error('❌ Missing userId')
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      )
-    }
+    // Extract data from request
+    const { contentId, userId, productData, options } = body
 
     if (!productData) {
-      console.error('❌ Missing productData')
-      return NextResponse.json(
-        { error: 'Product data is required' },
-        { status: 400 }
-      )
+      throw new Error('Product data is required')
     }
 
-    if (!productData.product_name && !productData.title) {
-      console.error('❌ Missing product title')
-      return NextResponse.json(
-        { error: 'Product title is required' },
-        { status: 400 }
-      )
-    }
-
-    if (!options?.price) {
-      console.error('❌ Missing price')
-      return NextResponse.json({ error: 'Price is required' }, { status: 400 })
-    }
-
-    // ✅ Use productData directly instead of querying database
     console.log('✅ Using provided product data:', {
-      title: productData.product_name || productData.title,
-      hasContent: !!(productData.content || productData.description),
+      title: productData.title,
+      hasContent: !!productData.content,
       hasFeatures: !!productData.features,
     })
 
-    // Generate Amazon template data
-    const templateData = generateAmazonTemplate(productData, options, images)
-
+    // Generate template data
+    const templateData = generateTemplateData(productData, options)
     console.log('📊 Template data generated:', {
       title: templateData.title,
       price: templateData.price,
       sku: templateData.sku,
     })
 
-    // Convert to CSV format
-    const csvData = convertToCSV(templateData)
+    // Generate CSV content with proper formatting
+    const csvContent = generateCleanCSV(templateData)
 
-    // Generate unique filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const filename = `amazon-template-${timestamp}.csv`
+    // Create download URL (simplified)
+    const timestamp = Date.now()
+    const templateId = `template-${timestamp}`
 
-    // Create download URL (for now, we'll return the CSV data directly)
-    const downloadUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csvData)}`
-
-    // Save template to database (optional - for tracking)
+    // Try to save to database (optional - don't fail if it doesn't work)
     try {
-      const { data: savedTemplate, error: saveError } = await supabase
-        .from('amazon_templates')
-        .insert({
-          user_id: userId,
-          content_id: contentId || `template-${Date.now()}`,
-          template_data: templateData,
-          filename: filename,
-          status: 'generated',
-          created_at: new Date().toISOString(),
-        })
-        .select()
-        .single()
-
-      if (saveError) {
-        console.warn('⚠️ Failed to save template to database:', saveError)
-        // Don't fail the request, template generation still works
-      } else {
-        console.log('✅ Template saved to database:', savedTemplate.id)
-      }
-    } catch (dbError) {
-      console.warn('⚠️ Database save error:', dbError)
-      // Continue without database save
-    }
-
-    const response = {
-      success: true,
-      method: 'amazon_template',
-      data: {
-        templateId: `template-${Date.now()}`,
-        downloadUrl: downloadUrl,
-        filename: filename,
+      await supabase.from('amazon_templates').insert({
+        id: templateId,
+        user_id: userId,
+        content_id: contentId,
         sku: templateData.sku,
-        title: templateData.title,
-        price: templateData.price,
-      },
-      message: 'Amazon template generated successfully',
+        template_data: templateData,
+        status: 'generated',
+        created_at: new Date().toISOString(),
+      })
+    } catch (dbError: any) {
+      console.log('⚠️ Failed to save template to database:', dbError)
+      // Continue execution - database save is optional
     }
 
-    console.log('✅ Template generation completed:', response.data.templateId)
+    console.log('✅ Template generation completed:', templateId)
 
-    return NextResponse.json(response)
+    return NextResponse.json({
+      success: true,
+      templateId,
+      downloadUrl: `/api/amazon/template/download/${templateId}`,
+      csvContent,
+      message: 'Amazon template generated successfully!',
+    })
   } catch (error: any) {
     console.error('❌ Template generation failed:', error)
     return NextResponse.json(
       {
         success: false,
-        method: 'amazon_template',
-        message: `Template generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: error.message || 'Failed to generate template',
       },
       { status: 500 }
     )
   }
 }
 
-// Generate Amazon template data structure
-function generateAmazonTemplate(
-  productData: any,
-  options: any,
-  images: string[] = []
-) {
-  const title = productData.product_name || productData.title || 'Product Title'
-  const description =
-    productData.content || productData.description || 'Product description'
-  const features = productData.features || ''
-  const brand = extractBrand(productData)
+function generateTemplateData(productData: any, options: any) {
+  // Clean and extract product information
+  const title = cleanTitle(productData.title || 'Product')
+  const description = cleanDescription(
+    productData.content || productData.description || ''
+  )
+  const features = extractFeatures(
+    productData.features || productData.content || ''
+  )
+
+  // Generate SKU
+  const sku = generateSKU(title)
+
+  // Extract brand from content
+  const brand = extractBrand(productData.content || '', title)
+
+  // Generate keywords
+  const keywords = generateKeywords(title, description)
+
+  // Extract price
+  const price = parseFloat(options?.price || '29.99')
 
   return {
-    // Required Amazon fields
-    title: cleanAndTruncateTitle(title, 200), // Amazon title limit with cleaning
-    description: formatAmazonDescription(description, features),
-    brand: brand,
-    manufacturer: brand,
-
-    // Pricing and inventory
-    price: parseFloat(options.price),
-    quantity: parseInt(options.quantity) || 1,
-    sku: options.sku || generateSKU(title),
-    condition: mapCondition(options.condition || 'new'),
-
-    // Product classification
-    product_type: options.productType || detectAmazonCategory(productData),
-    department: detectDepartment(productData),
-
-    // Images
-    main_image_url: images[0] || '',
-    other_image_url1: images[1] || '',
-    other_image_url2: images[2] || '',
-    other_image_url3: images[3] || '',
-    other_image_url4: images[4] || '',
-
-    // Additional fields
-    keywords: generateCleanKeywords(productData),
-    bullet_point1: extractCleanBulletPoints(features)[0] || '',
-    bullet_point2: extractCleanBulletPoints(features)[1] || '',
-    bullet_point3: extractCleanBulletPoints(features)[2] || '',
-    bullet_point4: extractCleanBulletPoints(features)[3] || '',
-    bullet_point5: extractCleanBulletPoints(features)[4] || '',
+    sku,
+    title,
+    description,
+    price,
+    quantity: parseInt(options?.quantity || '1'),
+    brand,
+    keywords,
+    features,
+    images: extractImages(productData),
+    productType: detectProductType(title, description),
   }
 }
 
-// Convert template data to CSV format
-function convertToCSV(templateData: any): string {
+function cleanTitle(title: string): string {
+  // Remove common formatting issues
+  return title
+    .replace(/^\d+\.\s*/, '') // Remove "1. " from beginning
+    .replace(/PRODUCT TITLE\/HEADLINE:\s*/i, '') // Remove header text
+    .replace(/[""'']/g, '"') // Fix quotes
+    .replace(/[–—]/g, '-') // Fix dashes
+    .trim()
+    .substring(0, 200) // Amazon title limit
+}
+
+function cleanDescription(content: string): string {
+  if (!content)
+    return 'High-quality product with excellent features and reliable performance.'
+
+  // Remove formatting headers and markdown
+  let cleaned = content
+    .replace(/^\d+\.\s*PRODUCT TITLE\/HEADLINE:.*$/gm, '') // Remove title headers
+    .replace(/^\d+\.\s*KEY SELLING POINTS:.*$/gm, '') // Remove selling points headers
+    .replace(/^\d+\.\s*DETAILED PRODUCT DESCRIPTION:.*$/gm, '') // Remove description headers
+    .replace(/^[-*•]\s*/gm, '') // Remove bullet points
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
+    .replace(/__(.*?)__/g, '$1') // Remove underline markdown
+    .replace(/[""'']/g, '"') // Fix quotes
+    .replace(/[–—]/g, '-') // Fix dashes
+    .replace(/\s+/g, ' ') // Multiple spaces to single
+    .trim()
+
+  // Extract first meaningful sentences
+  const sentences = cleaned.split(/[.!?]+/).filter((s) => s.trim().length > 10)
+  let description = sentences.slice(0, 3).join('. ').trim()
+
+  // Ensure it ends with period
+  if (description && !description.endsWith('.')) {
+    description += '.'
+  }
+
+  // Amazon description limit (400 chars for safety)
+  if (description.length > 400) {
+    description = description.substring(0, 400).trim()
+    // Find last complete word
+    const lastSpace = description.lastIndexOf(' ')
+    if (lastSpace > 300) {
+      description = description.substring(0, lastSpace) + '...'
+    }
+  }
+
+  return (
+    description ||
+    'High-quality product with excellent features and reliable performance.'
+  )
+}
+
+function extractFeatures(content: string): string[] {
+  if (!content) return []
+
+  // Look for bullet points or numbered lists
+  const bulletPoints = content.match(/[-*•]\s*([^-*•\n]+)/g) || []
+  const numberedPoints = content.match(/\d+\.\s*([^\n]+)/g) || []
+
+  let features = [...bulletPoints, ...numberedPoints]
+    .map((point) =>
+      point
+        .replace(/^[-*•]\s*/, '')
+        .replace(/^\d+\.\s*/, '')
+        .replace(/[""'']/g, '"')
+        .replace(/[–—]/g, '-')
+        .trim()
+    )
+    .filter((point) => point.length > 10 && point.length < 200)
+    .slice(0, 5) // Max 5 bullet points
+
+  return features
+}
+
+function generateKeywords(title: string, description: string): string {
+  const text = `${title} ${description}`.toLowerCase()
+
+  // Extract meaningful words (3+ characters, not common words)
+  const commonWords = [
+    'the',
+    'and',
+    'for',
+    'with',
+    'you',
+    'are',
+    'this',
+    'that',
+    'have',
+    'your',
+    'can',
+    'will',
+    'not',
+    'but',
+    'all',
+    'more',
+  ]
+
+  const words = text.match(/\b[a-z]{3,}\b/g) || []
+  const uniqueWords = [...new Set(words)]
+    .filter((word) => !commonWords.includes(word))
+    .slice(0, 10)
+
+  return uniqueWords.join(', ')
+}
+
+function extractBrand(content: string, title: string): string {
+  // Common brand patterns
+  const brandPatterns = [
+    /\b(Nike|Adidas|Apple|Samsung|Sony|LG|HP|Dell|Microsoft|Google)\b/i,
+    /\b([A-Z][a-z]+)\s+(brand|company|inc|corp|ltd)\b/i,
+  ]
+
+  const text = `${title} ${content}`
+
+  for (const pattern of brandPatterns) {
+    const match = text.match(pattern)
+    if (match) {
+      return match[1] || match[0]
+    }
+  }
+
+  // Fallback - extract first capitalized word that's not common
+  const words = title.split(' ')
+  for (const word of words) {
+    if (
+      word.length > 2 &&
+      /^[A-Z]/.test(word) &&
+      !['The', 'For', 'With', 'And'].includes(word)
+    ) {
+      return word
+    }
+  }
+
+  return 'Generic'
+}
+
+function extractImages(productData: any): string[] {
+  const images: string[] = []
+
+  if (productData.images && Array.isArray(productData.images)) {
+    images.push(
+      ...productData.images.map((img: any) => img.url || img).filter(Boolean)
+    )
+  }
+
+  if (productData.imageUrl) {
+    images.push(productData.imageUrl)
+  }
+
+  return images.slice(0, 5) // Max 5 images for Amazon
+}
+
+function detectProductType(title: string, description: string): string {
+  const text = `${title} ${description}`.toLowerCase()
+
+  if (
+    text.includes('shoe') ||
+    text.includes('sneaker') ||
+    text.includes('boot') ||
+    text.includes('footwear')
+  ) {
+    return 'Shoes'
+  }
+  if (
+    text.includes('shirt') ||
+    text.includes('dress') ||
+    text.includes('pants') ||
+    text.includes('clothing')
+  ) {
+    return 'Clothing'
+  }
+  if (
+    text.includes('book') ||
+    text.includes('novel') ||
+    text.includes('guide')
+  ) {
+    return 'Books'
+  }
+  if (
+    text.includes('electronic') ||
+    text.includes('phone') ||
+    text.includes('computer') ||
+    text.includes('device')
+  ) {
+    return 'Electronics'
+  }
+
+  return 'Sports'
+}
+
+function generateSKU(title: string): string {
+  const prefix = 'AMZ'
+  const titlePart = title
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .substring(0, 6)
+    .toUpperCase()
+  const randomNum = Math.floor(100000 + Math.random() * 900000)
+
+  return `${prefix}-${titlePart}-${randomNum}`
+}
+
+function generateCleanCSV(data: any): string {
   const headers = [
     'sku',
     'product-id',
@@ -208,322 +347,49 @@ function convertToCSV(templateData: any): string {
     'bullet-point5',
   ]
 
+  // Prepare row data
   const row = [
-    cleanText(templateData.sku),
-    '', // product-id (empty for new products)
+    data.sku,
+    '', // product-id (Amazon will assign)
     '', // product-id-type
-    escapeCSVField(templateData.title),
-    escapeCSVField(templateData.description),
-    templateData.price,
-    templateData.quantity,
-    cleanText(templateData.product_type),
-    cleanText(templateData.brand),
-    cleanText(templateData.manufacturer),
-    cleanText(templateData.condition),
-    cleanText(templateData.main_image_url),
-    cleanText(templateData.other_image_url1),
-    cleanText(templateData.other_image_url2),
-    cleanText(templateData.other_image_url3),
-    cleanText(templateData.other_image_url4),
-    escapeCSVField(templateData.keywords),
-    escapeCSVField(templateData.bullet_point1),
-    escapeCSVField(templateData.bullet_point2),
-    escapeCSVField(templateData.bullet_point3),
-    escapeCSVField(templateData.bullet_point4),
-    escapeCSVField(templateData.bullet_point5),
+    data.title,
+    data.description,
+    data.price.toString(),
+    data.quantity.toString(),
+    data.productType,
+    data.brand,
+    data.brand, // manufacturer same as brand
+    'New', // condition
+    data.images[0] || '', // main image
+    data.images[1] || '', // other images
+    data.images[2] || '',
+    data.images[3] || '',
+    data.images[4] || '',
+    data.keywords,
+    data.features[0] || '', // bullet points
+    data.features[1] || '',
+    data.features[2] || '',
+    data.features[3] || '',
+    data.features[4] || '',
   ]
 
-  return headers.join(',') + '\n' + row.join(',')
-}
-
-// ✅ NEW: Clean text function to fix encoding issues
-function cleanText(text: string): string {
-  if (!text) return ''
-
-  return (
-    text
-      // Fix common UTF-8 encoding issues
-      .replace(/â€™/g, "'") // Smart apostrophe
-      .replace(/â€œ/g, '"') // Smart quote open
-      .replace(/â€\x9D/g, '"') // Smart quote close
-      .replace(/â€"/g, '—') // Em dash
-      .replace(/â€\x93/g, '–') // En dash
-      .replace(/Â/g, '') // Non-breaking space artifacts
-      // Fix other common issues
-      .replace(/'/g, "'") // Curly apostrophe
-      .replace(/"/g, '"') // Curly quote left
-      .replace(/"/g, '"') // Curly quote right
-      .replace(/—/g, '-') // Em dash to regular dash
-      .replace(/–/g, '-') // En dash to regular dash
-      // Remove or fix problematic characters
-      .replace(/[^\x00-\x7F]/g, (char) => {
-        // Replace non-ASCII characters with ASCII equivalents
-        const replacements: { [key: string]: string } = {
-          é: 'e',
-          è: 'e',
-          ê: 'e',
-          ë: 'e',
-          á: 'a',
-          à: 'a',
-          â: 'a',
-          ä: 'a',
-          í: 'i',
-          ì: 'i',
-          î: 'i',
-          ï: 'i',
-          ó: 'o',
-          ò: 'o',
-          ô: 'o',
-          ö: 'o',
-          ú: 'u',
-          ù: 'u',
-          û: 'u',
-          ü: 'u',
-          ñ: 'n',
-          ç: 'c',
+  // Generate CSV with proper escaping
+  const csvRows = [
+    headers.join('\t'), // Use tabs for better Excel compatibility
+    row
+      .map((field) => {
+        // Escape fields that contain commas or quotes
+        if (
+          field.includes(',') ||
+          field.includes('"') ||
+          field.includes('\n')
+        ) {
+          return `"${field.replace(/"/g, '""')}"`
         }
-        return replacements[char] || ''
+        return field
       })
-      .trim()
-  )
-}
+      .join('\t'),
+  ]
 
-// ✅ NEW: Escape CSV fields properly
-function escapeCSVField(text: string): string {
-  if (!text) return ''
-
-  const cleaned = cleanText(text)
-
-  // If field contains comma, quote, or newline, wrap in quotes and escape internal quotes
-  if (
-    cleaned.includes(',') ||
-    cleaned.includes('"') ||
-    cleaned.includes('\n')
-  ) {
-    return `"${cleaned.replace(/"/g, '""')}"`
-  }
-
-  return cleaned
-}
-
-// ✅ NEW: Clean and truncate title
-function cleanAndTruncateTitle(title: string, maxLength: number): string {
-  const cleaned = cleanText(title)
-
-  // Remove markdown/formatting
-  const withoutFormatting = cleaned
-    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
-    .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
-    .replace(/#{1,6}\s/g, '') // Remove # headers
-    .replace(/^\d+\.\s*/g, '') // Remove numbered lists
-    .replace(/^-\s*/g, '') // Remove bullet points
-    .trim()
-
-  if (withoutFormatting.length <= maxLength) return withoutFormatting
-  return withoutFormatting.substring(0, maxLength - 3) + '...'
-}
-
-// ✅ UPDATED: Format Amazon description with length limit
-function formatAmazonDescription(
-  description: string,
-  features: string
-): string {
-  let cleaned = cleanText(description)
-
-  // Remove markdown/HTML formatting
-  cleaned = cleaned
-    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
-    .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
-    .replace(/#{1,6}\s/g, '') // Remove # headers
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/^\d+\.\s*/gm, '') // Remove numbered lists
-    .replace(/^-\s*/gm, '') // Remove bullet points
-    .replace(/\n{3,}/g, '\n\n') // Collapse multiple newlines
-    .trim()
-
-  // If too long, truncate to Amazon's CSV limit (500 chars for CSV)
-  if (cleaned.length > 500) {
-    cleaned = cleaned.substring(0, 497) + '...'
-  }
-
-  return cleaned
-}
-
-// ✅ UPDATED: Detect Amazon category with "shoes" fix
-function detectAmazonCategory(productData: any): string {
-  const content = cleanText(
-    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
-  ).toLowerCase()
-
-  // ✅ FIX: Detect shoes/footwear
-  if (
-    content.includes('shoes') ||
-    content.includes('sneakers') ||
-    content.includes('boots') ||
-    content.includes('sandals') ||
-    content.includes('footwear')
-  ) {
-    return 'Shoes'
-  }
-
-  if (
-    content.includes('electronics') ||
-    content.includes('phone') ||
-    content.includes('computer')
-  ) {
-    return 'Electronics'
-  }
-  if (
-    content.includes('clothing') ||
-    content.includes('shirt') ||
-    content.includes('dress')
-  ) {
-    return 'Clothing'
-  }
-  if (content.includes('book')) {
-    return 'Books'
-  }
-  if (content.includes('home') || content.includes('kitchen')) {
-    return 'Home & Kitchen'
-  }
-
-  return 'Sports & Outdoors' // ✅ Changed from "Miscellaneous"
-}
-
-// ✅ NEW: Map condition to Amazon accepted values
-function mapCondition(condition: string): string {
-  const conditionMap: { [key: string]: string } = {
-    new: 'New',
-    used_like_new: 'UsedLikeNew',
-    used_very_good: 'UsedVeryGood',
-    used_good: 'UsedGood',
-    used_acceptable: 'UsedAcceptable',
-    refurbished: 'Refurbished',
-  }
-
-  return conditionMap[condition] || 'New'
-}
-
-// ✅ UPDATED: Generate clean keywords
-function generateCleanKeywords(productData: any): string {
-  const content = cleanText(
-    `${productData.product_name || productData.title || ''} ${productData.features || ''} ${productData.content || productData.description || ''}`
-  )
-
-  const words = content
-    .toLowerCase()
-    .replace(/[^\w\s]/g, ' ') // Remove punctuation
-    .split(/\s+/)
-    .filter((word) => word.length > 2 && word.length < 20)
-    .filter(
-      (word) =>
-        ![
-          'the',
-          'and',
-          'for',
-          'with',
-          'this',
-          'that',
-          'will',
-          'can',
-          'your',
-          'are',
-          'has',
-          'have',
-          'been',
-          'was',
-          'were',
-          'product',
-          'title',
-          'headline',
-          'description',
-          'features',
-          'key',
-          'selling',
-          'points',
-        ].includes(word)
-    )
-
-  // Remove duplicates and take first 8 keywords
-  const uniqueKeywords = [...new Set(words)].slice(0, 8)
-
-  return uniqueKeywords.join(', ')
-}
-
-// ✅ UPDATED: Extract clean bullet points
-function extractCleanBulletPoints(features: string): string[] {
-  if (!features) return ['', '', '', '', '']
-
-  const cleaned = cleanText(features)
-
-  // Split by common separators and clean
-  const points = cleaned
-    .split(/[•\-\n]/)
-    .map((point) => point.trim())
-    .map((point) => point.replace(/^\d+\.\s*/, '')) // Remove numbering
-    .map((point) => point.replace(/^\*+\s*/, '')) // Remove asterisks
-    .filter((point) => point.length > 10) // Only meaningful points
-    .slice(0, 5) // Max 5 points
-
-  // Ensure we have 5 bullet points, pad with empty strings
-  const bullets = ['', '', '', '', '']
-  for (let i = 0; i < points.length; i++) {
-    bullets[i] = points[i].substring(0, 250) // Amazon bullet point limit
-  }
-
-  return bullets
-}
-
-// Helper functions (unchanged)
-function extractBrand(productData: any): string {
-  const content = cleanText(
-    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
-  ).toLowerCase()
-
-  // Common brand extraction patterns
-  if (content.includes('nike')) return 'Nike'
-  if (content.includes('apple')) return 'Apple'
-  if (content.includes('samsung')) return 'Samsung'
-  if (content.includes('sony')) return 'Sony'
-  if (content.includes('adidas')) return 'Adidas'
-
-  // Try to extract from title (first word if it looks like a brand)
-  const words = (productData.product_name || productData.title || '').split(' ')
-  if (words[0] && words[0].length > 2 && /^[A-Z]/.test(words[0])) {
-    return cleanText(words[0])
-  }
-
-  return 'Generic'
-}
-
-function detectDepartment(productData: any): string {
-  const content = cleanText(
-    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`
-  ).toLowerCase()
-
-  if (content.includes('men') || content.includes('male')) return 'mens'
-  if (
-    content.includes('women') ||
-    content.includes('female') ||
-    content.includes('ladies')
-  )
-    return 'womens'
-  if (
-    content.includes('kids') ||
-    content.includes('children') ||
-    content.includes('child')
-  )
-    return 'kids'
-  if (content.includes('baby') || content.includes('infant')) return 'baby'
-
-  return 'unisex'
-}
-
-function generateSKU(title: string): string {
-  const timestamp = Date.now().toString().slice(-6)
-  const prefix = cleanText(title)
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .toUpperCase()
-    .slice(0, 6)
-  return `AMZ-${prefix}-${timestamp}`
+  return csvRows.join('\n')
 }
