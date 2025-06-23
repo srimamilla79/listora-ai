@@ -178,62 +178,58 @@ function generateAmazonTemplate(
   }
 }
 
-// Convert template data to CSV format
+// Convert template data to CSV format with EXACT Amazon headers
 function convertToCSV(templateData: any): string {
-  // ✅ SIMPLE APPROACH: Use basic CSV format that Amazon accepts for inventory files
-  // Amazon's "Add Products via Upload" accepts simple CSV format without complex template headers
-
+  // ✅ AMAZON'S EXACT INVENTORY LOADER HEADERS (from search results)
   const headers = [
     'sku',
     'product-id',
     'product-id-type',
-    'item-name',
-    'item-description',
     'price',
-    'quantity',
-    'product-type',
-    'brand-name',
-    'manufacturer',
+    'minimum-seller-allowed-price',
+    'maximum-seller-allowed-price',
     'item-condition',
-    'main-image-url',
-    'other-image-url1',
-    'other-image-url2',
-    'other-image-url3',
-    'other-image-url4',
-    'keywords',
-    'bullet-point1',
-    'bullet-point2',
-    'bullet-point3',
-    'bullet-point4',
-    'bullet-point5',
+    'quantity',
+    'add-delete',
+    'will-ship-internationally',
+    'expedited-shipping',
+    'standard-plus',
+    'item-note',
+    'fulfillment-center-id',
+    'product-tax-code',
+    'launch-date',
+    'sale-price',
+    'sale-start-date',
+    'sale-end-date',
+    'leadtime-to-ship',
+    'optional-payment-type-exclusion',
   ]
 
   const row = [
-    cleanText(templateData.sku),
-    '', // product-id (empty for new products)
-    '', // product-id-type
-    escapeCSVField(templateData.title),
-    escapeCSVField(templateData.description),
-    templateData.price,
-    templateData.quantity,
-    cleanText(templateData.product_type),
-    cleanText(templateData.brand),
-    cleanText(templateData.manufacturer),
-    cleanText(templateData.condition),
-    cleanText(templateData.main_image_url),
-    cleanText(templateData.other_image_url1),
-    cleanText(templateData.other_image_url2),
-    cleanText(templateData.other_image_url3),
-    cleanText(templateData.other_image_url4),
-    escapeCSVField(templateData.keywords),
-    escapeCSVField(templateData.bullet_point1),
-    escapeCSVField(templateData.bullet_point2),
-    escapeCSVField(templateData.bullet_point3),
-    escapeCSVField(templateData.bullet_point4),
-    escapeCSVField(templateData.bullet_point5),
+    cleanText(templateData.sku), // sku
+    '', // product-id (empty for new)
+    '', // product-id-type (empty for new)
+    templateData.price, // price
+    '', // minimum-seller-allowed-price
+    '', // maximum-seller-allowed-price
+    '11', // item-condition (11 = New)
+    templateData.quantity, // quantity
+    'a', // add-delete (a = add/update)
+    '6', // will-ship-internationally (6 = Worldwide)
+    '', // expedited-shipping
+    '', // standard-plus
+    '', // item-note
+    '', // fulfillment-center-id
+    '', // product-tax-code
+    '', // launch-date
+    '', // sale-price
+    '', // sale-start-date
+    '', // sale-end-date
+    '', // leadtime-to-ship
+    '', // optional-payment-type-exclusion
   ]
 
-  // ✅ USE TAB-SEPARATED FORMAT (Amazon prefers tabs)
+  // ✅ USE TAB-SEPARATED FORMAT (Amazon requirement)
   return (
     headers.join('\t') +
     '\n' +
