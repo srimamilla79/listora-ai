@@ -1,118 +1,128 @@
 // src/app/api/amazon/template/generate/route.ts
-// Amazon Template Generation - Guaranteed to appear in Seller Central
+// Fixed Amazon Template Generation - Content Validation Fix
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-interface TemplateData {
-  'Product Type': string
-  'Seller SKU': string
-  'Brand Name': string
-  'Product Name': string
-  'Product Description': string
-  'List Price': number
-  Quantity: number
-  'Main Image URL': string
-  'Additional Image URL 1'?: string
-  'Additional Image URL 2'?: string
-  'Additional Image URL 3'?: string
-  'Country of Origin': string
-  'Condition Type': string
-  [key: string]: any // For product-specific fields
-}
-
 export async function POST(request: NextRequest) {
   try {
     console.log('📋 Amazon Template Generation Started')
 
-    const { contentId, userId, productData, options } = await request.json()
+    const body = await request.json()
+    const { contentId, userId, productData, options, images } = body
 
-    // Generate unique SKU
-    const sku = `LISTORA-${Date.now()}`
+    console.log('🔍 Request data:', {
+      contentId,
+      userId,
+      hasProductData: !!productData,
+      optionsPrice: options?.price,
+    })
 
-    // Fetch product data from your database (same as your existing code)
-    const { data: content } = await supabase
-      .from('generated_content')
-      .select('*')
-      .eq('id', contentId)
-      .eq('user_id', userId)
-      .single()
-
-    if (!content) {
-      throw new Error('Content not found')
+    // Validate required fields
+    if (!userId) {
+      console.error('❌ Missing userId')
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      )
     }
 
-    // Fetch images (same as your existing code)
-    const { data: images } = await supabase
-      .from('generated_images')
-      .select('*')
-      .eq('content_id', contentId)
-      .eq('platform', 'amazon')
+    if (!productData) {
+      console.error('❌ Missing productData')
+      return NextResponse.json(
+        { error: 'Product data is required' },
+        { status: 400 }
+      )
+    }
 
-    const imageUrls = images?.map((img) => img.image_url) || []
+    if (!productData.product_name && !productData.title) {
+      console.error('❌ Missing product title')
+      return NextResponse.json(
+        { error: 'Product title is required' },
+        { status: 400 }
+      )
+    }
 
-    // Determine product type
-    const productType = options.productType || detectProductType(productData)
+    if (!options?.price) {
+      console.error('❌ Missing price')
+      return NextResponse.json({ error: 'Price is required' }, { status: 400 })
+    }
 
-    console.log('📋 Generating template for:', productType)
+    // ✅ Use productData directly instead of querying database
+    console.log('✅ Using provided product data:', {
+      title: productData.product_name || productData.title,
+      hasContent: !!(productData.content || productData.description),
+      hasFeatures: !!productData.features,
+    })
 
-    // Generate template data based on product type
-    const templateData = generateTemplateData(
-      productData,
-      options,
-      sku,
-      imageUrls,
-      productType
-    )
+    // Generate Amazon template data
+    const templateData = generateAmazonTemplate(productData, options, images)
+
+    console.log('📊 Template data generated:', {
+      title: templateData.title,
+      price: templateData.price,
+      sku: templateData.sku,
+    })
 
     // Convert to CSV format
-    const csvContent = generateCSV(templateData)
+    const csvData = convertToCSV(templateData)
 
-    // Save template info to database for download tracking
-    const { data: savedTemplate } = await supabase
-      .from('amazon_templates')
-      .insert({
-        user_id: userId,
-        content_id: contentId,
-        sku: sku,
-        product_type: productType,
-        template_data: templateData,
-        csv_content: csvContent,
-        status: 'ready',
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    // Generate unique filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `amazon-template-${timestamp}.csv`
 
-    console.log('✅ Template generated successfully:', savedTemplate.id)
+    // Create download URL (for now, we'll return the CSV data directly)
+    const downloadUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(csvData)}`
 
-    return NextResponse.json({
+    // Save template to database (optional - for tracking)
+    try {
+      const { data: savedTemplate, error: saveError } = await supabase
+        .from('amazon_templates')
+        .insert({
+          user_id: userId,
+          content_id: contentId || `template-${Date.now()}`,
+          template_data: templateData,
+          csv_data: csvData,
+          filename: filename,
+          status: 'generated',
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      if (saveError) {
+        console.warn('⚠️ Failed to save template to database:', saveError)
+        // Don't fail the request, template generation still works
+      } else {
+        console.log('✅ Template saved to database:', savedTemplate.id)
+      }
+    } catch (dbError) {
+      console.warn('⚠️ Database save error:', dbError)
+      // Continue without database save
+    }
+
+    const response = {
       success: true,
       method: 'amazon_template',
-      message: 'Amazon template generated successfully!',
       data: {
-        templateId: savedTemplate.id,
-        sku: sku,
-        productType: productType,
-        downloadUrl: `/api/amazon/template/download/${savedTemplate.id}`,
-        fieldsCount: Object.keys(templateData).length,
-        hasImages: imageUrls.length > 0,
-        imageCount: imageUrls.length,
+        templateId: `template-${Date.now()}`,
+        downloadUrl: downloadUrl,
+        filename: filename,
+        sku: templateData.sku,
+        title: templateData.title,
+        price: templateData.price,
       },
-      instructions: {
-        step1: 'Download the generated template file',
-        step2:
-          'Go to Amazon Seller Central → Inventory → Add Products via Upload',
-        step3: 'Upload the template file',
-        step4: 'Products will appear in your Seller Central within 15 minutes',
-      },
-    })
+      message: 'Amazon template generated successfully',
+    }
+
+    console.log('✅ Template generation completed:', response.data.templateId)
+
+    return NextResponse.json(response)
   } catch (error: any) {
     console.error('❌ Template generation failed:', error)
     return NextResponse.json(
@@ -126,139 +136,176 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function detectProductType(productData: any): string {
-  const title = productData.title?.toLowerCase() || ''
-  const description = productData.description?.toLowerCase() || ''
-  const allText = `${title} ${description}`
-
-  if (allText.includes('air fryer') || allText.includes('fryer'))
-    return 'AIR_FRYER'
-  if (allText.includes('watch') || allText.includes('timepiece')) return 'WATCH'
-  if (allText.includes('shoe') || allText.includes('sneaker')) return 'SHOES'
-  if (allText.includes('clothing') || allText.includes('shirt'))
-    return 'CLOTHING'
-
-  return 'WATCH' // Safe default
-}
-
-function generateTemplateData(
+// Generate Amazon template data structure
+function generateAmazonTemplate(
   productData: any,
   options: any,
-  sku: string,
-  imageUrls: string[],
-  productType: string
-): TemplateData {
-  // Base template structure
-  const baseTemplate: TemplateData = {
-    'Product Type': productType,
-    'Seller SKU': sku,
-    'Brand Name': productData.brand || 'Generic',
-    'Product Name': productData.title || 'Product',
-    'Product Description':
-      productData.description || productData.content || 'Quality product',
-    'List Price': parseFloat(options.price) || 29.99,
-    Quantity: parseInt(options.quantity) || 10,
-    'Main Image URL': imageUrls[0] || '',
-    'Country of Origin': 'US',
-    'Condition Type': 'New',
-  }
+  images: string[] = []
+) {
+  const title = productData.product_name || productData.title || 'Product Title'
+  const description =
+    productData.content || productData.description || 'Product description'
+  const features = productData.features || ''
+  const brand = extractBrand(productData)
 
-  // Add additional images
-  if (imageUrls[1]) baseTemplate['Additional Image URL 1'] = imageUrls[1]
-  if (imageUrls[2]) baseTemplate['Additional Image URL 2'] = imageUrls[2]
-  if (imageUrls[3]) baseTemplate['Additional Image URL 3'] = imageUrls[3]
+  return {
+    // Required Amazon fields
+    title: truncateTitle(title, 200), // Amazon title limit
+    description: formatAmazonDescription(description, features),
+    brand: brand,
+    manufacturer: brand,
 
-  // Add product-specific fields based on type
-  switch (productType) {
-    case 'AIR_FRYER':
-      return {
-        ...baseTemplate,
-        'Material Type': 'Stainless Steel',
-        Wattage: '1500',
-        Capacity: '5 Quarts',
-        Color: extractColor(productData),
-        'Special Features': 'Digital Display, Timer, Non-stick Coating',
-        'Recommended Uses': 'Frying, Baking, Roasting, Reheating',
-        'Assembly Required': 'No',
-        'Number of Items': '1',
-        'Included Components': 'Air Fryer, Basket, Manual, Recipe Book',
-      }
+    // Pricing and inventory
+    price: parseFloat(options.price),
+    quantity: parseInt(options.quantity) || 1,
+    sku: options.sku || generateSKU(title),
+    condition: options.condition || 'new',
 
-    case 'SHOES':
-      return {
-        ...baseTemplate,
-        'Outer Material': 'Synthetic',
-        'Closure Type': 'Lace Up',
-        'Heel Type': 'Flat',
-        'Target Gender': extractGender(productData),
-        Department: extractDepartment(productData),
-        Color: extractColor(productData),
-        Size: 'One Size',
-        'Shoe Width': 'Medium',
-      }
+    // Product classification
+    product_type: options.productType || detectAmazonCategory(productData),
+    department: detectDepartment(productData),
 
-    case 'WATCH':
-      return {
-        ...baseTemplate,
-        'Target Gender': extractGender(productData),
-        Department: extractDepartment(productData),
-        Color: extractColor(productData),
-        'Watch Movement Type': 'Quartz',
-        'Water Resistance Level': 'water_resistant_30_meters',
-        'Calendar Type': 'Day-Date',
-        'Item Shape': 'Round',
-        'Warranty Type': 'Limited Warranty',
-      }
+    // Images
+    main_image_url: images[0] || '',
+    other_image_url1: images[1] || '',
+    other_image_url2: images[2] || '',
+    other_image_url3: images[3] || '',
+    other_image_url4: images[4] || '',
 
-    default:
-      return baseTemplate
+    // Additional fields
+    keywords: generateKeywords(productData),
+    bullet_point1: extractBulletPoints(features)[0] || '',
+    bullet_point2: extractBulletPoints(features)[1] || '',
+    bullet_point3: extractBulletPoints(features)[2] || '',
+    bullet_point4: extractBulletPoints(features)[3] || '',
+    bullet_point5: extractBulletPoints(features)[4] || '',
   }
 }
 
-function generateCSV(templateData: TemplateData): string {
-  const headers = Object.keys(templateData)
-  const values = Object.values(templateData)
-
-  // Create CSV content
-  const csvHeaders = headers.join(',')
-  const csvValues = values
-    .map((value) =>
-      typeof value === 'string' && value.includes(',') ? `"${value}"` : value
-    )
-    .join(',')
-
-  return `${csvHeaders}\n${csvValues}`
-}
-
-function extractColor(productData: any): string {
-  const content =
-    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
-
-  const colors = [
-    'black',
-    'white',
-    'red',
-    'blue',
-    'green',
-    'yellow',
-    'orange',
-    'purple',
-    'pink',
-    'brown',
-    'gray',
-    'silver',
-    'gold',
+// Convert template data to CSV format
+function convertToCSV(templateData: any): string {
+  const headers = [
+    'sku',
+    'product-id',
+    'product-id-type',
+    'item-name',
+    'item-description',
+    'price',
+    'quantity',
+    'product-type',
+    'brand-name',
+    'manufacturer',
+    'item-condition',
+    'main-image-url',
+    'other-image-url1',
+    'other-image-url2',
+    'other-image-url3',
+    'other-image-url4',
+    'keywords',
+    'bullet-point1',
+    'bullet-point2',
+    'bullet-point3',
+    'bullet-point4',
+    'bullet-point5',
   ]
-  const foundColor = colors.find((color) => content.includes(color))
 
-  return foundColor
-    ? foundColor.charAt(0).toUpperCase() + foundColor.slice(1)
-    : 'Black'
+  const row = [
+    templateData.sku,
+    '', // product-id (empty for new products)
+    '', // product-id-type
+    `"${templateData.title.replace(/"/g, '""')}"`, // Escape quotes
+    `"${templateData.description.replace(/"/g, '""')}"`,
+    templateData.price,
+    templateData.quantity,
+    templateData.product_type,
+    templateData.brand,
+    templateData.manufacturer,
+    templateData.condition,
+    templateData.main_image_url,
+    templateData.other_image_url1,
+    templateData.other_image_url2,
+    templateData.other_image_url3,
+    templateData.other_image_url4,
+    `"${templateData.keywords.replace(/"/g, '""')}"`,
+    `"${templateData.bullet_point1.replace(/"/g, '""')}"`,
+    `"${templateData.bullet_point2.replace(/"/g, '""')}"`,
+    `"${templateData.bullet_point3.replace(/"/g, '""')}"`,
+    `"${templateData.bullet_point4.replace(/"/g, '""')}"`,
+    `"${templateData.bullet_point5.replace(/"/g, '""')}"`,
+  ]
+
+  return headers.join(',') + '\n' + row.join(',')
 }
 
-function extractGender(productData: any): string {
+// Helper functions
+function extractBrand(productData: any): string {
   const content =
-    `${productData.title || ''} ${productData.description || ''}`.toLowerCase()
+    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`.toLowerCase()
+
+  // Common brand extraction patterns
+  if (content.includes('nike')) return 'Nike'
+  if (content.includes('apple')) return 'Apple'
+  if (content.includes('samsung')) return 'Samsung'
+  if (content.includes('sony')) return 'Sony'
+
+  // Try to extract from title (first word if it looks like a brand)
+  const words = (productData.product_name || productData.title || '').split(' ')
+  if (words[0] && words[0].length > 2 && /^[A-Z]/.test(words[0])) {
+    return words[0]
+  }
+
+  return 'Generic'
+}
+
+function truncateTitle(title: string, maxLength: number): string {
+  if (title.length <= maxLength) return title
+  return title.substring(0, maxLength - 3) + '...'
+}
+
+function formatAmazonDescription(
+  description: string,
+  features: string
+): string {
+  let formatted = description
+
+  if (features) {
+    formatted += '\n\nKey Features:\n' + features
+  }
+
+  return formatted.substring(0, 2000) // Amazon description limit
+}
+
+function detectAmazonCategory(productData: any): string {
+  const content =
+    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`.toLowerCase()
+
+  if (
+    content.includes('electronics') ||
+    content.includes('phone') ||
+    content.includes('computer')
+  ) {
+    return 'Electronics'
+  }
+  if (
+    content.includes('clothing') ||
+    content.includes('shirt') ||
+    content.includes('dress')
+  ) {
+    return 'Clothing'
+  }
+  if (content.includes('book')) {
+    return 'Books'
+  }
+  if (content.includes('home') || content.includes('kitchen')) {
+    return 'Home & Kitchen'
+  }
+
+  return 'Miscellaneous'
+}
+
+function detectDepartment(productData: any): string {
+  const content =
+    `${productData.product_name || productData.title || ''} ${productData.content || productData.description || ''}`.toLowerCase()
 
   if (content.includes('men') || content.includes('male')) return 'mens'
   if (
@@ -267,14 +314,66 @@ function extractGender(productData: any): string {
     content.includes('ladies')
   )
     return 'womens'
+  if (
+    content.includes('kids') ||
+    content.includes('children') ||
+    content.includes('child')
+  )
+    return 'kids'
+  if (content.includes('baby') || content.includes('infant')) return 'baby'
+
   return 'unisex'
 }
 
-function extractDepartment(productData: any): string {
-  const gender = extractGender(productData)
-  return gender === 'mens'
-    ? 'mens'
-    : gender === 'womens'
-      ? 'womens'
-      : 'unisex-adult'
+function generateKeywords(productData: any): string {
+  const content = `${productData.product_name || productData.title || ''} ${productData.features || ''} ${productData.content || productData.description || ''}`
+  const words = content.toLowerCase().split(/\s+/)
+
+  // Extract meaningful keywords
+  const keywords = words
+    .filter((word) => word.length > 3 && word.length < 20)
+    .filter(
+      (word) =>
+        ![
+          'the',
+          'and',
+          'for',
+          'with',
+          'this',
+          'that',
+          'will',
+          'can',
+          'your',
+        ].includes(word)
+    )
+    .slice(0, 10)
+
+  return keywords.join(', ')
+}
+
+function extractBulletPoints(features: string): string[] {
+  if (!features) return ['', '', '', '', '']
+
+  // Split by common separators
+  const points = features
+    .split(/[•\-\n]/)
+    .map((point) => point.trim())
+    .filter((point) => point.length > 0)
+
+  // Ensure we have 5 bullet points
+  const bullets = ['', '', '', '', '']
+  for (let i = 0; i < Math.min(points.length, 5); i++) {
+    bullets[i] = points[i].substring(0, 255) // Amazon bullet point limit
+  }
+
+  return bullets
+}
+
+function generateSKU(title: string): string {
+  const timestamp = Date.now().toString().slice(-6)
+  const prefix = title
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+    .slice(0, 6)
+  return `AMZ-${prefix}-${timestamp}`
 }

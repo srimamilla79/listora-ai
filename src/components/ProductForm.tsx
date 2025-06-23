@@ -1811,7 +1811,6 @@ export default function ProductForm({
                 </div>
               </div>
             </div>
-            // Add this before your voice recorder section
             {showVoiceRecorder && (
               <div className="mb-4">
                 <div className="flex items-center space-x-2 text-sm text-gray-600 bg-blue-50 rounded-lg p-3">
