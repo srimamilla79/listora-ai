@@ -701,319 +701,327 @@ export default function UnifiedPublisher({
     <div className="mt-6 space-y-6">
       {/* Amazon Instructions Modal */}
       {showInstructions && instructionData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center z-50 p-4 pt-8 pb-8 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full min-h-fit">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-6 rounded-t-xl sticky top-0 z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold flex items-center">
-                    🚀 Amazon Listing Instructions
-                  </h2>
-                  <p className="text-orange-100 mt-1">
-                    Professional guide with optimized product data
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowInstructions(false)}
-                  className="text-white hover:text-orange-200 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white hover:bg-opacity-20 transition-colors"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {/* Product Info */}
-            <div className="bg-gray-50 p-6 border-b">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                📦 Your Product Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white p-3 rounded-lg border">
-                  <strong className="text-gray-600">Product:</strong>
-                  <p className="text-gray-900 text-sm">
-                    {instructionData.title}
-                  </p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border">
-                  <strong className="text-gray-600">Category:</strong>
-                  <p className="text-gray-900 text-sm">
-                    {instructionData.category}
-                  </p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border">
-                  <strong className="text-gray-600">SKU:</strong>
-                  <p className="text-gray-900 text-sm">{instructionData.sku}</p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border">
-                  <strong className="text-gray-600">Price:</strong>
-                  <p className="text-gray-900 text-sm">
-                    ${instructionData.price}
-                  </p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+          <div className="min-h-screen flex items-start justify-center p-4 pt-8">
+            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-0 relative">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-6 rounded-t-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold flex items-center">
+                      🚀 Amazon Listing Instructions
+                    </h2>
+                    <p className="text-orange-100 mt-1">
+                      Professional guide with optimized product data
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowInstructions(false)}
+                    className="text-white hover:text-orange-200 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white hover:bg-opacity-20 transition-colors"
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* Instructions Content */}
-            <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
-              {/* Step 1 */}
-              <div className="border-2 border-blue-200 rounded-lg overflow-hidden">
-                <div className="bg-blue-500 text-white p-4">
-                  <h4 className="font-semibold text-lg">
-                    📥 Step 1: Download Amazon's Official Template
-                  </h4>
-                </div>
-                <div className="p-4">
-                  <ol className="space-y-2 text-sm">
-                    <li>
-                      1. Go to <strong>Amazon Seller Central</strong>
-                    </li>
-                    <li>
-                      2. Navigate to:{' '}
-                      <strong>Catalog → Add Products via Upload</strong>
-                    </li>
-                    <li>
-                      3. Click: <strong>"Download an Inventory File"</strong>
-                    </li>
-                    <li>
-                      4. Select category:{' '}
-                      <strong>"Clothing, Shoes & Jewelry"</strong>
-                    </li>
-                    <li>
-                      5. Choose your marketplace and click{' '}
-                      <strong>"Generate Template"</strong>
-                    </li>
-                    <li>6. Download the official Amazon template file</li>
-                  </ol>
-                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-yellow-800 text-sm">
-                      <strong>⚠️ Important:</strong> Only use Amazon's official
-                      template. Never modify the headers or structure.
+              {/* Product Info */}
+              <div className="bg-gray-50 p-6 border-b">
+                <h3 className="font-semibold text-gray-900 mb-4">
+                  📦 Your Product Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-white p-3 rounded-lg border">
+                    <strong className="text-gray-600">Product:</strong>
+                    <p className="text-gray-900 text-sm">
+                      {instructionData.title}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border">
+                    <strong className="text-gray-600">Category:</strong>
+                    <p className="text-gray-900 text-sm">
+                      {instructionData.category}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border">
+                    <strong className="text-gray-600">SKU:</strong>
+                    <p className="text-gray-900 text-sm">
+                      {instructionData.sku}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border">
+                    <strong className="text-gray-600">Price:</strong>
+                    <p className="text-gray-900 text-sm">
+                      ${instructionData.price}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Step 2 */}
-              <div className="border-2 border-green-200 rounded-lg overflow-hidden">
-                <div className="bg-green-500 text-white p-4">
-                  <h4 className="font-semibold text-lg">
-                    ✏️ Step 2: Fill in Your Optimized Product Data
-                  </h4>
+              {/* Instructions Content */}
+              <div className="p-6 space-y-6">
+                {/* Step 1 */}
+                <div className="border-2 border-blue-200 rounded-lg overflow-hidden">
+                  <div className="bg-blue-500 text-white p-4">
+                    <h4 className="font-semibold text-lg">
+                      📥 Step 1: Download Amazon's Official Template
+                    </h4>
+                  </div>
+                  <div className="p-4">
+                    <ol className="space-y-2 text-sm">
+                      <li>
+                        1. Go to <strong>Amazon Seller Central</strong>
+                      </li>
+                      <li>
+                        2. Navigate to:{' '}
+                        <strong>Catalog → Add Products via Upload</strong>
+                      </li>
+                      <li>
+                        3. Click: <strong>"Download an Inventory File"</strong>
+                      </li>
+                      <li>
+                        4. Select category:{' '}
+                        <strong>"Clothing, Shoes & Jewelry"</strong>
+                      </li>
+                      <li>
+                        5. Choose your marketplace and click{' '}
+                        <strong>"Generate Template"</strong>
+                      </li>
+                      <li>6. Download the official Amazon template file</li>
+                    </ol>
+                    <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <p className="text-yellow-800 text-sm">
+                        <strong>⚠️ Important:</strong> Only use Amazon's
+                        official template. Never modify the headers or
+                        structure.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="p-4 space-y-4">
-                  <p className="text-sm text-gray-600">
-                    Open the downloaded template in Excel and copy-paste the
-                    optimized data below:
-                  </p>
 
-                  {/* Core Product Information */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h5 className="font-semibold text-blue-900 mb-3">
-                      🎯 Core Product Information
-                    </h5>
-                    <div className="space-y-3">
-                      {[
-                        { label: 'SKU', value: instructionData.sku },
-                        { label: 'Product Name', value: instructionData.title },
-                        { label: 'Brand', value: instructionData.brand },
-                        {
-                          label: 'Price',
-                          value: instructionData.price.toString(),
-                        },
-                        {
-                          label: 'Quantity',
-                          value: instructionData.quantity.toString(),
-                        },
-                      ].map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center space-x-3 bg-white p-3 rounded border"
-                        >
-                          <span className="text-sm font-medium text-gray-700 min-w-[100px]">
-                            {item.label}:
-                          </span>
-                          <div className="flex-1 bg-gray-50 p-2 rounded border text-sm font-mono">
-                            {item.value}
-                          </div>
-                          <button
-                            onClick={() => copyToClipboard(item.value)}
-                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors flex items-center"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                {/* Step 2 */}
+                <div className="border-2 border-green-200 rounded-lg overflow-hidden">
+                  <div className="bg-green-500 text-white p-4">
+                    <h4 className="font-semibold text-lg">
+                      ✏️ Step 2: Fill in Your Optimized Product Data
+                    </h4>
                   </div>
+                  <div className="p-4 space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Open the downloaded template in Excel and copy-paste the
+                      optimized data below:
+                    </p>
 
-                  {/* Description */}
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <h5 className="font-semibold text-purple-900 mb-3">
-                      📝 Product Description
-                    </h5>
-                    <div className="flex items-start space-x-3 bg-white p-3 rounded border">
-                      <span className="text-sm font-medium text-gray-700 min-w-[100px]">
-                        Description:
-                      </span>
-                      <div className="flex-1 bg-gray-50 p-2 rounded border text-sm">
-                        {instructionData.description}
+                    {/* Core Product Information */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h5 className="font-semibold text-blue-900 mb-3">
+                        🎯 Core Product Information
+                      </h5>
+                      <div className="space-y-3">
+                        {[
+                          { label: 'SKU', value: instructionData.sku },
+                          {
+                            label: 'Product Name',
+                            value: instructionData.title,
+                          },
+                          { label: 'Brand', value: instructionData.brand },
+                          {
+                            label: 'Price',
+                            value: instructionData.price.toString(),
+                          },
+                          {
+                            label: 'Quantity',
+                            value: instructionData.quantity.toString(),
+                          },
+                        ].map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center space-x-3 bg-white p-3 rounded border"
+                          >
+                            <span className="text-sm font-medium text-gray-700 min-w-[100px]">
+                              {item.label}:
+                            </span>
+                            <div className="flex-1 bg-gray-50 p-2 rounded border text-sm font-mono">
+                              {item.value}
+                            </div>
+                            <button
+                              onClick={() => copyToClipboard(item.value)}
+                              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors flex items-center"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      <button
-                        onClick={() =>
-                          copyToClipboard(instructionData.description)
-                        }
-                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors flex items-center"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </button>
                     </div>
-                  </div>
 
-                  {/* Bullet Points */}
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <h5 className="font-semibold text-orange-900 mb-3">
-                      🎯 Bullet Points
-                    </h5>
-                    <div className="space-y-3">
-                      {[
-                        instructionData.bullet_point1,
-                        instructionData.bullet_point2,
-                        instructionData.bullet_point3,
-                        instructionData.bullet_point4,
-                        instructionData.bullet_point5,
-                      ].map((bullet, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center space-x-3 bg-white p-3 rounded border"
-                        >
-                          <span className="text-sm font-medium text-gray-700 min-w-[100px]">
-                            Bullet {index + 1}:
-                          </span>
-                          <div className="flex-1 bg-gray-50 p-2 rounded border text-sm">
-                            {bullet}
-                          </div>
-                          <button
-                            onClick={() => copyToClipboard(bullet)}
-                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors flex items-center"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Keywords & Images */}
-                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
-                    <h5 className="font-semibold text-teal-900 mb-3">
-                      🔍 Keywords & Images
-                    </h5>
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-3 bg-white p-3 rounded border">
+                    {/* Description */}
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <h5 className="font-semibold text-purple-900 mb-3">
+                        📝 Product Description
+                      </h5>
+                      <div className="flex items-start space-x-3 bg-white p-3 rounded border">
                         <span className="text-sm font-medium text-gray-700 min-w-[100px]">
-                          Keywords:
+                          Description:
                         </span>
                         <div className="flex-1 bg-gray-50 p-2 rounded border text-sm">
-                          {instructionData.keywords}
+                          {instructionData.description}
                         </div>
                         <button
                           onClick={() =>
-                            copyToClipboard(instructionData.keywords)
+                            copyToClipboard(instructionData.description)
                           }
                           className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors flex items-center"
                         >
                           <Copy className="h-3 w-3" />
                         </button>
                       </div>
-                      {instructionData.main_image_url && (
+                    </div>
+
+                    {/* Bullet Points */}
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                      <h5 className="font-semibold text-orange-900 mb-3">
+                        🎯 Bullet Points
+                      </h5>
+                      <div className="space-y-3">
+                        {[
+                          instructionData.bullet_point1,
+                          instructionData.bullet_point2,
+                          instructionData.bullet_point3,
+                          instructionData.bullet_point4,
+                          instructionData.bullet_point5,
+                        ].map((bullet, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center space-x-3 bg-white p-3 rounded border"
+                          >
+                            <span className="text-sm font-medium text-gray-700 min-w-[100px]">
+                              Bullet {index + 1}:
+                            </span>
+                            <div className="flex-1 bg-gray-50 p-2 rounded border text-sm">
+                              {bullet}
+                            </div>
+                            <button
+                              onClick={() => copyToClipboard(bullet)}
+                              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors flex items-center"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Keywords & Images */}
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
+                      <h5 className="font-semibold text-teal-900 mb-3">
+                        🔍 Keywords & Images
+                      </h5>
+                      <div className="space-y-3">
                         <div className="flex items-center space-x-3 bg-white p-3 rounded border">
                           <span className="text-sm font-medium text-gray-700 min-w-[100px]">
-                            Main Image:
+                            Keywords:
                           </span>
-                          <div className="flex-1 bg-gray-50 p-2 rounded border text-sm font-mono">
-                            {instructionData.main_image_url}
+                          <div className="flex-1 bg-gray-50 p-2 rounded border text-sm">
+                            {instructionData.keywords}
                           </div>
                           <button
                             onClick={() =>
-                              copyToClipboard(instructionData.main_image_url)
+                              copyToClipboard(instructionData.keywords)
                             }
                             className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors flex items-center"
                           >
                             <Copy className="h-3 w-3" />
                           </button>
                         </div>
-                      )}
+                        {instructionData.main_image_url && (
+                          <div className="flex items-center space-x-3 bg-white p-3 rounded border">
+                            <span className="text-sm font-medium text-gray-700 min-w-[100px]">
+                              Main Image:
+                            </span>
+                            <div className="flex-1 bg-gray-50 p-2 rounded border text-sm font-mono">
+                              {instructionData.main_image_url}
+                            </div>
+                            <button
+                              onClick={() =>
+                                copyToClipboard(instructionData.main_image_url)
+                              }
+                              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm transition-colors flex items-center"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="border-2 border-purple-200 rounded-lg overflow-hidden">
+                  <div className="bg-purple-500 text-white p-4">
+                    <h4 className="font-semibold text-lg">
+                      📤 Step 3: Upload Your Completed Template
+                    </h4>
+                  </div>
+                  <div className="p-4">
+                    <ol className="space-y-2 text-sm">
+                      <li>1. Save your completed template file</li>
+                      <li>
+                        2. Go back to:{' '}
+                        <strong>Catalog → Add Products via Upload</strong>
+                      </li>
+                      <li>
+                        3. Click: <strong>"Upload your inventory file"</strong>
+                      </li>
+                      <li>
+                        4. Select{' '}
+                        <strong>"Category-specific inventory files"</strong>
+                      </li>
+                      <li>
+                        5. Choose <strong>"Clothing, Shoes & Jewelry"</strong>
+                      </li>
+                      <li>6. Upload your completed template</li>
+                      <li>7. Wait for Amazon to process your file</li>
+                      <li>8. Check the processing report for confirmation</li>
+                    </ol>
+                    <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-green-800 text-sm">
+                        <strong>🎉 Success!</strong> Your product will be listed
+                        on Amazon with professionally optimized data that
+                        complies with all Amazon requirements.
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Step 3 */}
-              <div className="border-2 border-purple-200 rounded-lg overflow-hidden">
-                <div className="bg-purple-500 text-white p-4">
-                  <h4 className="font-semibold text-lg">
-                    📤 Step 3: Upload Your Completed Template
-                  </h4>
-                </div>
-                <div className="p-4">
-                  <ol className="space-y-2 text-sm">
-                    <li>1. Save your completed template file</li>
-                    <li>
-                      2. Go back to:{' '}
-                      <strong>Catalog → Add Products via Upload</strong>
-                    </li>
-                    <li>
-                      3. Click: <strong>"Upload your inventory file"</strong>
-                    </li>
-                    <li>
-                      4. Select{' '}
-                      <strong>"Category-specific inventory files"</strong>
-                    </li>
-                    <li>
-                      5. Choose <strong>"Clothing, Shoes & Jewelry"</strong>
-                    </li>
-                    <li>6. Upload your completed template</li>
-                    <li>7. Wait for Amazon to process your file</li>
-                    <li>8. Check the processing report for confirmation</li>
-                  </ol>
-                  <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
-                    <p className="text-green-800 text-sm">
-                      <strong>🎉 Success!</strong> Your product will be listed
-                      on Amazon with professionally optimized data that complies
-                      with all Amazon requirements.
-                    </p>
+              {/* Footer */}
+              <div className="bg-gray-100 p-4 rounded-b-xl border-t">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Generated by <strong>Listora AI</strong> • Professional
+                    Amazon Optimization
                   </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-gray-100 p-4 rounded-b-xl border-t">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  Generated by <strong>Listora AI</strong> • Professional Amazon
-                  Optimization
-                </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() =>
-                      window.open(
-                        'https://sellercentral.amazon.com/listing/cards',
-                        '_blank'
-                      )
-                    }
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center space-x-2"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    <span>Open Seller Central</span>
-                  </button>
-                  <button
-                    onClick={() => setShowInstructions(false)}
-                    className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-                  >
-                    Close
-                  </button>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() =>
+                        window.open(
+                          'https://sellercentral.amazon.com/listing/cards',
+                          '_blank'
+                        )
+                      }
+                      className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center space-x-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      <span>Open Seller Central</span>
+                    </button>
+                    <button
+                      onClick={() => setShowInstructions(false)}
+                      className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
