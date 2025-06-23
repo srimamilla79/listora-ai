@@ -303,12 +303,12 @@ function escapeCSVField(text: string): string {
   return cleaned
 }
 
-// ✅ NEW: Clean and truncate title
+// ✅ ENHANCED: Clean and truncate title with duplicate word removal
 function cleanAndTruncateTitle(title: string, maxLength: number): string {
   const cleaned = cleanText(title)
 
   // Remove markdown/formatting
-  const withoutFormatting = cleaned
+  let withoutFormatting = cleaned
     .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
     .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
     .replace(/#{1,6}\s/g, '') // Remove # headers
@@ -316,8 +316,40 @@ function cleanAndTruncateTitle(title: string, maxLength: number): string {
     .replace(/^-\s*/g, '') // Remove bullet points
     .trim()
 
-  if (withoutFormatting.length <= maxLength) return withoutFormatting
-  return withoutFormatting.substring(0, maxLength - 3) + '...'
+  // ✅ AMAZON TITLE ENHANCEMENT
+  // If title is too simple (like "wooden watch"), make it more descriptive
+  if (withoutFormatting.length < 20) {
+    // Extract key info to build better title
+    const words = withoutFormatting.toLowerCase().split(' ')
+
+    if (words.includes('watch')) {
+      withoutFormatting = `Premium ${withoutFormatting} - Natural Design with Luxury Accents`
+    } else if (words.includes('shoe') || words.includes('shoes')) {
+      withoutFormatting = `Premium ${withoutFormatting} - Comfortable Athletic Footwear`
+    } else if (words.includes('shirt')) {
+      withoutFormatting = `Premium ${withoutFormatting} - Comfortable Casual Apparel`
+    } else {
+      withoutFormatting = `Premium ${withoutFormatting} - High Quality Product`
+    }
+  }
+
+  // ✅ REMOVE DUPLICATE WORDS (Amazon requirement)
+  const titleWords = withoutFormatting.split(' ')
+  const seenWords = new Set()
+  const uniqueWords = []
+
+  for (const word of titleWords) {
+    const lowerWord = word.toLowerCase()
+    if (!seenWords.has(lowerWord)) {
+      seenWords.add(lowerWord)
+      uniqueWords.push(word)
+    }
+  }
+
+  const finalTitle = uniqueWords.join(' ')
+
+  if (finalTitle.length <= maxLength) return finalTitle
+  return finalTitle.substring(0, maxLength - 3) + '...'
 }
 
 // ✅ FINAL FIX: Format Amazon description with SUPER AGGRESSIVE cleaning
@@ -447,7 +479,7 @@ function mapCondition(condition: string): string {
   return conditionMap[condition] || 'New'
 }
 
-// ✅ UPDATED: Generate clean keywords
+// ✅ UPDATED: Generate clean keywords without duplication
 function generateCleanKeywords(productData: any): string {
   const content = cleanText(
     `${productData.product_name || productData.title || ''} ${productData.features || ''} ${productData.content || productData.description || ''}`
@@ -484,11 +516,15 @@ function generateCleanKeywords(productData: any): string {
           'key',
           'selling',
           'points',
+          'premium',
+          'quality',
+          'design',
+          'luxury', // Remove common enhancement words
         ].includes(word)
     )
 
-  // Remove duplicates and take first 8 keywords
-  const uniqueKeywords = [...new Set(words)].slice(0, 8)
+  // Remove duplicates and take first 6 keywords (fewer to avoid repetition)
+  const uniqueKeywords = [...new Set(words)].slice(0, 6)
 
   return uniqueKeywords.join(', ')
 }
