@@ -101,7 +101,8 @@ export async function POST(request: NextRequest) {
       method: 'amazon_template',
       data: {
         templateId: `template-${Date.now()}`,
-        textContent: instructionsText, // Return text content directly
+        textContent: instructionsText, // For client-side download
+        downloadUrl: `data:text/plain;charset=utf-8,${encodeURIComponent(instructionsText)}`, // Fallback
         filename: filename,
         sku: amazonData.sku,
         title: amazonData.title,
