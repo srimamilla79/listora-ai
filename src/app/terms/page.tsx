@@ -5,7 +5,7 @@ import ListoraAILogo from '@/components/ui/ListoraAILogo'
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header - UPDATED */}
+      {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
@@ -35,9 +35,9 @@ export default function TermsOfServicePage() {
           </h1>
 
           <p className="text-gray-600 mb-8">
-            <strong>Effective Date:</strong> June 4, 2025
+            <strong>Effective Date:</strong> June 10, 2025
             <br />
-            <strong>Last Updated:</strong> June 4, 2025
+            <strong>Last Updated:</strong> June 10, 2025
           </p>
 
           <div className="prose prose-lg max-w-none">
@@ -53,11 +53,12 @@ export default function TermsOfServicePage() {
                 content generation platform, website, mobile applications, and
                 all related services (collectively, the "Service").
               </p>
-              <p className="text-gray-700 font-medium">
+              <p className="text-gray-700 font-medium mb-4">
                 IMPORTANT: BY ACCESSING, USING, OR REGISTERING FOR OUR SERVICE,
                 YOU EXPRESSLY ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND
-                AGREE TO BE BOUND BY THESE TERMS. IF YOU DO NOT AGREE TO THESE
-                TERMS, DO NOT USE OUR SERVICE.
+                AGREE TO BE BOUND BY THESE TERMS, INCLUDING THE AI-SPECIFIC
+                PROVISIONS, ARBITRATION CLAUSE, AND CLASS ACTION WAIVER. IF YOU
+                DO NOT AGREE TO THESE TERMS, DO NOT USE OUR SERVICE.
               </p>
               <p className="text-gray-700 leading-relaxed">
                 These Terms apply to all users, including visitors, registered
@@ -80,21 +81,34 @@ export default function TermsOfServicePage() {
                 <li>AI-generated product descriptions and marketing copy</li>
                 <li>
                   Content optimization for multiple e-commerce platforms
-                  (Amazon, Shopify, Etsy, Instagram, etc.)
+                  (Amazon, Shopify, eBay, Etsy, Instagram, etc.)
+                </li>
+                <li>
+                  Voice-to-content generation and audio processing capabilities
                 </li>
                 <li>Image processing, editing, and background removal tools</li>
                 <li>
                   Content templates, variations, and customization options
                 </li>
-                <li>Export capabilities and platform integrations</li>
+                <li>Third-party platform integrations and publishing tools</li>
+                <li>Export capabilities and bulk processing features</li>
                 <li>Analytics and performance tracking tools</li>
               </ul>
-              <p className="text-gray-700 font-medium">
-                AI Disclaimer: Our Service uses artificial intelligence and
-                machine learning algorithms. While we strive for accuracy and
-                quality, AI-generated content may contain errors, inaccuracies,
-                or inappropriate material. You are solely responsible for
-                reviewing, editing, and verifying all content before use.
+              <p className="text-gray-700 font-medium mb-4">
+                <strong>CRITICAL AI DISCLAIMER:</strong> Our Service uses
+                artificial intelligence and machine learning algorithms that are
+                inherently unpredictable and subject to limitations. While we
+                strive for accuracy and quality, AI-generated content may
+                contain errors, inaccuracies, biases, inappropriate material, or
+                content that violates third-party platform policies. YOU ARE
+                SOLELY RESPONSIBLE for reviewing, editing, verifying, and
+                ensuring compliance of all content before use.
+              </p>
+              <p className="text-gray-700 leading-relaxed">
+                <strong>Export Control Notice:</strong> Our AI technology may be
+                subject to export control laws. Access may be restricted in
+                certain countries or for certain individuals or entities subject
+                to sanctions.
               </p>
             </section>
 
@@ -120,6 +134,10 @@ export default function TermsOfServicePage() {
                   You must verify your email address before accessing certain
                   features
                 </li>
+                <li>
+                  You may not register if you are located in a restricted
+                  jurisdiction
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -140,7 +158,12 @@ export default function TermsOfServicePage() {
                 </li>
                 <li>
                   We are not liable for any loss or damage arising from
-                  unauthorized account access
+                  unauthorized account access due to your failure to maintain
+                  security
+                </li>
+                <li>
+                  You agree to use strong passwords and enable two-factor
+                  authentication when available
                 </li>
               </ul>
 
@@ -150,14 +173,14 @@ export default function TermsOfServicePage() {
               <p className="text-gray-700 leading-relaxed">
                 We reserve the right to suspend, disable, or terminate your
                 account at any time, with or without notice, for any violation
-                of these Terms or any reason we deem appropriate in our sole
-                discretion.
+                of these Terms, suspicious activity, legal requirements, or any
+                reason we deem appropriate in our sole discretion.
               </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                4. Acceptable Use Policy and Prohibited Activities
+                4. Acceptable Use Policy and Prohibited Activities - ENHANCED
               </h2>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -186,53 +209,104 @@ export default function TermsOfServicePage() {
                 </li>
                 <li>
                   Violates platform policies of e-commerce sites (Amazon, eBay,
-                  etc.)
+                  Shopify, Etsy, etc.)
                 </li>
                 <li>
                   Constitutes spam, bulk messaging, or unwanted commercial
                   communications
                 </li>
+                <li>
+                  Promotes financial schemes, cryptocurrencies without proper
+                  disclosure, or investment advice
+                </li>
+                <li>
+                  Contains health claims, medical advice, or pharmaceutical
+                  information without proper authorization
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                4.2 Technical Restrictions
+                4.2 Third-Party Platform Compliance - CRITICAL
+              </h3>
+              <p className="text-gray-700 font-medium leading-relaxed mb-4">
+                IMPORTANT PLATFORM LIABILITY DISCLAIMER: You acknowledge that
+                AI-generated content may violate third-party platform policies
+                including but not limited to Amazon, Shopify, eBay, Etsy, and
+                other e-commerce platforms. YOU ASSUME FULL RESPONSIBILITY FOR:
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>
+                  Platform compliance and policy adherence for all published
+                  content
+                </li>
+                <li>
+                  Account suspensions, bans, or penalties imposed by third-party
+                  platforms
+                </li>
+                <li>
+                  Financial losses resulting from platform policy violations
+                </li>
+                <li>
+                  Removal of listings, loss of seller privileges, or account
+                  restrictions
+                </li>
+                <li>Legal consequences arising from non-compliant content</li>
+              </ul>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                <strong>
+                  YOU HOLD LISTORA AI HARMLESS from any and all consequences
+                  arising from third-party platform actions, policy violations,
+                  or content rejections, regardless of whether such violations
+                  were foreseeable or preventable.
+                </strong>
+              </p>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                4.3 Technical Restrictions
               </h3>
               <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>
                   Do not attempt to reverse engineer, decompile, or extract our
-                  AI models
+                  AI models or proprietary algorithms
                 </li>
                 <li>
                   Do not use automated tools, bots, or scripts to access our
-                  Service
+                  Service beyond authorized API usage
                 </li>
                 <li>
                   Do not attempt to overwhelm our servers or infrastructure
+                  through excessive requests
                 </li>
                 <li>
-                  Do not circumvent usage limits, security measures, or access
-                  controls
+                  Do not circumvent usage limits, security measures, rate
+                  limits, or access controls
                 </li>
                 <li>
                   Do not interfere with other users' access to or use of the
                   Service
                 </li>
+                <li>
+                  Do not attempt to train competing AI models using our outputs
+                  or proprietary data
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                4.3 Consequences of Violations
+                4.4 Consequences of Violations
               </h3>
               <p className="text-gray-700 leading-relaxed">
                 Violation of this Acceptable Use Policy may result in immediate
                 account suspension or termination, removal of content, legal
-                action, and reporting to appropriate authorities. You may be
-                held liable for damages resulting from prohibited use.
+                action, reporting to appropriate authorities, and liability for
+                damages. You may be held liable for all costs and damages
+                resulting from prohibited use, including legal fees and
+                third-party claims.
               </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                5. Intellectual Property Rights and Content Ownership
+                5. Intellectual Property Rights and Content Ownership - ENHANCED
               </h2>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -242,9 +316,9 @@ export default function TermsOfServicePage() {
                 The Service, including all software, AI models, algorithms,
                 databases, content, trademarks, logos, and intellectual
                 property, is owned by Listora AI and protected by copyright,
-                trademark, patent, and other intellectual property laws. You
-                acknowledge that we retain all rights, title, and interest in
-                our intellectual property.
+                trademark, patent, trade secret, and other intellectual property
+                laws. You acknowledge that we retain all rights, title, and
+                interest in our intellectual property.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -253,56 +327,98 @@ export default function TermsOfServicePage() {
               <p className="text-gray-700 leading-relaxed mb-4">
                 You retain ownership of any original content, data, or materials
                 you upload to our Service ("User Content"). However, by using
-                our Service, you grant us certain rights as described below.
+                our Service, you grant us extensive rights as described below.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                5.3 License Grant to Listora AI
+                5.3 Comprehensive License Grant to Listora AI
               </h3>
               <p className="text-gray-700 font-medium leading-relaxed mb-4">
-                IMPORTANT LICENSE TERMS: By uploading or inputting content into
-                our Service, you grant Listora AI a worldwide, non-exclusive,
-                royalty-free, sublicensable, and transferable license to use,
-                reproduce, modify, adapt, publish, translate, distribute, and
-                display your User Content for the purposes of:
+                CRITICAL LICENSE TERMS: By uploading or inputting content into
+                our Service, you grant Listora AI a worldwide, perpetual,
+                irrevocable, non-exclusive, royalty-free, sublicensable, and
+                transferable license to use, reproduce, modify, adapt, publish,
+                translate, distribute, display, and create derivative works from
+                your User Content for the purposes of:
               </p>
-              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-1">
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>Providing and improving our Service</li>
-                <li>Training and enhancing our AI models</li>
+                <li>Training and enhancing our AI models and algorithms</li>
                 <li>Developing new features and capabilities</li>
                 <li>Analytics and service optimization</li>
+                <li>
+                  Creating training datasets for internal and partner AI
+                  development
+                </li>
+                <li>Research and development purposes</li>
+                <li>
+                  Marketing and promotional activities (with anonymization)
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                5.4 AI-Generated Content Ownership
+                5.4 AI-Generated Content Ownership and Risks
               </h3>
               <p className="text-gray-700 leading-relaxed mb-4">
                 You own the content generated by our AI based on your inputs and
-                prompts. However, you acknowledge that:
+                prompts, subject to the following important limitations:
               </p>
-              <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>
-                  Similar content may be generated for other users based on
-                  similar inputs
+                  <strong>Non-Exclusivity:</strong> Similar or identical content
+                  may be generated for other users based on similar inputs
                 </li>
                 <li>
-                  You are responsible for ensuring your use complies with all
-                  applicable laws
+                  <strong>No Originality Guarantee:</strong> We do not warrant
+                  that generated content is original or free from third-party
+                  rights
                 </li>
                 <li>
-                  You must verify that generated content does not infringe
+                  <strong>Compliance Responsibility:</strong> You must verify
+                  that generated content complies with all applicable laws and
                   third-party rights
                 </li>
                 <li>
-                  We provide no warranties regarding the originality or legal
-                  compliance of generated content
+                  <strong>Platform Policy Risk:</strong> Generated content may
+                  violate third-party platform policies
                 </li>
+                <li>
+                  <strong>Copyright Risk:</strong> AI-generated content may
+                  inadvertently infringe copyrights or other IP rights
+                </li>
+              </ul>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                5.5 DMCA and Copyright Compliance
+              </h3>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                We respect intellectual property rights and comply with the
+                Digital Millennium Copyright Act (DMCA). If you believe content
+                on our Service infringes your copyright:
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>
+                  Send a DMCA takedown notice to our designated agent at{' '}
+                  <a
+                    href="mailto:dmca@listora.ai"
+                    className="text-slate-600 hover:text-slate-800"
+                  >
+                    dmca@listora.ai
+                  </a>
+                </li>
+                <li>
+                  Include all required DMCA notice elements (identification of
+                  work, location, contact info, good faith statement, etc.)
+                </li>
+                <li>We will process valid takedown notices promptly</li>
+                <li>Users may submit counter-notices for wrongful takedowns</li>
+                <li>Repeat infringers' accounts will be terminated</li>
               </ul>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                6. Subscription Plans, Payment Terms, and Billing
+                6. Subscription Plans, Payment Terms, and Billing - ENHANCED
               </h2>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -329,40 +445,67 @@ export default function TermsOfServicePage() {
                 </li>
                 <li>
                   <strong>Payment Authorization:</strong> You authorize us to
-                  charge your payment method for all fees
+                  charge your payment method for all fees and give us permission
+                  to obtain updated payment information
                 </li>
                 <li>
-                  <strong>Failed Payments:</strong> Service may be suspended for
-                  failed payments until resolved
+                  <strong>Failed Payments:</strong> Service may be suspended
+                  immediately for failed payments until resolved
                 </li>
                 <li>
                   <strong>Currency:</strong> All fees are in US Dollars unless
                   otherwise specified
                 </li>
+                <li>
+                  <strong>Taxes:</strong> You are responsible for all applicable
+                  taxes, which may be added to your bill
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                6.3 Refund and Cancellation Policy
+                6.3 No Refund Policy - STRICT
               </h3>
               <p className="text-gray-700 font-medium leading-relaxed mb-4">
-                NO REFUNDS: All fees paid are non-refundable except as required
-                by applicable law or as explicitly stated in these Terms. This
-                includes:
+                NO REFUNDS: ALL FEES PAID ARE STRICTLY NON-REFUNDABLE except as
+                required by applicable law. This includes but is not limited to:
               </p>
-              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-1">
-                <li>Subscription fees for completed billing periods</li>
-                <li>Usage-based charges for completed services</li>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>Subscription fees for any completed billing periods</li>
+                <li>
+                  Usage-based charges for completed AI generation services
+                </li>
                 <li>Upgrade or downgrade fee differences</li>
+                <li>Fees for services accessed or used, even partially</li>
+                <li>
+                  Fees paid prior to account termination for policy violations
+                </li>
+                <li>Charges resulting from unauthorized account access</li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                6.4 Price Changes
+                6.4 Chargeback and Dispute Prevention
+              </h3>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                <strong>Chargeback Prohibition:</strong> You agree to contact us
+                directly to resolve any billing disputes before initiating
+                chargebacks or payment disputes with your financial institution.
+                Unauthorized chargebacks may result in:
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>Immediate account termination</li>
+                <li>Collection of chargeback fees and legal costs</li>
+                <li>Reporting to credit agencies and fraud databases</li>
+                <li>Legal action for damages and fees</li>
+              </ul>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                6.5 Price Changes
               </h3>
               <p className="text-gray-700 leading-relaxed">
                 We may change our pricing at any time with at least 30 days'
-                notice. Price changes will take effect at your next billing
-                cycle. Continued use of the Service after a price change
-                constitutes acceptance of the new pricing.
+                notice for existing subscribers. Price changes will take effect
+                at your next billing cycle. Continued use of the Service after a
+                price change constitutes acceptance of the new pricing.
               </p>
             </section>
 
@@ -380,19 +523,26 @@ export default function TermsOfServicePage() {
                   Policy
                 </li>
                 <li>
-                  Your content may be used to train and improve our AI models
+                  <strong>AI Training Consent:</strong> Your content will be
+                  used to train and improve our AI models indefinitely
                 </li>
                 <li>
                   We implement industry-standard security measures to protect
                   your data
                 </li>
                 <li>
-                  You have certain rights regarding your personal information
+                  You have certain rights regarding your personal information,
+                  subject to AI training limitations
+                </li>
+                <li>
+                  Data deletion requests cannot reverse AI training that has
+                  already occurred
                 </li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
                 By using our Service, you consent to our data practices as
-                described in our Privacy Policy and these Terms.
+                described in our Privacy Policy and these Terms, including the
+                use of your content for AI model training.
               </p>
             </section>
 
@@ -412,8 +562,13 @@ export default function TermsOfServicePage() {
               <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>Scheduled maintenance and updates</li>
                 <li>Technical difficulties or server issues</li>
-                <li>Third-party service interruptions</li>
+                <li>
+                  Third-party service interruptions (AI providers, cloud
+                  hosting)
+                </li>
                 <li>Force majeure events beyond our control</li>
+                <li>Security incidents or necessary emergency measures</li>
+                <li>Legal or regulatory requirements</li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -421,7 +576,8 @@ export default function TermsOfServicePage() {
               </h3>
               <p className="text-gray-700 leading-relaxed">
                 We reserve the right to modify, suspend, or discontinue any
-                aspect of our Service at any time, with or without notice. We
+                aspect of our Service at any time, with or without notice. This
+                includes changes to AI models, features, pricing, or terms. We
                 are not liable for any modification, suspension, or
                 discontinuation of the Service.
               </p>
@@ -429,38 +585,77 @@ export default function TermsOfServicePage() {
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                9. Disclaimers and Limitations of Warranties
+                9. Disclaimers and Limitations of Warranties - COMPREHENSIVE
               </h2>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                9.1 AI Content Disclaimers
+                9.1 Critical AI Content Disclaimers
               </h3>
               <p className="text-gray-700 font-medium leading-relaxed mb-4">
-                CRITICAL AI DISCLAIMER: Our AI generates content based on
-                algorithms and training data. We make no representations or
-                warranties regarding:
+                ESSENTIAL AI DISCLAIMER: Our AI generates content based on
+                algorithms, training data, and machine learning models that are
+                inherently unpredictable and subject to biases, errors, and
+                limitations. WE MAKE NO REPRESENTATIONS OR WARRANTIES REGARDING:
               </p>
-              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-1">
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>
-                  Accuracy, completeness, or reliability of generated content
+                  Accuracy, completeness, reliability, or appropriateness of
+                  generated content
                 </li>
-                <li>Suitability for any particular purpose or use case</li>
                 <li>
-                  Compliance with industry standards or platform requirements
+                  Suitability for any particular purpose, platform, or use case
                 </li>
-                <li>Freedom from errors, biases, or inappropriate content</li>
-                <li>Originality or non-infringement of third-party rights</li>
+                <li>
+                  Compliance with industry standards, platform requirements, or
+                  legal regulations
+                </li>
+                <li>
+                  Freedom from errors, biases, inappropriate content, or harmful
+                  outputs
+                </li>
+                <li>
+                  Originality, uniqueness, or non-infringement of third-party
+                  rights
+                </li>
+                <li>
+                  Compliance with Amazon, Shopify, eBay, Etsy, or other platform
+                  policies
+                </li>
+                <li>
+                  Commercial success, performance, or effectiveness of generated
+                  content
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                9.2 General Disclaimers
+                9.2 User Assumption of AI Risks
+              </h3>
+              <p className="text-gray-700 font-medium leading-relaxed mb-4">
+                YOU EXPRESSLY ASSUME ALL RISKS related to AI-generated content
+                including but not limited to:
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>Copyright infringement claims and legal liability</li>
+                <li>
+                  Third-party platform policy violations and account penalties
+                </li>
+                <li>Regulatory non-compliance and legal consequences</li>
+                <li>Commercial failures and financial losses</li>
+                <li>Reputational damage from inappropriate content</li>
+                <li>Algorithmic bias and discriminatory outputs</li>
+                <li>Factual errors and misinformation</li>
+              </ul>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                9.3 General Service Disclaimers
               </h3>
               <p className="text-gray-700 font-medium mb-4">
-                THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS.
-                TO THE FULLEST EXTENT PERMITTED BY LAW, WE DISCLAIM ALL
-                WARRANTIES, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING:
+                THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS
+                WITHOUT ANY WARRANTIES OF ANY KIND. TO THE FULLEST EXTENT
+                PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, WHETHER EXPRESS,
+                IMPLIED, OR STATUTORY, INCLUDING:
               </p>
-              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-1">
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>WARRANTIES OF MERCHANTABILITY</li>
                 <li>WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE</li>
                 <li>WARRANTIES OF NON-INFRINGEMENT</li>
@@ -471,66 +666,123 @@ export default function TermsOfServicePage() {
                 <li>
                   WARRANTIES REGARDING THE SECURITY OR TIMELINESS OF THE SERVICE
                 </li>
+                <li>WARRANTIES OF ACCURACY OR RELIABILITY</li>
+                <li>WARRANTIES THAT DEFECTS WILL BE CORRECTED</li>
               </ul>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                9.4 Third-Party Platform Disclaimers
+              </h3>
+              <p className="text-gray-700 leading-relaxed">
+                We disclaim all responsibility for third-party platforms'
+                policies, actions, or decisions. We do not guarantee that
+                AI-generated content will comply with any third-party platform's
+                current or future policies, and we are not responsible for any
+                consequences resulting from platform policy violations.
+              </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                10. Limitation of Liability and Damages
+                10. Limitation of Liability and Damages - MAXIMUM PROTECTION
               </h2>
               <p className="text-gray-700 font-medium leading-relaxed mb-4">
                 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT
-                SHALL LISTORA AI, ITS OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, OR
-                AFFILIATES BE LIABLE FOR ANY:
+                SHALL LISTORA AI, ITS OFFICERS, DIRECTORS, EMPLOYEES, AGENTS,
+                AFFILIATES, OR SUPPLIERS BE LIABLE FOR ANY:
               </p>
               <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>
-                  INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE
-                  DAMAGES
+                  INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR
+                  PUNITIVE DAMAGES
                 </li>
-                <li>LOST PROFITS, REVENUE, DATA, OR BUSINESS OPPORTUNITIES</li>
-                <li>BUSINESS INTERRUPTION OR LOSS OF GOODWILL</li>
-                <li>DAMAGES RESULTING FROM AI-GENERATED CONTENT</li>
                 <li>
-                  DAMAGES EXCEEDING THE AMOUNT PAID BY YOU IN THE 12 MONTHS
-                  PRECEDING THE CLAIM
+                  LOST PROFITS, REVENUE, DATA, BUSINESS OPPORTUNITIES, OR
+                  GOODWILL
+                </li>
+                <li>BUSINESS INTERRUPTION OR LOSS OF USE</li>
+                <li>
+                  DAMAGES RESULTING FROM AI-GENERATED CONTENT, INCLUDING
+                  COPYRIGHT INFRINGEMENT CLAIMS
+                </li>
+                <li>
+                  DAMAGES FROM THIRD-PARTY PLATFORM ACTIONS, POLICY VIOLATIONS,
+                  OR ACCOUNT SUSPENSIONS
+                </li>
+                <li>
+                  DAMAGES FROM SERVICE INTERRUPTIONS, DATA LOSS, OR SECURITY
+                  BREACHES
+                </li>
+                <li>
+                  DAMAGES EXCEEDING THE TOTAL AMOUNT PAID BY YOU IN THE 12
+                  MONTHS PRECEDING THE CLAIM
                 </li>
               </ul>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-gray-700 leading-relaxed mb-4">
                 Some jurisdictions do not allow the limitation of liability, so
                 these limitations may not apply to you. In such cases, our
                 liability is limited to the fullest extent permitted by law.
               </p>
+              <p className="text-gray-700 font-medium leading-relaxed">
+                <strong>AGGREGATE LIABILITY CAP:</strong> Our total liability to
+                you for all claims arising from or related to the Service shall
+                not exceed the lesser of (a) $100 or (b) the total amount paid
+                by you to us in the 12 months preceding the claim.
+              </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                11. Indemnification
+                11. Comprehensive Indemnification
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
                 <strong>
                   You agree to indemnify, defend, and hold harmless Listora AI
-                  and its officers, directors, employees, agents, and affiliates
-                  from and against any and all claims, damages, losses, costs,
-                  and expenses (including reasonable attorneys' fees) arising
-                  from or relating to:
+                  and its officers, directors, employees, agents, affiliates,
+                  and suppliers from and against any and all claims, damages,
+                  losses, costs, and expenses (including reasonable attorneys'
+                  fees and court costs) arising from or relating to:
                 </strong>
               </p>
-              <ul className="list-disc pl-6 text-gray-700 space-y-2">
-                <li>Your use of the Service or violation of these Terms</li>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>
-                  Your User Content or any content you generate using our
+                  Your use of the Service or violation of these Terms or our
+                  policies
+                </li>
+                <li>
+                  Your User Content or any content you generate, publish, or
+                  distribute using our Service
+                </li>
+                <li>
+                  Your violation of any third-party rights, including
+                  intellectual property rights
+                </li>
+                <li>
+                  Your violation of any applicable laws, regulations, or
+                  third-party platform policies
+                </li>
+                <li>Any misrepresentation or breach of warranty made by you</li>
+                <li>
+                  Claims arising from AI-generated content you use or distribute
+                </li>
+                <li>
+                  Third-party platform actions resulting from your use of our
                   Service
                 </li>
-                <li>Your violation of any third-party rights</li>
-                <li>Your violation of any applicable laws or regulations</li>
-                <li>Any misrepresentation made by you</li>
+                <li>
+                  Any unauthorized access to your account due to your failure to
+                  maintain security
+                </li>
               </ul>
+              <p className="text-gray-700 leading-relaxed">
+                This indemnification obligation will survive termination of
+                these Terms and your use of the Service.
+              </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                12. Termination
+                12. Termination and Account Closure
               </h2>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -540,7 +792,8 @@ export default function TermsOfServicePage() {
                 You may terminate your account at any time by canceling your
                 subscription through your account settings or contacting our
                 support team. Termination will be effective at the end of your
-                current billing period.
+                current billing period, and no refunds will be provided for
+                unused portions of paid subscriptions.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -552,10 +805,12 @@ export default function TermsOfServicePage() {
               </p>
               <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>Violation of these Terms or our policies</li>
-                <li>Non-payment of fees</li>
-                <li>Suspicious or fraudulent activity</li>
+                <li>Non-payment of fees or chargebacks</li>
+                <li>Suspicious, fraudulent, or illegal activity</li>
                 <li>Legal or regulatory requirements</li>
+                <li>Abuse of our Service or resources</li>
                 <li>Any reason we deem appropriate in our sole discretion</li>
+                <li>Threat to the security or integrity of our Service</li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -563,37 +818,81 @@ export default function TermsOfServicePage() {
               </h3>
               <p className="text-gray-700 leading-relaxed">
                 Upon termination: (a) your access to the Service will cease
-                immediately; (b) you remain liable for all outstanding fees; (c)
-                we may delete your account and data after a reasonable period;
-                (d) all provisions that should survive termination will remain
-                in effect.
+                immediately; (b) you remain liable for all outstanding fees and
+                obligations; (c) we may delete your account and data after a
+                reasonable period; (d) content used for AI training will remain
+                in our systems; (e) all provisions that should survive
+                termination will remain in effect, including indemnification,
+                limitation of liability, and dispute resolution.
               </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                13. Dispute Resolution and Arbitration
+                13. Mandatory Dispute Resolution and Arbitration
               </h2>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                13.1 Mandatory Arbitration
+                13.1 Mandatory Arbitration Agreement
               </h3>
               <p className="text-gray-700 font-medium leading-relaxed mb-4">
                 PLEASE READ CAREFULLY: Any dispute, claim, or controversy
-                arising out of or relating to these Terms or the Service shall
-                be resolved through binding arbitration rather than in court,
-                except for claims that may be brought in small claims court.
+                arising out of or relating to these Terms, the Service, or our
+                relationship shall be resolved through binding arbitration
+                administered by the American Arbitration Association (AAA) under
+                its Commercial Arbitration Rules, rather than in court, except
+                for:
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>Claims that may be brought in small claims court</li>
+                <li>
+                  Claims for injunctive relief to protect intellectual property
+                </li>
+                <li>
+                  Claims related to the validity or enforceability of this
+                  arbitration clause
+                </li>
+              </ul>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                13.2 Arbitration Procedures
+              </h3>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>
+                  Arbitration will be conducted in Delaware, United States
+                </li>
+                <li>The arbitrator's decision will be final and binding</li>
+                <li>
+                  Each party will bear its own costs and attorneys' fees unless
+                  the arbitrator decides otherwise
+                </li>
+                <li>
+                  Discovery will be limited as determined by the arbitrator
+                </li>
+                <li>The arbitration will be confidential</li>
+              </ul>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                13.3 Class Action and Collective Action Waiver
+              </h3>
+              <p className="text-gray-700 font-medium leading-relaxed mb-4">
+                <strong>
+                  YOU WAIVE YOUR RIGHT TO PARTICIPATE IN CLASS ACTIONS,
+                  COLLECTIVE ACTIONS, OR REPRESENTATIVE PROCEEDINGS.
+                </strong>{' '}
+                Any arbitration will be conducted on an individual basis and not
+                as a class, collective, or representative action. You may not
+                consolidate or join claims with other users.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                13.2 Class Action Waiver
+                13.4 Opt-Out Right
               </h3>
               <p className="text-gray-700 leading-relaxed">
-                <strong>
-                  YOU WAIVE YOUR RIGHT TO PARTICIPATE IN CLASS ACTIONS.
-                </strong>{' '}
-                Any arbitration will be conducted on an individual basis and not
-                as a class, collective, or representative action.
+                You may opt out of this arbitration agreement by sending written
+                notice to legal@listora.ai within 30 days of first accepting
+                these Terms. Your notice must include your name, address, and a
+                clear statement that you wish to opt out of arbitration.
               </p>
             </section>
 
@@ -601,59 +900,123 @@ export default function TermsOfServicePage() {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
                 14. Governing Law and Jurisdiction
               </h2>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-gray-700 leading-relaxed mb-4">
                 These Terms are governed by and construed in accordance with the
                 laws of the State of Delaware, United States, without regard to
                 conflict of law principles. Any legal action not subject to
                 arbitration shall be brought exclusively in the federal or state
                 courts located in Delaware.
               </p>
+              <p className="text-gray-700 leading-relaxed">
+                <strong>International Users:</strong> If you are accessing our
+                Service from outside the United States, you acknowledge that you
+                are subject to U.S. law and jurisdiction for all matters related
+                to the Service.
+              </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                15. General Provisions
+                15. Export Controls and Sanctions Compliance
+              </h2>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                Our Service and AI technology may be subject to export control
+                laws and regulations. You represent and warrant that:
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>
+                  You are not located in a country subject to U.S. government
+                  embargo
+                </li>
+                <li>
+                  You are not on any U.S. government restricted or denied party
+                  list
+                </li>
+                <li>
+                  You will comply with all applicable export control and
+                  sanctions laws
+                </li>
+                <li>
+                  You will not use our Service for any prohibited end use or end
+                  user
+                </li>
+              </ul>
+              <p className="text-gray-700 leading-relaxed">
+                We reserve the right to restrict access to our Service based on
+                geographic location or other factors to ensure compliance with
+                applicable laws.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                16. General Provisions
               </h2>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                15.1 Entire Agreement
+                16.1 Entire Agreement
               </h3>
               <p className="text-gray-700 leading-relaxed mb-4">
                 These Terms, together with our Privacy Policy and any other
                 policies referenced herein, constitute the entire agreement
-                between you and Listora AI and supersede all prior agreements
-                and understandings.
+                between you and Listora AI and supersede all prior agreements,
+                understandings, and communications, whether written or oral.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                15.2 Severability
+                16.2 Severability
               </h3>
               <p className="text-gray-700 leading-relaxed mb-4">
-                If any provision of these Terms is found to be unenforceable,
-                the remaining provisions will remain in full force and effect.
+                If any provision of these Terms is found to be unenforceable or
+                invalid, the remaining provisions will remain in full force and
+                effect, and the invalid provision will be modified to the
+                minimum extent necessary to make it enforceable.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                15.3 Assignment
+                16.3 Assignment
               </h3>
               <p className="text-gray-700 leading-relaxed mb-4">
-                You may not assign these Terms without our written consent. We
-                may assign these Terms at any time without notice.
+                You may not assign, transfer, or delegate these Terms or your
+                rights and obligations without our prior written consent. We may
+                assign these Terms at any time without notice, including in
+                connection with a merger, acquisition, or sale of assets.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                15.4 Force Majeure
+                16.4 No Waiver
               </h3>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-gray-700 leading-relaxed mb-4">
+                Our failure to enforce any provision of these Terms will not
+                constitute a waiver of that provision or any other provision.
+                Any waiver must be in writing and signed by an authorized
+                representative of Listora AI.
+              </p>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                16.5 Force Majeure
+              </h3>
+              <p className="text-gray-700 leading-relaxed mb-4">
                 We are not liable for any failure to perform due to causes
                 beyond our reasonable control, including natural disasters, war,
-                terrorism, labor disputes, or government actions.
+                terrorism, labor disputes, government actions, pandemics, or
+                third-party service interruptions.
+              </p>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                16.6 Survival
+              </h3>
+              <p className="text-gray-700 leading-relaxed">
+                Provisions that by their nature should survive termination will
+                survive, including intellectual property rights,
+                indemnification, limitation of liability, dispute resolution,
+                and governing law.
               </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                16. Changes to Terms
+                17. Changes to Terms
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
                 We reserve the right to modify these Terms at any time. We will
@@ -665,6 +1028,9 @@ export default function TermsOfServicePage() {
                 </li>
                 <li>Sending email notification to registered users</li>
                 <li>Providing in-app notifications</li>
+                <li>
+                  For significant changes, requiring affirmative acceptance
+                </li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
                 <strong>
@@ -672,13 +1038,13 @@ export default function TermsOfServicePage() {
                   constitutes acceptance of the updated Terms.
                 </strong>{' '}
                 If you do not agree to the modifications, you must stop using
-                the Service.
+                the Service and may terminate your account.
               </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                17. Contact Information
+                18. Contact Information
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
                 For questions about these Terms or our Service, please contact
@@ -695,6 +1061,12 @@ export default function TermsOfServicePage() {
                   <strong>Business Inquiries:</strong> business@listora.ai
                 </p>
                 <p className="text-gray-700 mb-2">
+                  <strong>DMCA Agent:</strong> dmca@listora.ai
+                </p>
+                <p className="text-gray-700 mb-2">
+                  <strong>Privacy Officer:</strong> privacy@listora.ai
+                </p>
+                <p className="text-gray-700 mb-2">
                   <strong>Website:</strong>{' '}
                   <a
                     href="https://listora.ai"
@@ -706,7 +1078,7 @@ export default function TermsOfServicePage() {
                 <p className="text-gray-700 mt-4">
                   <strong>Mailing Address:</strong>
                   <br />
-                  Listora AI
+                  Listora AI Legal Department
                   <br />
                   24272 Yellow Hammer Ct
                   <br />
@@ -717,19 +1089,25 @@ export default function TermsOfServicePage() {
               </div>
             </section>
 
-            <p className="text-gray-700 text-sm">
-              Legal Notice: These Terms of Service were last updated on June 4,
-              2025. This document represents our current terms and conditions
-              and may be subject to legal review and modification. For the most
-              current version, always refer to the terms posted on our website.
-              BY USING OUR SERVICE, YOU ACKNOWLEDGE THAT YOU HAVE READ AND
-              UNDERSTOOD THESE TERMS.
-            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <p className="text-red-800 text-sm font-medium mb-2">
+                <strong>IMPORTANT LEGAL NOTICE:</strong>
+              </p>
+              <p className="text-red-700 text-sm">
+                These Terms of Service were last updated on June 10, 2025. This
+                document represents our current terms and conditions and has
+                been designed to provide maximum legal protection. BY USING OUR
+                SERVICE, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND
+                AGREE TO BE BOUND BY THESE TERMS, INCLUDING THE ARBITRATION
+                CLAUSE, CLASS ACTION WAIVER, AND AI-SPECIFIC PROVISIONS. If you
+                do not agree to these terms, do not use our Service.
+              </p>
+            </div>
           </div>
         </div>
       </main>
 
-      {/* Footer - UPDATED */}
+      {/* Footer */}
       <footer className="bg-white border-t border-gray-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center">

@@ -1,7 +1,8 @@
-// src/components/UsageDisplay.tsx - Enhanced with Smart Refresh & SSR Safety
+// src/components/UsageDisplay.tsx - Enhanced with Billing Cycle Logic
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { getBillingCycleInfo } from '@/lib/billingCycle'
 import {
   TrendingUp,
   AlertTriangle,
@@ -14,6 +15,7 @@ import {
   Star,
   Rocket,
   X,
+  Calendar,
 } from 'lucide-react'
 
 interface UsageDisplayProps {
@@ -21,6 +23,11 @@ interface UsageDisplayProps {
   planType?: string
   refreshKey?: number
   onUsageUpdate?: (usage: number, limit: number) => void
+  userPlan?: {
+    created_at: string
+    plan_type: string
+    stripe_subscription_id?: string
+  }
 }
 
 const PLAN_LIMITS = {
@@ -35,6 +42,7 @@ const UsageDisplay = ({
   planType = 'starter',
   refreshKey = 0,
   onUsageUpdate,
+  userPlan,
 }: UsageDisplayProps) => {
   const [monthlyUsage, setMonthlyUsage] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -61,6 +69,11 @@ const UsageDisplay = ({
   const monthlyLimit = currentPlan.monthlyGenerations
   const remainingGenerations = monthlyLimit - monthlyUsage
   const usagePercentage = (monthlyUsage / monthlyLimit) * 100
+
+  // Get billing cycle info
+  const billingInfo = userPlan?.created_at
+    ? getBillingCycleInfo(userPlan.created_at)
+    : null
 
   // Determine warning level
   const getWarningLevel = () => {
@@ -219,7 +232,7 @@ const UsageDisplay = ({
     )
   }
 
-  // ADMIN/OWNER DISPLAY - Updated with balanced colors
+  // ADMIN/OWNER DISPLAY - Updated with billing cycle info
   if (isAdmin) {
     return (
       <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-50 rounded-xl border-2 border-blue-200 p-6 mb-6 shadow-sm relative overflow-hidden">
@@ -349,7 +362,7 @@ const UsageDisplay = ({
     )
   }
 
-  // Regular user display with upgrade prompts - Updated colors
+  // Regular user display with billing cycle info
   return (
     <div className="space-y-4 mb-6">
       {/* Upgrade Prompt (Priority Display) */}
@@ -561,12 +574,29 @@ const UsageDisplay = ({
           </div>
         )}
 
-        {/* Plan Info with Upgrade Option */}
+        {/* Plan Info with Billing Cycle */}
         <div className="mt-3 pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>{currentPlan.name} Plan</span>
+            <div className="flex items-center space-x-2">
+              <span>{currentPlan.name} Plan</span>
+              {billingInfo && (
+                <div className="flex items-center space-x-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>
+                    Resets {billingInfo.formattedDate}
+                    {billingInfo.isNearReset && (
+                      <span className="text-orange-500 font-medium ml-1">
+                        ({billingInfo.daysUntilReset} days)
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {!billingInfo && planType === 'starter' && (
+                <span>Resets monthly</span>
+              )}
+            </div>
             <div className="flex items-center space-x-3">
-              <span>Resets monthly</span>
               {planType !== 'enterprise' && (
                 <button
                   onClick={handleUpgrade}

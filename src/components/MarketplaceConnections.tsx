@@ -1,4 +1,4 @@
-// src/components/MarketplaceConnections.tsx - Complete with eBay + Etsy Support
+// src/components/MarketplaceConnections.tsx - Updated with eBay/Etsy Coming Soon
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -19,6 +19,8 @@ import {
 interface Connection {
   platform: string
   connected: boolean
+  disabled?: boolean
+  comingSoon?: boolean
   storeInfo?: {
     seller_id?: string
     shop_name?: string
@@ -52,10 +54,14 @@ export default function MarketplaceConnections({
     {
       platform: 'ebay',
       connected: false,
+      disabled: true,
+      comingSoon: true,
     },
     {
       platform: 'etsy',
       connected: false,
+      disabled: true,
+      comingSoon: true,
     },
   ])
   const [loading, setLoading] = useState(true)
@@ -142,48 +148,6 @@ export default function MarketplaceConnections({
         )
       }
 
-      // Query eBay connections
-      console.log('🔍 MarketplaceConnections: Querying eBay connections...')
-      const { data: ebayConnections, error: ebayError } = await supabase
-        .from('ebay_connections')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('status', 'active')
-
-      if (ebayError) {
-        console.error(
-          '❌ MarketplaceConnections: eBay connection error:',
-          ebayError
-        )
-      } else {
-        console.log(
-          '✅ MarketplaceConnections: eBay query successful, found:',
-          ebayConnections?.length || 0,
-          'connections'
-        )
-      }
-
-      // ✅ NEW: Query Etsy connections
-      console.log('🔍 MarketplaceConnections: Querying Etsy connections...')
-      const { data: etsyConnections, error: etsyError } = await supabase
-        .from('etsy_connections')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('status', 'active')
-
-      if (etsyError) {
-        console.error(
-          '❌ MarketplaceConnections: Etsy connection error:',
-          etsyError
-        )
-      } else {
-        console.log(
-          '✅ MarketplaceConnections: Etsy query successful, found:',
-          etsyConnections?.length || 0,
-          'connections'
-        )
-      }
-
       clearTimeout(timeoutId)
 
       // Filter valid connections
@@ -197,17 +161,6 @@ export default function MarketplaceConnections({
           ? shopifyConnections[0]
           : null
 
-      const validEbayConnection =
-        ebayConnections?.find(
-          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
-        ) || null
-
-      // ✅ NEW: Filter valid Etsy connections
-      const validEtsyConnection =
-        etsyConnections?.find(
-          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
-        ) || null
-
       console.log(
         '🔍 MarketplaceConnections: Valid Amazon connection:',
         !!validAmazonConnection
@@ -215,14 +168,6 @@ export default function MarketplaceConnections({
       console.log(
         '🔍 MarketplaceConnections: Valid Shopify connection:',
         !!validShopifyConnection
-      )
-      console.log(
-        '🔍 MarketplaceConnections: Valid eBay connection:',
-        !!validEbayConnection
-      )
-      console.log(
-        '🔍 MarketplaceConnections: Valid Etsy connection:',
-        !!validEtsyConnection
       )
 
       const updatedConnections = [
@@ -246,35 +191,27 @@ export default function MarketplaceConnections({
         },
         {
           platform: 'ebay',
-          connected: !!validEbayConnection?.access_token,
-          storeInfo: {
-            seller_id:
-              validEbayConnection?.seller_info?.seller_id || 'Connected',
-            environment: process.env.EBAY_ENVIRONMENT || 'sandbox',
-          },
-          connectedAt: validEbayConnection?.created_at,
+          connected: false,
+          disabled: true,
+          comingSoon: true,
         },
-        // ✅ NEW: Add Etsy connection
         {
           platform: 'etsy',
-          connected: !!validEtsyConnection?.access_token,
-          storeInfo: {
-            shop_name: validEtsyConnection?.shop_info?.shop_name || 'Connected',
-            shop_id: validEtsyConnection?.shop_info?.shop_id,
-          },
-          connectedAt: validEtsyConnection?.created_at,
+          connected: false,
+          disabled: true,
+          comingSoon: true,
         },
       ]
 
       setConnections(updatedConnections)
       console.log('✅ Marketplace connections loaded:', updatedConnections)
 
-      // Notify parent components
+      // Notify parent components (only for active platforms)
       if (onConnectionChange) {
         onConnectionChange('amazon', !!validAmazonConnection?.access_token)
         onConnectionChange('shopify', !!validShopifyConnection)
-        onConnectionChange('ebay', !!validEbayConnection?.access_token)
-        onConnectionChange('etsy', !!validEtsyConnection?.access_token) // ✅ NEW
+        onConnectionChange('ebay', false) // Always false for coming soon
+        onConnectionChange('etsy', false) // Always false for coming soon
       }
     } catch (error) {
       clearTimeout(timeoutId)
@@ -284,15 +221,25 @@ export default function MarketplaceConnections({
       setConnections([
         { platform: 'amazon', connected: false },
         { platform: 'shopify', connected: false },
-        { platform: 'ebay', connected: false },
-        { platform: 'etsy', connected: false }, // ✅ NEW
+        {
+          platform: 'ebay',
+          connected: false,
+          disabled: true,
+          comingSoon: true,
+        },
+        {
+          platform: 'etsy',
+          connected: false,
+          disabled: true,
+          comingSoon: true,
+        },
       ])
 
       if (onConnectionChange) {
         onConnectionChange('amazon', false)
         onConnectionChange('shopify', false)
         onConnectionChange('ebay', false)
-        onConnectionChange('etsy', false) // ✅ NEW
+        onConnectionChange('etsy', false)
       }
     } finally {
       setLoading(false)
@@ -306,16 +253,16 @@ export default function MarketplaceConnections({
       return
     }
 
-    // OAuth flows for all platforms
+    // Only allow connection for enabled platforms
+    if (platform === 'ebay' || platform === 'etsy') {
+      return // Do nothing for disabled platforms
+    }
+
+    // OAuth flows for enabled platforms
     if (platform === 'amazon') {
       window.location.href = `/api/amazon/oauth?user_id=${currentUserId}`
     } else if (platform === 'shopify') {
       window.location.href = `/api/shopify/oauth?user_id=${currentUserId}`
-    } else if (platform === 'ebay') {
-      window.location.href = `/api/ebay/oauth?user_id=${currentUserId}`
-    } else if (platform === 'etsy') {
-      // ✅ NEW: Etsy OAuth redirect
-      window.location.href = `/api/etsy/oauth?user_id=${currentUserId}`
     }
   }
 
@@ -335,27 +282,6 @@ export default function MarketplaceConnections({
         }
       } else if (platform === 'shopify') {
         const response = await fetch('/api/shopify/disconnect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: currentUserId }),
-        })
-
-        if (response.ok) {
-          loadConnections()
-        }
-      } else if (platform === 'ebay') {
-        const response = await fetch('/api/ebay/disconnect', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: currentUserId }),
-        })
-
-        if (response.ok) {
-          loadConnections()
-        }
-      } else if (platform === 'etsy') {
-        // ✅ NEW: Etsy disconnect endpoint
-        const response = await fetch('/api/etsy/disconnect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: currentUserId }),
@@ -401,6 +327,7 @@ export default function MarketplaceConnections({
   }
 
   const connectedCount = connections.filter((c) => c.connected).length
+  const availableCount = connections.filter((c) => !c.disabled).length
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
@@ -422,7 +349,7 @@ export default function MarketplaceConnections({
           </div>
           <div className="bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
             <span className="text-blue-700 text-sm font-medium">
-              {connectedCount}/4 Connected
+              {connectedCount}/{availableCount} Connected
             </span>
           </div>
         </div>
@@ -439,7 +366,11 @@ export default function MarketplaceConnections({
           return (
             <div
               key={connection.platform}
-              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                connection.disabled
+                  ? 'border-gray-200 bg-gray-50 opacity-75'
+                  : 'border-gray-200 hover:bg-gray-50'
+              }`}
             >
               <div className="flex items-center space-x-4">
                 <div className="text-2xl">
@@ -473,6 +404,13 @@ export default function MarketplaceConnections({
                           Connected
                         </span>
                       </div>
+                    ) : connection.comingSoon ? (
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        <span className="text-sm text-yellow-700 font-medium">
+                          Coming Soon
+                        </span>
+                      </div>
                     ) : (
                       <div className="flex items-center space-x-1">
                         <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
@@ -484,11 +422,11 @@ export default function MarketplaceConnections({
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {isAmazon
-                      ? 'Sell to millions of Amazon customers worldwide'
+                      ? 'Professional instructions with optimized data'
                       : isShopify
                         ? 'Publish directly to your Shopify store'
                         : isEbay
-                          ? "List on the world's largest auction marketplace"
+                          ? "World's largest auction marketplace"
                           : isEtsy
                             ? 'Perfect for handmade, vintage & creative products'
                             : ''}
@@ -499,13 +437,13 @@ export default function MarketplaceConnections({
                     {isAmazon ? (
                       <>
                         <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ Instant product publishing
+                          ✓ Step-by-step instructions
                         </span>
                         <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ Automatic inventory sync
+                          ✓ Optimized product data
                         </span>
                         <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ Global marketplace reach
+                          ✓ Amazon-optimized format
                         </span>
                       </>
                     ) : isShopify ? (
@@ -520,29 +458,28 @@ export default function MarketplaceConnections({
                           ✓ Store management tools
                         </span>
                       </>
-                    ) : isEbay ? (
+                    ) : isEbay && connection.comingSoon ? (
                       <>
-                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ Auction & Buy-It-Now
+                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
+                          ⏳ Auction & Buy-It-Now
                         </span>
-                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ 190M active buyers
+                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
+                          ⏳ 190M active buyers
                         </span>
-                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ Lower seller fees
+                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
+                          ⏳ Lower seller fees
                         </span>
                       </>
-                    ) : isEtsy ? (
-                      // ✅ NEW: Etsy feature tags
+                    ) : isEtsy && connection.comingSoon ? (
                       <>
-                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ Handmade & vintage focus
+                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
+                          ⏳ Handmade & vintage focus
                         </span>
-                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ 96M active buyers
+                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
+                          ⏳ 96M active buyers
                         </span>
-                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                          ✓ Higher profit margins
+                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
+                          ⏳ Higher profit margins
                         </span>
                       </>
                     ) : null}
@@ -568,14 +505,6 @@ export default function MarketplaceConnections({
                             `https://${connection.storeInfo.shop_domain}/admin`,
                             '_blank'
                           )
-                        } else if (isEbay) {
-                          window.open('https://www.ebay.com/sh/ovw', '_blank')
-                        } else if (isEtsy) {
-                          // ✅ NEW: Etsy shop manager link
-                          window.open(
-                            'https://www.etsy.com/your/shops/me',
-                            '_blank'
-                          )
                         }
                       }}
                       className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors border border-gray-300 rounded-lg"
@@ -590,6 +519,10 @@ export default function MarketplaceConnections({
                       Disconnect
                     </button>
                   </>
+                ) : connection.comingSoon ? (
+                  <div className="px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg cursor-default border border-yellow-300">
+                    Coming Soon
+                  </div>
                 ) : (
                   <button
                     onClick={() => handleConnect(connection.platform)}
@@ -598,23 +531,11 @@ export default function MarketplaceConnections({
                         ? 'bg-orange-600 hover:bg-orange-700'
                         : isShopify
                           ? 'bg-green-600 hover:bg-green-700'
-                          : isEbay
-                            ? 'bg-blue-600 hover:bg-blue-700'
-                            : isEtsy
-                              ? 'bg-purple-600 hover:bg-purple-700'
-                              : 'bg-gray-600 hover:bg-gray-700'
+                          : 'bg-gray-600 hover:bg-gray-700'
                     }`}
                   >
                     Connect{' '}
-                    {isAmazon
-                      ? 'Amazon'
-                      : isShopify
-                        ? 'Shopify'
-                        : isEbay
-                          ? 'eBay'
-                          : isEtsy
-                            ? 'Etsy'
-                            : 'Platform'}
+                    {isAmazon ? 'Amazon' : isShopify ? 'Shopify' : 'Platform'}
                   </button>
                 )}
               </div>
@@ -654,10 +575,10 @@ export default function MarketplaceConnections({
             <Clock className="h-4 w-4 text-blue-600 mt-0.5" />
             <div>
               <div className="text-sm font-medium text-blue-900">
-                Real-time Publishing
+                Professional Results
               </div>
               <div className="text-xs text-blue-700">
-                Instant product updates and status tracking
+                Optimized content and marketplace compliance
               </div>
             </div>
           </div>

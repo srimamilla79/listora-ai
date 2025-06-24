@@ -79,9 +79,9 @@ export default function EnhancedAboutUsPage() {
     },
     {
       number: '2 Platforms',
-      label: 'Amazon & Shopify Direct',
+      label: 'Amazon Optimization + Shopify Direct',
       icon: Globe,
-      description: 'Direct publishing to major marketplaces',
+      description: 'Amazon optimization + Shopify direct publishing',
     },
   ]
 
@@ -147,9 +147,9 @@ export default function EnhancedAboutUsPage() {
     },
     {
       phase: 'Integration',
-      title: 'Direct Amazon & Shopify Publishing',
+      title: 'Amazon Optimization + Shopify Publishing',
       description:
-        'Skip the copy-paste hassle! One-click publishing directly to Amazon and Shopify with seamless seller account integration.',
+        'Professional Amazon listing optimization with step-by-step guidance and optimized data, plus direct one-click publishing to Shopify with seamless seller account integration.',
       icon: ShoppingCart,
       color: 'from-orange-400 to-red-500',
     },
@@ -296,7 +296,6 @@ export default function EnhancedAboutUsPage() {
               </span>
               <Heart className="h-4 w-4 text-red-500 fill-current animate-pulse" />
             </div>
-
             {/* Free Tier Highlight */}
             <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl px-6 py-4 mb-8 shadow-lg">
               <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
@@ -311,7 +310,6 @@ export default function EnhancedAboutUsPage() {
                 </div>
               </div>
             </div>
-
             {/* Enhanced Title */}
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-8 leading-tight">
               We're Building the Future of
@@ -319,7 +317,6 @@ export default function EnhancedAboutUsPage() {
                 Content Creation
               </span>
             </h1>
-
             {/* Enhanced Subtitle */}
             <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
               At Listora AI, we believe every entrepreneur deserves access to
@@ -930,8 +927,8 @@ export default function EnhancedAboutUsPage() {
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 Empowering entrepreneurs with AI-powered content creation tools.
-                From voice to professional content in seconds, with direct
-                Amazon & Shopify publishing.
+                From voice to professional content in seconds, with Amazon
+                Optimization & Direct Shopify publishing.
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">

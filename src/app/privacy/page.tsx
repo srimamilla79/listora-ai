@@ -5,7 +5,7 @@ import ListoraAILogo from '@/components/ui/ListoraAILogo'
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header - UPDATED */}
+      {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
@@ -35,9 +35,9 @@ export default function PrivacyPolicyPage() {
           </h1>
 
           <p className="text-gray-600 mb-8">
-            <strong>Effective Date:</strong> June 4, 2025
+            <strong>Effective Date:</strong> June 10, 2025
             <br />
-            <strong>Last Updated:</strong> June 4, 2025
+            <strong>Last Updated:</strong> June 10, 2025
           </p>
 
           <div className="prose prose-lg max-w-none">
@@ -57,7 +57,8 @@ export default function PrivacyPolicyPage() {
                 <strong>
                   By using our Service, you expressly consent to the collection,
                   use, and disclosure of your information as described in this
-                  Privacy Policy.
+                  Privacy Policy, including our use of your content for AI model
+                  training and improvement.
                 </strong>{' '}
                 If you do not agree with our policies and practices, do not use
                 our Service.
@@ -96,6 +97,15 @@ export default function PrivacyPolicyPage() {
                   <strong>Support Data:</strong> Information provided when you
                   contact customer support
                 </li>
+                <li>
+                  <strong>Voice Data:</strong> Audio recordings and voice inputs
+                  when using voice-to-content features
+                </li>
+                <li>
+                  <strong>Biometric Identifiers:</strong> Voice patterns and
+                  audio characteristics for service provision (where legally
+                  permitted)
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -118,6 +128,10 @@ export default function PrivacyPolicyPage() {
                   <strong>Preferences:</strong> Settings, configurations, and
                   customization choices
                 </li>
+                <li>
+                  <strong>Platform Connections:</strong> Data from connected
+                  third-party platforms (Amazon, Shopify, etc.)
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -139,6 +153,10 @@ export default function PrivacyPolicyPage() {
                 <li>
                   <strong>Cookies and Tracking:</strong> See our Cookie Policy
                   below
+                </li>
+                <li>
+                  <strong>Location Data:</strong> General geographic location
+                  based on IP address
                 </li>
               </ul>
 
@@ -171,6 +189,7 @@ export default function PrivacyPolicyPage() {
                 <li>Process your requests and generate personalized content</li>
                 <li>Enable account creation, authentication, and management</li>
                 <li>Facilitate customer support and technical assistance</li>
+                <li>Enable third-party platform integrations and publishing</li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -181,6 +200,7 @@ export default function PrivacyPolicyPage() {
                 <li>Send important service announcements and updates</li>
                 <li>Conduct research and analytics to improve our Service</li>
                 <li>Train and improve our AI models and algorithms</li>
+                <li>Prevent fraud and ensure platform security</li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -196,30 +216,86 @@ export default function PrivacyPolicyPage() {
                   users
                 </li>
                 <li>Resolve disputes and enforce our agreements</li>
+                <li>Comply with export control and sanctions requirements</li>
               </ul>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                4. AI Model Training and Content Usage
+                4. AI Model Training and Content Usage - ENHANCED
               </h2>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                <strong>IMPORTANT AI TRAINING CONSENT:</strong> By using our
+                Service, you expressly consent to and acknowledge the following:
+              </p>
 
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                4.1 Explicit AI Training Rights
+              </h3>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>
+                  <strong>Content Usage:</strong> We may use all content you
+                  input, upload, or generate (including text, images, voice
+                  data, and prompts) to train, improve, and develop our AI
+                  models and algorithms
+                </li>
+                <li>
+                  <strong>Dataset Creation:</strong> Your content may be
+                  incorporated into AI training datasets that may be shared with
+                  our AI technology partners and service providers
+                </li>
+                <li>
+                  <strong>Model Enhancement:</strong> We use your interactions,
+                  preferences, and usage patterns to enhance AI model
+                  performance and accuracy
+                </li>
+                <li>
+                  <strong>Derivative Works:</strong> AI models trained on your
+                  content may generate similar content for other users based on
+                  learned patterns and features
+                </li>
+              </ul>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                4.2 Privacy-Preserving Techniques
+              </h3>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>
+                  We implement anonymization and aggregation techniques where
+                  technically feasible
+                </li>
+                <li>
+                  Personal identifiers are typically removed from training data
+                </li>
+                <li>
+                  We use differential privacy and other privacy-preserving
+                  methods when appropriate
+                </li>
+                <li>
+                  However, complete anonymization cannot be guaranteed due to
+                  the nature of AI training
+                </li>
+              </ul>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                4.3 Content Ownership and Licensing
+              </h3>
               <ul className="list-disc pl-6 text-gray-700 space-y-2">
                 <li>
-                  We may use anonymized and aggregated user content to improve
-                  our AI algorithms
+                  You retain ownership of your original content input into our
+                  system
                 </li>
                 <li>
-                  Your specific personal information is not shared with other
-                  users
+                  You grant us a perpetual, worldwide, royalty-free license to
+                  use your content for AI training purposes
                 </li>
                 <li>
-                  We implement privacy-preserving techniques in our model
-                  training processes
+                  You own AI-generated content based on your inputs, subject to
+                  our Terms of Service
                 </li>
                 <li>
-                  You retain ownership of your original content, but grant us
-                  broad usage rights
+                  You acknowledge that similar content may be generated for
+                  other users based on AI training
                 </li>
               </ul>
             </section>
@@ -236,18 +312,27 @@ export default function PrivacyPolicyPage() {
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                5.1 Service Providers
+                5.1 Service Providers and AI Partners
               </h3>
               <p className="text-gray-700 leading-relaxed mb-4">
                 We share information with trusted third-party service providers
                 who perform services on our behalf, including:
               </p>
               <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
-                <li>Cloud hosting and infrastructure providers</li>
+                <li>
+                  Cloud hosting and infrastructure providers (AWS, Google Cloud,
+                  etc.)
+                </li>
+                <li>
+                  AI model training and machine learning service providers
+                </li>
                 <li>Payment processing services</li>
                 <li>Analytics and monitoring services</li>
                 <li>Email and communication services</li>
                 <li>Customer support platforms</li>
+                <li>
+                  Third-party platform integrations (Amazon, Shopify, etc.)
+                </li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -262,6 +347,8 @@ export default function PrivacyPolicyPage() {
                 <li>
                   In response to lawful requests from government authorities
                 </li>
+                <li>To comply with export control and sanctions laws</li>
+                <li>To respond to DMCA takedown notices and IP claims</li>
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
@@ -289,7 +376,7 @@ export default function PrivacyPolicyPage() {
                 </li>
                 <li>
                   <strong>Access Controls:</strong> Strict employee access
-                  controls and authentication
+                  controls and multi-factor authentication
                 </li>
                 <li>
                   <strong>Infrastructure:</strong> Secure cloud infrastructure
@@ -306,6 +393,10 @@ export default function PrivacyPolicyPage() {
                 <li>
                   <strong>Incident Response:</strong> Comprehensive data breach
                   response procedures
+                </li>
+                <li>
+                  <strong>Data Isolation:</strong> User data logically separated
+                  and protected
                 </li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
@@ -341,7 +432,7 @@ export default function PrivacyPolicyPage() {
                 </li>
                 <li>
                   <strong>Deletion:</strong> Request deletion of your personal
-                  information
+                  information (subject to AI training limitations)
                 </li>
                 <li>
                   <strong>Portability:</strong> Receive your data in a portable
@@ -358,26 +449,39 @@ export default function PrivacyPolicyPage() {
               </ul>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                7.2 GDPR Rights (EU Residents)
+                7.2 AI Training Opt-Out Limitations
+              </h3>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                <strong>Important Notice:</strong> Once your content has been
+                used to train our AI models, it may not be possible to
+                completely remove or "untrain" that information from our models.
+                Deletion requests will prevent future use of your data but
+                cannot reverse prior AI training that has already occurred.
+              </p>
+
+              <h3 className="text-xl font-medium text-gray-900 mb-3">
+                7.3 GDPR Rights (EU Residents)
               </h3>
               <p className="text-gray-700 leading-relaxed mb-4">
                 If you are located in the European Union, you have additional
                 rights under the GDPR, including the right to lodge a complaint
-                with your local supervisory authority.
+                with your local supervisory authority. Note that AI training may
+                constitute a legitimate interest that limits certain rights.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                7.3 CCPA Rights (California Residents)
+                7.4 CCPA Rights (California Residents)
               </h3>
               <p className="text-gray-700 leading-relaxed mb-4">
                 California residents have specific rights under the CCPA,
                 including the right to know what personal information we collect
                 and the right to opt-out of the sale of personal information (we
-                do not sell personal information).
+                do not sell personal information). AI training may constitute
+                "sharing" under CCPA.
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                7.4 Exercising Your Rights
+                7.5 Exercising Your Rights
               </h3>
               <p className="text-gray-700 leading-relaxed">
                 To exercise your privacy rights, contact us at{' '}
@@ -388,7 +492,8 @@ export default function PrivacyPolicyPage() {
                   privacy@listora.ai
                 </a>
                 . We will respond to your request within the timeframes required
-                by applicable law.
+                by applicable law, noting any limitations due to AI training
+                requirements.
               </p>
             </section>
 
@@ -417,6 +522,10 @@ export default function PrivacyPolicyPage() {
                   <strong>Marketing Cookies:</strong> Used for advertising and
                   marketing purposes
                 </li>
+                <li>
+                  <strong>AI Enhancement Cookies:</strong> Help improve AI model
+                  performance and personalization
+                </li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
                 You can control cookies through your browser settings, but
@@ -426,34 +535,44 @@ export default function PrivacyPolicyPage() {
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                9. Data Retention and Deletion
+                9. Data Retention and Deletion - UPDATED
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                We retain your information only as long as necessary for the
-                purposes outlined in this policy:
+                We retain your information for different periods depending on
+                the type and purpose:
               </p>
               <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
                 <li>
                   <strong>Account Data:</strong> Retained while your account is
-                  active and for up to 30 days after deletion
+                  active and for up to 90 days after deletion
                 </li>
                 <li>
-                  <strong>Content Data:</strong> Retained as long as necessary
-                  for service provision and AI model training
+                  <strong>AI Training Data:</strong> Retained indefinitely for
+                  AI model training and improvement purposes, even after account
+                  deletion
                 </li>
                 <li>
-                  <strong>Log Data:</strong> Typically retained for 12 months
+                  <strong>Generated Content:</strong> Retained as long as
+                  necessary for service provision and AI model training
+                </li>
+                <li>
+                  <strong>Log Data:</strong> Typically retained for 24 months
                   for security and analytics purposes
                 </li>
                 <li>
                   <strong>Legal Requirements:</strong> Some data may be retained
                   longer to comply with legal obligations
                 </li>
+                <li>
+                  <strong>Backup Data:</strong> May persist in backups for up to
+                  5 years for business continuity
+                </li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
-                When you delete your account, we will delete or anonymize your
-                personal information within 30 days, except where retention is
-                required for legal, regulatory, or legitimate business purposes.
+                <strong>Important:</strong> When you delete your account, we
+                will delete your personal account information, but content used
+                for AI training may remain in our systems indefinitely as it
+                becomes part of our AI model training datasets.
               </p>
             </section>
 
@@ -466,29 +585,49 @@ export default function PrivacyPolicyPage() {
                 than your own, including the United States. These countries may
                 have different data protection laws than your jurisdiction.
               </p>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-gray-700 leading-relaxed mb-4">
                 When we transfer personal information internationally, we ensure
                 appropriate safeguards are in place, including Standard
                 Contractual Clauses, adequacy decisions, or other lawful
                 transfer mechanisms.
               </p>
+              <p className="text-gray-700 leading-relaxed">
+                <strong>Export Controls:</strong> We comply with applicable
+                export control and sanctions laws. Some features may not be
+                available in certain countries due to legal restrictions.
+              </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                11. Children's Privacy
+                11. Children's Privacy - ENHANCED
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
                 <strong>
                   Our Service is not intended for children under the age of 16.
                 </strong>{' '}
                 We do not knowingly collect personal information from children
-                under 16. If you become aware that a child has provided us with
-                personal information, please contact us immediately.
+                under 16. This includes:
               </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>No targeted collection of children's data</li>
+                <li>No AI training on content from known minors</li>
+                <li>Immediate deletion of data identified as from minors</li>
+                <li>
+                  Parental notification and consent procedures where legally
+                  required
+                </li>
+              </ul>
               <p className="text-gray-700 leading-relaxed">
-                If we learn that we have collected personal information from a
-                child under 16, we will delete such information promptly.
+                If you become aware that a child has provided us with personal
+                information, please contact us immediately at{' '}
+                <a
+                  href="mailto:privacy@listora.ai"
+                  className="text-slate-600 hover:text-slate-800"
+                >
+                  privacy@listora.ai
+                </a>
+                .
               </p>
             </section>
 
@@ -496,18 +635,74 @@ export default function PrivacyPolicyPage() {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
                 12. Third-Party Links and Services
               </h2>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-gray-700 leading-relaxed mb-4">
                 Our Service may contain links to third-party websites or
-                integrate with third-party services. This Privacy Policy does
-                not apply to those third-party services. We encourage you to
-                read the privacy policies of any third-party services you access
-                through our platform.
+                integrate with third-party services (including Amazon, Shopify,
+                eBay, Etsy, and other platforms). This Privacy Policy does not
+                apply to those third-party services.
+              </p>
+              <p className="text-gray-700 leading-relaxed">
+                We encourage you to read the privacy policies of any third-party
+                services you access through our platform. We are not responsible
+                for the privacy practices of third-party platforms or the
+                consequences of publishing content to those platforms.
               </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                13. Changes to This Privacy Policy
+                13. AI and Emerging Technology Disclosures
+              </h2>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                <strong>AI Technology Limitations:</strong> Our AI systems are
+                subject to evolving technology and regulations. We cannot
+                guarantee:
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>Complete accuracy or appropriateness of AI outputs</li>
+                <li>Freedom from bias in AI model training or outputs</li>
+                <li>Compliance with all future AI regulations and standards</li>
+                <li>
+                  Prevention of all potential misuse of AI-generated content
+                </li>
+              </ul>
+              <p className="text-gray-700 leading-relaxed">
+                <strong>Regulatory Compliance:</strong> AI regulations are
+                rapidly evolving. We monitor regulatory developments and will
+                update our practices as needed to maintain compliance.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                14. Business Continuity and Service Termination
+              </h2>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                In the event that Listora AI ceases operations or significantly
+                modifies its services:
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
+                <li>
+                  We will provide at least 30 days' notice where technically and
+                  legally feasible
+                </li>
+                <li>
+                  Users will have opportunity to export their personal content
+                  and data
+                </li>
+                <li>
+                  AI training data may be retained by successor entities or
+                  technology partners
+                </li>
+                <li>
+                  This Privacy Policy will remain in effect for retained data
+                </li>
+              </ul>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                15. Changes to This Privacy Policy
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
                 We may update this Privacy Policy from time to time to reflect
@@ -519,6 +714,10 @@ export default function PrivacyPolicyPage() {
                 <li>Updating the "Last Updated" date</li>
                 <li>Sending email notification for significant changes</li>
                 <li>Providing in-app notifications where appropriate</li>
+                <li>
+                  For AI training changes, providing additional consent
+                  mechanisms where required
+                </li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
                 Your continued use of our Service after such modifications
@@ -528,7 +727,7 @@ export default function PrivacyPolicyPage() {
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                14. Contact Information and Data Protection Officer
+                16. Contact Information and Data Protection Officer
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
                 If you have any questions, concerns, or requests regarding this
@@ -543,6 +742,9 @@ export default function PrivacyPolicyPage() {
                 </p>
                 <p className="text-gray-700 mb-2">
                   <strong>Legal Matters:</strong> legal@listora.ai
+                </p>
+                <p className="text-gray-700 mb-2">
+                  <strong>DMCA Agent:</strong> dmca@listora.ai
                 </p>
                 <p className="text-gray-700 mb-2">
                   <strong>Website:</strong>{' '}
@@ -570,7 +772,7 @@ export default function PrivacyPolicyPage() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
               <p className="text-blue-800 text-sm">
                 <strong>Legal Notice:</strong> This Privacy Policy was last
-                updated on June 4, 2025. This document represents our current
+                updated on June 10, 2025. This document represents our current
                 privacy practices and may be subject to legal review and
                 modification. For the most current version, always refer to the
                 policy posted on our website.
@@ -580,7 +782,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </main>
 
-      {/* Footer - UPDATED */}
+      {/* Footer */}
       <footer className="bg-white border-t border-gray-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center">

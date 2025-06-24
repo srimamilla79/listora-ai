@@ -44,6 +44,7 @@ export default function OptimizedSignupPage() {
     email: '',
     password: '',
     confirmPassword: '',
+    agreeToTerms: false,
   })
 
   const router = useRouter()
@@ -124,6 +125,10 @@ export default function OptimizedSignupPage() {
       setMessage('Passwords do not match.')
       return false
     }
+    if (!formData.agreeToTerms) {
+      setMessage('Please agree to the Terms of Service and Privacy Policy.')
+      return false
+    }
     return true
   }
 
@@ -169,6 +174,13 @@ export default function OptimizedSignupPage() {
   }
 
   const handleGoogleSignUp = async () => {
+    if (!formData.agreeToTerms) {
+      setMessage(
+        'Please agree to the Terms of Service and Privacy Policy before signing up.'
+      )
+      return
+    }
+
     setGoogleLoading(true)
     setMessage('')
 
@@ -324,7 +336,7 @@ export default function OptimizedSignupPage() {
             </div>
 
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Join 10,000+ Entrepreneurs
+              Join thousands of Entrepreneurs
               <span className="block text-blue-600">
                 Making $1M+ More Revenue
               </span>
@@ -367,10 +379,10 @@ export default function OptimizedSignupPage() {
                 <ShoppingCart className="h-5 w-5 text-white" />
               </div>
               <h4 className="font-bold text-gray-900 text-sm mb-1">
-                Direct Publishing
+                Amazon Optimization & Direct Shopify Publishing
               </h4>
               <p className="text-gray-600 text-xs">
-                Publish to Amazon instantly
+                Professional Amazon instructions
               </p>
             </div>
 
@@ -549,7 +561,7 @@ export default function OptimizedSignupPage() {
               <div className="flex items-center space-x-2">
                 <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
                 <span className="text-gray-700 text-sm">
-                  All 5+ platforms supported
+                  Amazon + Shopify support
                 </span>
               </div>
               <div className="flex items-center space-x-2">
@@ -702,10 +714,51 @@ export default function OptimizedSignupPage() {
                   )}
               </div>
 
+              {/* Terms Agreement Checkbox */}
+              <div className="flex items-start space-x-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <input
+                  id="agreeToTerms"
+                  type="checkbox"
+                  required
+                  checked={formData.agreeToTerms}
+                  onChange={(e) =>
+                    setFormData({ ...formData, agreeToTerms: e.target.checked })
+                  }
+                  className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  disabled={loading}
+                />
+                <label
+                  htmlFor="agreeToTerms"
+                  className="text-sm text-gray-700 leading-relaxed"
+                >
+                  I agree to the{' '}
+                  <Link
+                    href="/terms"
+                    target="_blank"
+                    className="text-blue-600 hover:text-blue-500 underline font-medium"
+                  >
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link
+                    href="/privacy"
+                    target="_blank"
+                    className="text-blue-600 hover:text-blue-500 underline font-medium"
+                  >
+                    Privacy Policy
+                  </Link>
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+              </div>
+
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full flex justify-center items-center py-4 px-6 border border-transparent rounded-lg shadow-sm text-lg font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all transform hover:scale-105"
+                disabled={loading || !formData.agreeToTerms}
+                className={`w-full flex justify-center items-center py-4 px-6 border border-transparent rounded-lg shadow-sm text-lg font-bold text-white transition-all transform ${
+                  loading || !formData.agreeToTerms
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
               >
                 {loading ? (
                   <>
@@ -736,8 +789,12 @@ export default function OptimizedSignupPage() {
 
               <button
                 onClick={handleGoogleSignUp}
-                disabled={googleLoading || loading}
-                className="mt-4 w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all transform hover:scale-105"
+                disabled={googleLoading || loading || !formData.agreeToTerms}
+                className={`mt-4 w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 transition-all transform ${
+                  googleLoading || loading || !formData.agreeToTerms
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-gray-50 hover:scale-105'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
               >
                 {googleLoading ? (
                   'Setting up your account...'
@@ -765,6 +822,13 @@ export default function OptimizedSignupPage() {
                   </>
                 )}
               </button>
+
+              {!formData.agreeToTerms && (
+                <p className="mt-2 text-xs text-red-600 text-center">
+                  Please agree to the Terms and Privacy Policy above to continue
+                  with Google
+                </p>
+              )}
             </div>
 
             {/* Already have account */}
@@ -783,20 +847,6 @@ export default function OptimizedSignupPage() {
 
           {/* Footer */}
           <div className="mt-8 text-center">
-            <p className="text-xs text-gray-500 mb-4">
-              By creating an account, you agree to our{' '}
-              <Link href="/terms" className="text-blue-600 hover:text-blue-500">
-                Terms
-              </Link>{' '}
-              and{' '}
-              <Link
-                href="/privacy"
-                className="text-blue-600 hover:text-blue-500"
-              >
-                Privacy Policy
-              </Link>
-            </p>
-
             <div className="flex items-center justify-center space-x-6 text-xs text-gray-500">
               <div className="flex items-center space-x-1">
                 <Shield className="h-3 w-3 text-green-500" />

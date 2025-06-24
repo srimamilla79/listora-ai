@@ -31,6 +31,7 @@ export default function EnhancedContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [formErrors, setFormErrors] = useState<any>({})
+  const [submitError, setSubmitError] = useState('')
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
@@ -59,10 +60,23 @@ export default function EnhancedContactPage() {
     if (!validateForm()) return
 
     setIsSubmitting(true)
+    setSubmitError('')
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message')
+      }
+
       setSubmitted(true)
       // Reset form
       setFormData({
@@ -74,9 +88,18 @@ export default function EnhancedContactPage() {
       })
       setFormErrors({})
 
-      // Reset success state after 5 seconds
-      setTimeout(() => setSubmitted(false), 5000)
-    }, 1500)
+      // Reset success state after 8 seconds
+      setTimeout(() => setSubmitted(false), 8000)
+    } catch (error) {
+      console.error('Contact form error:', error)
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to send message. Please try again.'
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleChange = (
@@ -90,6 +113,10 @@ export default function EnhancedContactPage() {
     // Clear error when user starts typing
     if (formErrors[name]) {
       setFormErrors((prev: any) => ({ ...prev, [name]: '' }))
+    }
+    // Clear submit error
+    if (submitError) {
+      setSubmitError('')
     }
   }
 
@@ -541,13 +568,10 @@ export default function EnhancedContactPage() {
                 Visit Help Center
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
-              <Link
-                href="/tutorials"
-                className="inline-flex items-center border border-white text-white px-6 py-3 rounded-lg font-medium hover:bg-white hover:text-indigo-600 transition-colors"
-              >
+              <span className="inline-flex items-center border border-white/50 text-white/70 px-6 py-3 rounded-lg font-medium cursor-not-allowed">
                 Watch Tutorials
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </Link>
+                <span className="ml-2 text-xs">(Coming Soon)</span>
+              </span>
             </div>
           </div>
         </section>
@@ -604,9 +628,9 @@ export default function EnhancedContactPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/careers" className="hover:text-blue-600">
+                  <span className="text-gray-400 cursor-not-allowed">
                     Careers
-                  </Link>
+                  </span>
                 </li>
               </ul>
             </div>
@@ -625,9 +649,9 @@ export default function EnhancedContactPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/security" className="hover:text-blue-600">
+                  <span className="text-gray-400 cursor-not-allowed">
                     Security
-                  </Link>
+                  </span>
                 </li>
               </ul>
             </div>

@@ -1,4 +1,4 @@
-// src/components/UnifiedPublisher.tsx - Complete with Premium Amazon Instructions
+// src/components/UnifiedPublisher.tsx - Updated with eBay/Etsy Disabled & Amazon Instructions Focus
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -29,6 +29,8 @@ interface Platform {
   icon: string
   color: string
   connected: boolean
+  disabled?: boolean
+  comingSoon?: boolean
   setupUrl?: string
 }
 
@@ -74,6 +76,8 @@ export default function UnifiedPublisher({
       icon: '🔨',
       color: 'blue',
       connected: false,
+      disabled: true,
+      comingSoon: true,
     },
     {
       id: 'etsy',
@@ -81,6 +85,8 @@ export default function UnifiedPublisher({
       icon: '🎨',
       color: 'purple',
       connected: false,
+      disabled: true,
+      comingSoon: true,
     },
   ])
 
@@ -103,7 +109,6 @@ export default function UnifiedPublisher({
     sku: '',
     condition: 'new',
     productType: '',
-    // Removed amazonMethod - only instructions method available
   })
 
   const [supabase, setSupabase] = useState<any>(null)
@@ -178,42 +183,6 @@ export default function UnifiedPublisher({
         )
       }
 
-      // Query eBay connections
-      console.log('🔍 UnifiedPublisher: Querying eBay connections...')
-      const { data: ebayConnections, error: ebayError } = await supabase
-        .from('ebay_connections')
-        .select('*')
-        .eq('user_id', passedUser.id)
-        .eq('status', 'active')
-
-      if (ebayError) {
-        console.error('❌ UnifiedPublisher: eBay connection error:', ebayError)
-      } else {
-        console.log(
-          '✅ UnifiedPublisher: eBay query successful, found:',
-          ebayConnections?.length || 0,
-          'connections'
-        )
-      }
-
-      // Query Etsy connections
-      console.log('🔍 UnifiedPublisher: Querying Etsy connections...')
-      const { data: etsyConnections, error: etsyError } = await supabase
-        .from('etsy_connections')
-        .select('*')
-        .eq('user_id', passedUser.id)
-        .eq('status', 'active')
-
-      if (etsyError) {
-        console.error('❌ UnifiedPublisher: Etsy connection error:', etsyError)
-      } else {
-        console.log(
-          '✅ UnifiedPublisher: Etsy query successful, found:',
-          etsyConnections?.length || 0,
-          'connections'
-        )
-      }
-
       // Filter valid connections
       const validAmazonConnection =
         amazonConnections?.find(
@@ -225,16 +194,6 @@ export default function UnifiedPublisher({
           ? shopifyConnections[0]
           : null
 
-      const validEbayConnection =
-        ebayConnections?.find(
-          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
-        ) || null
-
-      const validEtsyConnection =
-        etsyConnections?.find(
-          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
-        ) || null
-
       console.log(
         '🔍 UnifiedPublisher: Valid Amazon connection:',
         !!validAmazonConnection
@@ -243,31 +202,22 @@ export default function UnifiedPublisher({
         '🔍 UnifiedPublisher: Valid Shopify connection:',
         !!validShopifyConnection
       )
-      console.log(
-        '🔍 UnifiedPublisher: Valid eBay connection:',
-        !!validEbayConnection
-      )
-      console.log(
-        '🔍 UnifiedPublisher: Valid Etsy connection:',
-        !!validEtsyConnection
-      )
 
-      // Update platforms with connection status
+      // Update platforms with connection status (only for enabled platforms)
       const updatedPlatforms = platforms.map((platform) => {
         let isConnected = false
 
-        if (platform.id === 'amazon') {
-          isConnected = !!validAmazonConnection?.access_token
-        } else if (platform.id === 'shopify') {
-          isConnected = !!validShopifyConnection
-        } else if (platform.id === 'ebay') {
-          isConnected = !!validEbayConnection?.access_token
-        } else if (platform.id === 'etsy') {
-          isConnected = !!validEtsyConnection?.access_token
+        // Only check connections for enabled platforms
+        if (!platform.disabled) {
+          if (platform.id === 'amazon') {
+            isConnected = !!validAmazonConnection?.access_token
+          } else if (platform.id === 'shopify') {
+            isConnected = !!validShopifyConnection
+          }
         }
 
         console.log(
-          `📱 UnifiedPublisher: Platform ${platform.id}: ${isConnected ? 'Connected' : 'Not connected'}`
+          `📱 UnifiedPublisher: Platform ${platform.id}: ${isConnected ? 'Connected' : platform.disabled ? 'Disabled' : 'Not connected'}`
         )
 
         return {
@@ -279,7 +229,9 @@ export default function UnifiedPublisher({
       setPlatforms(updatedPlatforms)
 
       // Set first connected platform as default
-      const connectedPlatform = updatedPlatforms.find((p) => p.connected)
+      const connectedPlatform = updatedPlatforms.find(
+        (p) => p.connected && !p.disabled
+      )
       if (connectedPlatform) {
         setSelectedPlatform(connectedPlatform.id)
         console.log(
@@ -310,6 +262,11 @@ export default function UnifiedPublisher({
   const handlePlatformConnect = async (platformId: string) => {
     if (!passedUser?.id) {
       console.error('No user ID available for OAuth. User:', passedUser)
+      return
+    }
+
+    // Don't allow connection for disabled platforms
+    if (platformId === 'ebay' || platformId === 'etsy') {
       return
     }
 
@@ -421,44 +378,23 @@ export default function UnifiedPublisher({
       let endpoint = `/api/${selectedPlatform}/publish`
       let requestPayload
 
-      if (selectedPlatform === 'ebay' || selectedPlatform === 'etsy') {
-        // eBay and Etsy format (similar to Shopify)
-        requestPayload = {
-          productContent: {
-            id: productContent?.id,
-            product_name: productContent.product_name,
-            features: productContent.features,
-            content: productContent.content,
-          },
-          images: images,
-          publishingOptions: {
-            ...publishingOptions,
-            price: parseFloat(publishingOptions.price),
-            quantity: parseInt(publishingOptions.quantity),
-            sku: publishingOptions.sku || generateSKU(),
-          },
-          platform: selectedPlatform,
-          userId: passedUser?.id,
-        }
-      } else {
-        // Shopify format (original working format)
-        requestPayload = {
-          productContent: {
-            id: productContent?.id,
-            product_name: productContent.product_name,
-            features: productContent.features,
-            content: productContent.content,
-          },
-          images: images,
-          publishingOptions: {
-            ...publishingOptions,
-            price: parseFloat(publishingOptions.price),
-            quantity: parseInt(publishingOptions.quantity),
-            sku: publishingOptions.sku || generateSKU(),
-          },
-          platform: selectedPlatform,
-          userId: passedUser?.id,
-        }
+      // Shopify format (only enabled non-Amazon platform)
+      requestPayload = {
+        productContent: {
+          id: productContent?.id,
+          product_name: productContent.product_name,
+          features: productContent.features,
+          content: productContent.content,
+        },
+        images: images,
+        publishingOptions: {
+          ...publishingOptions,
+          price: parseFloat(publishingOptions.price),
+          quantity: parseInt(publishingOptions.quantity),
+          sku: publishingOptions.sku || generateSKU(),
+        },
+        platform: selectedPlatform,
+        userId: passedUser?.id,
       }
 
       console.log('🚀 Publishing request:', {
@@ -481,17 +417,8 @@ export default function UnifiedPublisher({
 
       const result = await response.json()
 
-      // Success handling for non-Amazon platforms
-      let successMessage = ''
-
-      if (selectedPlatform === 'ebay') {
-        successMessage = `✅ Successfully listed on ${selectedPlatformData?.name}! Item ID: ${result.data?.itemId || 'N/A'}`
-      } else if (selectedPlatform === 'etsy') {
-        successMessage = `✅ Successfully listed on ${selectedPlatformData?.name}! Listing ID: ${result.data?.listingId || 'N/A'}`
-      } else {
-        // Shopify and others
-        successMessage = `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.data?.productId || 'N/A'}`
-      }
+      // Success handling for Shopify
+      const successMessage = `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.data?.productId || 'N/A'}`
 
       setPublishSuccess(successMessage)
 
@@ -687,7 +614,8 @@ export default function UnifiedPublisher({
   }
 
   const selectedPlatformData = platforms.find((p) => p.id === selectedPlatform)
-  const connectedPlatforms = platforms.filter((p) => p.connected)
+  const connectedPlatforms = platforms.filter((p) => p.connected && !p.disabled)
+  const enabledPlatforms = platforms.filter((p) => !p.disabled)
 
   // Show loading state
   if (loading) {
@@ -708,8 +636,8 @@ export default function UnifiedPublisher({
       {/* Amazon Instructions Modal */}
       {showInstructions && instructionData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-          <div className="h-full overflow-y-auto py-4">
-            <div className="max-w-4xl mx-auto px-4">
+          <div className="h-full overflow-y-auto pt-4">
+            <div className="max-w-4xl mx-auto px-4 pb-4">
               <div className="bg-white rounded-xl shadow-2xl">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-6 rounded-t-xl">
@@ -1074,7 +1002,7 @@ export default function UnifiedPublisher({
               content.
             </p>
             <div className="flex justify-center space-x-3">
-              {platforms.map((platform) => (
+              {enabledPlatforms.map((platform) => (
                 <button
                   key={platform.id}
                   onClick={() => handlePlatformConnect(platform.id)}
@@ -1083,16 +1011,24 @@ export default function UnifiedPublisher({
                       ? 'bg-orange-600 hover:bg-orange-700'
                       : platform.id === 'shopify'
                         ? 'bg-green-600 hover:bg-green-700'
-                        : platform.id === 'ebay'
-                          ? 'bg-blue-600 hover:bg-blue-700'
-                          : platform.id === 'etsy'
-                            ? 'bg-purple-600 hover:bg-purple-700'
-                            : 'bg-gray-600 hover:bg-gray-700'
+                        : 'bg-gray-600 hover:bg-gray-700'
                   }`}
                 >
                   {platform.icon} {platform.name}
                 </button>
               ))}
+
+              {/* Show coming soon platforms */}
+              {platforms
+                .filter((p) => p.comingSoon)
+                .map((platform) => (
+                  <div
+                    key={platform.id}
+                    className="px-4 py-2 rounded-lg font-medium text-sm bg-yellow-100 text-yellow-700 border border-yellow-300 cursor-default"
+                  >
+                    {platform.icon} {platform.name} - Coming Soon
+                  </div>
+                ))}
             </div>
           </div>
         ) : (
@@ -1102,7 +1038,7 @@ export default function UnifiedPublisher({
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Select Publishing Platform
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {connectedPlatforms.map((platform) => (
                   <div
                     key={platform.id}
@@ -1122,14 +1058,10 @@ export default function UnifiedPublisher({
                         <p className="text-xs text-green-600">✓ Connected</p>
                         <p className="text-xs text-gray-500 mt-1">
                           {platform.id === 'amazon'
-                            ? 'Sell to millions of Amazon customers worldwide'
+                            ? 'Professional instructions with optimized data'
                             : platform.id === 'shopify'
                               ? 'Publish directly to your Shopify store'
-                              : platform.id === 'ebay'
-                                ? "List on the world's largest auction marketplace"
-                                : platform.id === 'etsy'
-                                  ? 'Perfect for handmade & creative products'
-                                  : 'Marketplace integration'}
+                              : 'Marketplace integration'}
                         </p>
                       </div>
                     </div>
@@ -1294,7 +1226,7 @@ export default function UnifiedPublisher({
                             </p>
                             <p className="text-blue-700 text-xs mt-1">
                               We'll generate step-by-step instructions with
-                              optimized data for guaranteed Amazon success.
+                              optimized data for Amazon success.
                             </p>
                           </div>
                         </div>
@@ -1340,16 +1272,13 @@ export default function UnifiedPublisher({
                           {publishedProducts[selectedPlatform].method ===
                           'instructions'
                             ? 'generated instructions for'
-                            : publishedProducts[selectedPlatform].method ===
-                                'template'
-                              ? 'generated template for'
-                              : 'published to'}{' '}
+                            : 'published to'}{' '}
                           {selectedPlatformData?.name}!
                         </p>
                       </div>
                     </div>
 
-                    {/* Instructions or Template Download Button OR Product View Button */}
+                    {/* Instructions Download Button OR Product View Button */}
                     {publishedProducts[selectedPlatform].method ===
                     'instructions' ? (
                       <>
@@ -1411,47 +1340,12 @@ export default function UnifiedPublisher({
                                 'https://admin.shopify.com/',
                                 '_blank'
                               )
-                            } else if (selectedPlatform === 'amazon') {
-                              window.open(
-                                'https://sellercentral.amazon.com/',
-                                '_blank'
-                              )
-                            } else if (selectedPlatform === 'ebay') {
-                              const itemId = publishedProduct?.productId
-                              if (itemId && itemId !== 'N/A') {
-                                window.open(
-                                  `https://www.ebay.com/itm/${itemId}`,
-                                  '_blank'
-                                )
-                              } else {
-                                window.open(
-                                  'https://www.ebay.com/sh/ovw',
-                                  '_blank'
-                                )
-                              }
-                            } else if (selectedPlatform === 'etsy') {
-                              const listingId = publishedProduct?.productId
-                              if (listingId && listingId !== 'N/A') {
-                                window.open(
-                                  `https://www.etsy.com/listing/${listingId}`,
-                                  '_blank'
-                                )
-                              } else {
-                                window.open(
-                                  'https://www.etsy.com/your/shops/me',
-                                  '_blank'
-                                )
-                              }
                             }
                           }}
                           className="w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
                         >
                           <Globe className="h-5 w-5 mr-2" />
-                          {selectedPlatform === 'ebay'
-                            ? 'View Listing on eBay'
-                            : selectedPlatform === 'etsy'
-                              ? 'View Listing on Etsy'
-                              : `View Product on ${selectedPlatformData?.name}`}
+                          View Product on {selectedPlatformData?.name}
                         </button>
 
                         {/* Publish Again Button */}

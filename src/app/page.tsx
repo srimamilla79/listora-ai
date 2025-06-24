@@ -128,7 +128,7 @@ export default function HomePage() {
       icon: Camera,
       title: 'AI Vision Analysis + Multi-Platform Images',
       description:
-        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions. Then automatically optimize for Amazon, Shopify, Etsy, eBay, and Instagram.',
+        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions. Then automatically optimize for Amazon, Shopify, and other major platforms.',
       benefit:
         'AI sees your product and writes descriptions based on actual visual details',
       stats: 'OpenAI Vision + 5 platform optimization',
@@ -166,22 +166,19 @@ export default function HomePage() {
                 name: 'Amazon',
                 color: 'from-orange-400 to-orange-500',
                 emoji: '📦',
+                status: 'optimized',
               },
               {
                 name: 'Shopify',
                 color: 'from-green-400 to-green-500',
                 emoji: '🛍️',
+                status: 'direct',
               },
               {
-                name: 'Etsy',
-                color: 'from-yellow-400 to-orange-400',
-                emoji: '🎨',
-              },
-              { name: 'eBay', color: 'from-blue-400 to-blue-500', emoji: '💰' },
-              {
-                name: 'Instagram',
-                color: 'from-pink-400 to-purple-500',
-                emoji: '📱',
+                name: 'More Soon',
+                color: 'from-gray-400 to-gray-500',
+                emoji: '➕',
+                status: 'coming',
               },
             ].map((platform, i) => (
               <div
@@ -205,11 +202,11 @@ export default function HomePage() {
     },
     {
       icon: ShoppingCart,
-      title: 'Direct Amazon & Shopify Publishing',
+      title: 'Amazon Optimization + Shopify Publishing',
       description:
-        'Skip the copy-paste hassle! Publish your AI-generated content directly to Amazon and Shopify with one click. Our integration connects to your seller accounts for seamless product listing creation.',
+        'Get professional Amazon listing optimization with step-by-step guidance and optimized data, plus direct one-click publishing to Shopify with seamless seller account integration.',
       benefit:
-        'From voice input to live marketplace listings in under 2 minutes',
+        'From voice input to Amazon-ready listings + live Shopify in under 2 minutes',
       stats: 'Direct API integration with both platforms',
       demo: (
         <div className="bg-gradient-to-br from-orange-50 to-green-100 rounded-xl p-6 border border-orange-200">
@@ -246,7 +243,7 @@ export default function HomePage() {
                   icon: '🔗',
                 },
                 {
-                  step: '4. Publishing to Both...',
+                  step: '4. Optimizing + Publishing...',
                   status: 'processing',
                   icon: '🚀',
                 },
@@ -278,10 +275,10 @@ export default function HomePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
                 <div className="text-sm font-semibold text-orange-800">
-                  📦 Amazon Live!
+                  📦 Amazon Optimized!
                 </div>
                 <div className="text-xs text-orange-600 mt-1">
-                  ASIN: B08XYZ123
+                  Ready to list
                 </div>
               </div>
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
@@ -628,7 +625,7 @@ export default function HomePage() {
               <Sparkles className="h-4 w-4 text-indigo-600" />
               <span className="text-sm font-medium text-indigo-800">
                 Join thousands of entrepreneurs using AI Vision + Bulk
-                Processing + Amazon & Shopify Direct
+                Processing + Amazon Optimization + Shopify Direct
               </span>
               <Star className="h-4 w-4 text-yellow-500 fill-current" />
             </div>
@@ -645,10 +642,17 @@ export default function HomePage() {
             {/* Enhanced Subtitle */}
             <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
               The world's first AI that combines voice recognition, OpenAI
-              Vision analysis, bulk CSV processing, and direct publishing to
-              <span className="font-semibold text-orange-600"> Amazon</span> &
-              <span className="font-semibold text-green-600"> Shopify</span>.
-              Scale from 1 product to 500+ with background automation.
+              Vision analysis, bulk CSV processing, and
+              <span className="font-semibold text-orange-600">
+                {' '}
+                Amazon listing optimization
+              </span>{' '}
+              +
+              <span className="font-semibold text-green-600">
+                {' '}
+                Shopify direct publishing
+              </span>
+              . Scale from 1 product to 500+ with background automation.
               <span className="font-semibold text-gray-800">
                 {' '}
                 No technical skills required.
@@ -729,10 +733,10 @@ export default function HomePage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        Publish Everywhere
+                        Optimize & Publish
                       </h3>
                       <p className="text-sm text-gray-600">
-                        Amazon & Shopify go live instantly
+                        Amazon optimized + Shopify goes live
                       </p>
                     </div>
                   </div>
@@ -755,7 +759,7 @@ export default function HomePage() {
                         }`}
                       >
                         {activePlatform === 0
-                          ? 'Live on Amazon!'
+                          ? 'Amazon Optimized!'
                           : 'Live on Shopify!'}
                       </span>
                     </div>
@@ -769,7 +773,6 @@ export default function HomePage() {
                       {activePlatform === 0
                         ? 'ASIN: B08XYZ123'
                         : 'Product ID: 789456'}{' '}
-                      • Status: Active
                     </div>
                   </div>
                 </div>
@@ -841,7 +844,7 @@ export default function HomePage() {
               },
               {
                 number: '2 Platforms',
-                label: 'Amazon + Shopify Direct',
+                label: 'Amazon Optimization + Shopify Direct',
                 icon: ShoppingCart,
                 color: 'from-orange-500 to-red-500',
               },
@@ -1146,6 +1149,7 @@ export default function HomePage() {
                   'Bulk CSV upload (up to 50 products)',
                   'Background job processing',
                   'Content library with organization',
+                  'Amazon optimization & Direct Shopify publishing integration',
                   'Priority email support',
                 ],
                 newCapabilities: [
@@ -1171,13 +1175,13 @@ export default function HomePage() {
                 features: [
                   'Everything in Business plan',
                   'Large bulk CSV upload (up to 200 products)',
-                  'Direct Amazon & Shopify publishing integration',
+                  'Amazon optimization & Direct Shopify publishing integration',
                   'Enhanced voice processing (full 1-minute)',
                   'Advanced AI Vision analysis',
                   'Bulk export options (CSV, Excel)',
                 ],
                 differentiators: [
-                  'Direct Amazon & Shopify integration',
+                  'Amazon optimization & Direct Shopify publishing integration',
                   'Higher bulk limits',
                   'Enhanced AI features',
                 ],
@@ -1203,7 +1207,7 @@ export default function HomePage() {
                 features: [
                   'Everything in Premium plan',
                   'Enterprise bulk processing (up to 1,000 products)',
-                  'Direct Amazon & Shopify publishing (unlimited)',
+                  'Amazon optimization & Direct Shopify publishing (unlimited)',
                   'Priority support (faster response)',
                   'Large-scale background processing',
                 ],
@@ -1398,9 +1402,9 @@ export default function HomePage() {
           </h2>
           <p className="text-xl text-indigo-100 mb-12 max-w-3xl mx-auto">
             Join thousands of entrepreneurs who have already discovered the
-            power of voice-driven content creation with direct Amazon & Shopify
-            publishing. Start your free trial today and transform your business
-            forever.
+            power of voice-driven content creation with Amazon optimization &
+            Direct Shopify publishing. Start your free trial today and transform
+            your business forever.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
@@ -1549,6 +1553,14 @@ export default function HomePage() {
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     Terms of Service
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="/dmca"
+                    className="hover:text-white transition-colors cursor-pointer"
+                  >
+                    DMCA Policy
                   </a>
                 </li>
               </ul>

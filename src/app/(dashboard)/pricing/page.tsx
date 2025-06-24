@@ -1,4 +1,4 @@
-// src/app/(dashboard)/pricing/page.tsx - UPDATED WITH SHOPIFY INTEGRATION
+// src/app/(dashboard)/pricing/page.tsx - UPDATED WITH PROPER BILLING CYCLE LOGIC
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -30,6 +30,7 @@ import {
   Timer,
   Building2,
   Store,
+  Calendar,
 } from 'lucide-react'
 
 interface UserPlan {
@@ -37,6 +38,34 @@ interface UserPlan {
   created_at: string
   expires_at: string | null
   is_active: boolean
+}
+
+// Helper function for billing cycle calculation
+const getBillingCycleInfo = (subscriptionStartDate: string | Date) => {
+  const startDate = new Date(subscriptionStartDate)
+  const today = new Date()
+  const nextCycle = new Date(startDate)
+
+  // Start with same day next month
+  nextCycle.setMonth(nextCycle.getMonth() + 1)
+
+  // If we're already past this month's billing date, move to next month
+  while (nextCycle <= today) {
+    nextCycle.setMonth(nextCycle.getMonth() + 1)
+  }
+
+  const diffTime = nextCycle.getTime() - today.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+  return {
+    nextResetDate: nextCycle,
+    daysUntilReset: Math.max(0, diffDays),
+    formattedDate: nextCycle.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    }),
+    isNearReset: diffDays <= 3,
+  }
 }
 
 export default function EnhancedPricingPage() {
@@ -286,6 +315,11 @@ export default function EnhancedPricingPage() {
   const usagePercentage =
     currentLimit > 0 ? (currentUsage / currentLimit) * 100 : 0
 
+  // Get billing cycle info
+  const billingInfo = userPlan?.created_at
+    ? getBillingCycleInfo(userPlan.created_at)
+    : null
+
   const plans = [
     {
       name: 'Starter (Free)',
@@ -325,7 +359,7 @@ export default function EnhancedPricingPage() {
         '250 content generations per month',
         'Everything in Starter plan',
         'Bulk CSV upload (up to 50 products)',
-        'Direct Amazon & Shopify publishing integration',
+        'Amazon optimization & Direct Shopify publishing integration',
         'Background job processing',
         'Content library with organization',
         'Priority email support',
@@ -353,13 +387,13 @@ export default function EnhancedPricingPage() {
         '1,000 content generations per month',
         'Everything in Business plan',
         'Large bulk CSV upload (up to 200 products)',
-        'Direct Amazon & Shopify publishing integration',
+        'Amazon optimization & Direct Shopify publishing integration',
         'Enhanced voice processing (full 1-minute)',
         'Advanced AI Vision analysis',
         'Bulk export options (CSV, Excel)',
       ],
       differentiators: [
-        'Direct Amazon & Shopify integration',
+        'Amazon optimization & Shopify Publish integration',
         'Higher bulk limits',
         'Enhanced AI features',
       ],
@@ -386,7 +420,7 @@ export default function EnhancedPricingPage() {
         'Unlimited content generations',
         'Everything in Premium plan',
         'Enterprise bulk processing (up to 1,000 products)',
-        'Direct Amazon & Shopify publishing (unlimited)',
+        'Amazon optimization & Direct Shopify publishing (unlimited)',
         'Priority support (faster response)',
         'Large-scale background processing',
       ],
@@ -562,23 +596,38 @@ export default function EnhancedPricingPage() {
 
                 {/* Plan Features Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* UPDATED: Monthly Reset with Billing Cycle Logic */}
                   <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
                     <div className="flex items-center space-x-2 mb-2">
-                      <BarChart3 className="h-5 w-5 text-blue-600" />
+                      <Calendar className="h-5 w-5 text-blue-600" />
                       <span className="text-sm font-semibold text-blue-900">
-                        Monthly Reset
+                        Billing Cycle
                       </span>
                     </div>
                     <p className="text-sm text-blue-700">
-                      Resets{' '}
-                      {new Date(
-                        new Date().getFullYear(),
-                        new Date().getMonth() + 1,
-                        1
-                      ).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {billingInfo ? (
+                        <>
+                          Resets {billingInfo.formattedDate}
+                          {billingInfo.isNearReset && (
+                            <span className="text-orange-600 font-medium ml-1">
+                              ({billingInfo.daysUntilReset} days)
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        // Fallback for starter plan (no subscription date)
+                        <>
+                          Resets{' '}
+                          {new Date(
+                            new Date().getFullYear(),
+                            new Date().getMonth() + 1,
+                            1
+                          ).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </>
+                      )}
                     </p>
                   </div>
 
@@ -646,7 +695,7 @@ export default function EnhancedPricingPage() {
               {
                 icon: Store,
                 label: 'Marketplace Publishing',
-                desc: 'Direct Amazon & Shopify integration',
+                desc: 'Amazon optimization & Shopify integration',
               },
             ].map((feature, index) => {
               const Icon = feature.icon
@@ -994,9 +1043,9 @@ export default function EnhancedPricingPage() {
                     Direct Marketplace Publishing
                   </h4>
                   <p className="text-gray-600 text-sm">
-                    One-click publish generated content directly to Amazon and
-                    Shopify. No copy-paste required. Integrates directly with
-                    your seller accounts for seamless workflow.
+                    One-click publish generated content directly to Shopify &
+                    Amazon optimization. No copy-paste required. Integrates
+                    directly with your seller accounts for seamless workflow.
                   </p>
                 </div>
               </div>
@@ -1105,6 +1154,8 @@ export default function EnhancedPricingPage() {
               <div className="mt-4">
                 <a
                   href="/contact"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center"
                 >
                   Contact us for enterprise features
@@ -1177,22 +1228,33 @@ export default function EnhancedPricingPage() {
               and enterprise-grade security.
             </p>
             <div className="flex justify-center space-x-8 text-sm">
-              {[
-                { label: 'Terms', icon: Shield },
-                { label: 'Privacy', icon: Shield },
-                { label: 'Support', icon: Users },
-              ].map((item, index) => {
-                const Icon = item.icon
-                return (
-                  <button
-                    key={index}
-                    className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </button>
-                )
-              })}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+              >
+                <Shield className="h-4 w-4" />
+                <span>Terms</span>
+              </a>
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+              >
+                <Shield className="h-4 w-4" />
+                <span>Privacy</span>
+              </a>
+              <a
+                href="/contact"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+              >
+                <Users className="h-4 w-4" />
+                <span>Support</span>
+              </a>
             </div>
           </div>
         </div>
