@@ -521,10 +521,6 @@ export default function OptimizedLoginPage() {
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span>All systems operational</span>
             </div>
-            <div className="flex items-center space-x-1">
-              <CheckCircle className="h-3 w-3 text-blue-500" />
-              <span>10,000+ entrepreneurs trust us</span>
-            </div>
           </div>
         </div>
       </div>
