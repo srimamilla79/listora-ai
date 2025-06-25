@@ -37,13 +37,13 @@ import {
   Package,
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
+import Link from 'next/link'
 
 export default function HomePage() {
   const [activeFeature, setActiveFeature] = useState(0)
   const [isVoiceActive, setIsVoiceActive] = useState(false)
   const [contentPreview, setContentPreview] = useState('')
   const [typingIndex, setTypingIndex] = useState(0)
-  const [currentTestimonial, setCurrentTestimonial] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [activePlatform, setActivePlatform] = useState(0)
 
@@ -60,14 +60,6 @@ export default function HomePage() {
       return () => clearTimeout(timer)
     }
   }, [activeFeature, typingIndex])
-
-  // Auto-rotate testimonials
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTestimonial((prev) => (prev + 1) % testimonials.length)
-    }, 5000)
-    return () => clearTimeout(timer)
-  }, [])
 
   // Auto-rotate platform showcase
   useEffect(() => {
@@ -495,45 +487,6 @@ export default function HomePage() {
     },
   ]
 
-  const testimonials = [
-    {
-      name: 'Sarah Chen',
-      role: 'E-commerce Entrepreneur',
-      company: 'TechGadgets Pro',
-      content:
-        'Listora AI completely transformed my workflow. What used to take me 4-5 hours per product now takes 5 minutes. The voice feature is incredibly intuitive, and publishing to both Amazon and Shopify is seamless!',
-      rating: 5,
-      metric: '300% efficiency boost',
-      avatar: 'SC',
-      color: 'from-blue-400 to-blue-600',
-      results: '+40% sales increase',
-    },
-    {
-      name: 'Michael Rodriguez',
-      role: 'Digital Marketing Specialist',
-      company: 'Growth Marketing Co',
-      content:
-        'As someone managing 50+ clients, Listora AI became my secret weapon. The AI-generated content consistently outperforms human-written copy across all platforms.',
-      rating: 5,
-      metric: '40% more clients served',
-      avatar: 'MR',
-      color: 'from-green-400 to-green-600',
-      results: '+$50k monthly revenue',
-    },
-    {
-      name: 'Emma Thompson',
-      role: 'Amazon FBA & Shopify Seller',
-      company: 'Home Essentials',
-      content:
-        'The multi-platform optimization is brilliant. I launch products 5x faster now on both Amazon and Shopify, and my conversion rates have never been higher.',
-      rating: 5,
-      metric: '5x faster launches',
-      avatar: 'ET',
-      color: 'from-purple-400 to-purple-600',
-      results: '+65% conversion rate',
-    },
-  ]
-
   const handleLogin = () => {
     window.location.href = '/login'
   }
@@ -559,51 +512,95 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Enhanced Header */}
+      {/* Enhanced Header - REMOVED REVIEWS TAB */}
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <ListoraAILogo size="header" showText={true} />
+            {/* Logo - Always clickable to home */}
+            <Link
+              href="/"
+              className="flex items-center hover:opacity-80 transition-opacity"
+            >
+              <ListoraAILogo size="header" showText={true} />
+            </Link>
 
-            <div className="hidden md:flex items-center space-x-8">
+            {/* Desktop Navigation - Always visible */}
+            <nav className="hidden md:flex items-center space-x-8">
+              <Link
+                href="/"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Home
+              </Link>
               <button
                 onClick={() => scrollToSection('features-section')}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
               >
                 Features
               </button>
               <button
                 onClick={() => scrollToSection('pricing-section')}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
               >
                 Pricing
               </button>
-              <button
-                onClick={() => scrollToSection('testimonials-section')}
+              <Link
+                href="/about"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
-                Reviews
-              </button>
-              <button
-                onClick={handleAbout}
+                About
+              </Link>
+              <Link
+                href="/contact"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
-                About Us
-              </button>
-            </div>
+                Contact
+              </Link>
+            </nav>
 
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleLogin}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium px-4 py-2 rounded-lg hover:bg-gray-100 cursor-pointer"
+            {/* Action Buttons - Always visible */}
+            <div className="flex items-center space-x-3">
+              {/* Login Button */}
+              <Link
+                href="/login"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium px-4 py-2 rounded-lg hover:bg-gray-100"
               >
                 Login
-              </button>
-              <button
-                onClick={handleSignup}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg cursor-pointer"
+              </Link>
+
+              {/* Book Demo Button */}
+              <Link
+                href="/demo"
+                className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+              >
+                Book Demo
+              </Link>
+
+              {/* Start Free Trial Button */}
+              <Link
+                href="/signup"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
               >
                 Start Free Trial
+              </Link>
+            </div>
+
+            {/* Mobile Menu Button - Add this for mobile responsiveness */}
+            <div className="md:hidden">
+              <button className="text-gray-600 hover:text-indigo-600 p-2">
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
               </button>
             </div>
           </div>
@@ -624,19 +621,17 @@ export default function HomePage() {
             <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-4 py-2 mb-8">
               <Sparkles className="h-4 w-4 text-indigo-600" />
               <span className="text-sm font-medium text-indigo-800">
-                Join thousands of entrepreneurs using AI Vision + Bulk
-                Processing + Amazon Optimization + Shopify Direct
+                Revolutionary AI platform combining Voice + Vision + Bulk
+                Processing + Direct Publishing
               </span>
               <Star className="h-4 w-4 text-yellow-500 fill-current" />
             </div>
 
             {/* Enhanced Title */}
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-8 leading-tight">
-              Transform Your
-              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
-                Voice Into Sales
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-8 leading-tight">
+              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                Complete Content Automation Platform
               </span>
-              in 30 Seconds
             </h1>
 
             {/* Enhanced Subtitle */}
@@ -988,102 +983,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Enhanced Testimonials Section */}
+      {/* Enhanced Pricing Section - TESTIMONIALS SECTION REMOVED */}
       <section
-        id="testimonials-section"
+        id="pricing-section"
         className="py-24 bg-gradient-to-br from-gray-50 to-indigo-50"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20">
-            <div className="inline-flex items-center space-x-2 bg-green-50 border border-green-200 rounded-full px-4 py-2 mb-6">
-              <Star className="h-4 w-4 text-yellow-500 fill-current" />
-              <span className="text-sm font-medium text-green-800">
-                4.9/5 from 3,500+ reviews
-              </span>
-            </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Real results from
-              <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                {' '}
-                real entrepreneurs
-              </span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              See how businesses of all sizes are using Listora AI to create
-              better content faster and achieve remarkable growth across Amazon
-              and Shopify.
-            </p>
-          </div>
-
-          {/* Featured Testimonial */}
-          <div className="mb-16">
-            <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 border border-gray-200 max-w-4xl mx-auto">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center space-x-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className="h-6 w-6 text-yellow-400 fill-current"
-                    />
-                  ))}
-                </div>
-                <div className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-semibold">
-                  {testimonials[currentTestimonial].results}
-                </div>
-              </div>
-
-              <blockquote className="text-xl md:text-2xl text-gray-800 leading-relaxed mb-8 italic">
-                "{testimonials[currentTestimonial].content}"
-              </blockquote>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div
-                    className={`w-16 h-16 bg-gradient-to-r ${testimonials[currentTestimonial].color} rounded-full flex items-center justify-center text-white font-bold text-lg`}
-                  >
-                    {testimonials[currentTestimonial].avatar}
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-900 text-lg">
-                      {testimonials[currentTestimonial].name}
-                    </div>
-                    <div className="text-indigo-600 font-medium">
-                      {testimonials[currentTestimonial].role}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {testimonials[currentTestimonial].company}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-indigo-600 mb-1">
-                    {testimonials[currentTestimonial].metric}
-                  </div>
-                  <div className="text-sm text-gray-500">improvement</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Testimonial Navigation */}
-          <div className="flex justify-center space-x-2">
-            {testimonials.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentTestimonial(index)}
-                className={`w-3 h-3 rounded-full transition-all ${
-                  currentTestimonial === index
-                    ? 'bg-indigo-600 w-8'
-                    : 'bg-gray-300 hover:bg-gray-400'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Enhanced Pricing Section - Updated Layout */}
-      <section id="pricing-section" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <div className="inline-flex items-center space-x-2 bg-purple-50 border border-purple-200 rounded-full px-4 py-2 mb-6">
@@ -1229,10 +1133,10 @@ export default function HomePage() {
                   plan.popular ? 'transform scale-105' : ''
                 } h-full flex flex-col`}
               >
-                {/* Top colored border - just color, no text */}
+                {/* Top colored border */}
                 <div className={`h-2 ${plan.topBorderColor}`}></div>
 
-                {/* Most Popular Badge - ADD THIS */}
+                {/* Most Popular Badge */}
                 {plan.badge && (
                   <div className="px-4 py-2 text-center text-white text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600">
                     {plan.badge}
@@ -1269,7 +1173,7 @@ export default function HomePage() {
                     </p>
                   </div>
 
-                  {/* CTA Button - This will align across all cards */}
+                  {/* CTA Button */}
                   <div className="mb-6">
                     <button
                       onClick={handleSignup}
@@ -1279,7 +1183,7 @@ export default function HomePage() {
                     </button>
                   </div>
 
-                  {/* Features - Flexible content that grows */}
+                  {/* Features */}
                   <div className="flex-1">
                     <div className="space-y-4">
                       <div>
@@ -1364,7 +1268,7 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  {/* Money back guarantee - Fixed at bottom */}
+                  {/* Money back guarantee */}
                   <div className="mt-6 text-center text-xs text-gray-500">
                     {plan.name === 'Starter (Free)'
                       ? '✓ No credit card required • ✓ Forever free'
@@ -1401,10 +1305,10 @@ export default function HomePage() {
             Ready to 10X your content creation speed?
           </h2>
           <p className="text-xl text-indigo-100 mb-12 max-w-3xl mx-auto">
-            Join thousands of entrepreneurs who have already discovered the
-            power of voice-driven content creation with Amazon optimization &
-            Direct Shopify publishing. Start your free trial today and transform
-            your business forever.
+            Ready to 10X your content creation speed? Experience the power of
+            voice-driven content creation with Amazon optimization & direct
+            Shopify publishing. Start your free trial today and transform your
+            business forever.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
@@ -1454,7 +1358,7 @@ export default function HomePage() {
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 Revolutionizing product marketing with advanced AI technology.
                 Transform your voice into professional content and optimize
-                images for Amazon, Shopify, and every major e-commerce platform.
+                images for various e-commerce platforms.
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">

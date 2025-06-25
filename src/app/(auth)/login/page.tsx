@@ -135,16 +135,104 @@ export default function OptimizedLoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Enhanced Header - UPDATED WITH CONSISTENT NAVIGATION */}
+      <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo - Always clickable to home */}
+            <Link
+              href="/"
+              className="flex items-center hover:opacity-80 transition-opacity"
+            >
+              <ListoraAILogo size="header" showText={true} />
+            </Link>
+
+            {/* Desktop Navigation - Always visible */}
+            <nav className="hidden md:flex items-center space-x-8">
+              <Link
+                href="/"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Home
+              </Link>
+              <Link
+                href="/#features-section"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Features
+              </Link>
+              <Link
+                href="/#pricing-section"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Pricing
+              </Link>
+              <Link
+                href="/about"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                About
+              </Link>
+              <Link
+                href="/contact"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Contact
+              </Link>
+            </nav>
+
+            {/* Action Buttons - Always visible */}
+            <div className="flex items-center space-x-3">
+              {/* Login Button - Active State */}
+              <Link
+                href="/login"
+                className="text-indigo-600 font-medium border-b-2 border-indigo-600 px-4 py-2"
+              >
+                Login
+              </Link>
+
+              {/* Book Demo Button */}
+              <Link
+                href="/demo"
+                className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+              >
+                Book Demo
+              </Link>
+
+              {/* Start Free Trial Button */}
+              <Link
+                href="/signup"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+              >
+                Start Free Trial
+              </Link>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <div className="md:hidden">
+              <button className="text-gray-600 hover:text-indigo-600 p-2">
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* Centered Single Column Layout for Speed */}
       <div className="flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          {/* Quick Header */}
-          <div className="flex items-center justify-center mb-8">
-            <Link href="/" className="hover:opacity-80 transition-opacity">
-              <ListoraAILogo size="lg" showText={true} />
-            </Link>
-          </div>
-
           {/* Trust Indicators for Returning Users */}
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-3">

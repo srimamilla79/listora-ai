@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import {
   Zap,
   Users,
@@ -47,7 +48,7 @@ export default function EnhancedAboutUsPage() {
     const timer = setInterval(() => {
       setCurrentMilestone((prev) => (prev + 1) % milestones.length)
     }, 4000)
-    return () => clearTimeout(timer)
+    return () => clearInterval(timer)
   }, [])
 
   // Auto-rotate values
@@ -55,7 +56,7 @@ export default function EnhancedAboutUsPage() {
     const timer = setInterval(() => {
       setCurrentValue((prev) => (prev + 1) % values.length)
     }, 3000)
-    return () => clearTimeout(timer)
+    return () => clearInterval(timer)
   }, [])
 
   const stats = [
@@ -232,48 +233,97 @@ export default function EnhancedAboutUsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Enhanced Header */}
+      {/* Enhanced Header - UPDATED WITH CONSISTENT NAVIGATION */}
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <ListoraAILogo size="header" showText={true} />
+            {/* Logo - Always clickable to home */}
+            <Link
+              href="/"
+              className="flex items-center hover:opacity-80 transition-opacity"
+            >
+              <ListoraAILogo size="header" showText={true} />
+            </Link>
 
-            <div className="hidden md:flex items-center space-x-8">
-              <button
-                onClick={() => (window.location.href = '/#features-section')}
+            {/* Desktop Navigation - Always visible */}
+            <nav className="hidden md:flex items-center space-x-8">
+              <Link
+                href="/"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              >
+                Home
+              </Link>
+              <Link
+                href="/#features-section"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
                 Features
-              </button>
-              <button
-                onClick={() => (window.location.href = '/#pricing-section')}
+              </Link>
+              <Link
+                href="/#pricing-section"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
                 Pricing
-              </button>
-              <button
-                onClick={() =>
-                  (window.location.href = '/#testimonials-section')
-                }
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              </Link>
+              <Link
+                href="/about"
+                className="text-indigo-600 font-medium border-b-2 border-indigo-600"
               >
-                Reviews
-              </button>
-              <button
-                onClick={() => (window.location.href = '/contact')}
+                About
+              </Link>
+              <Link
+                href="/contact"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
                 Contact
-              </button>
+              </Link>
+            </nav>
+
+            {/* Action Buttons - Always visible */}
+            <div className="flex items-center space-x-3">
+              {/* Login Button */}
+              <Link
+                href="/login"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Login
+              </Link>
+
+              {/* Book Demo Button */}
+              <Link
+                href="/demo"
+                className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+              >
+                Book Demo
+              </Link>
+
+              {/* Start Free Trial Button */}
+              <Link
+                href="/signup"
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+              >
+                Start Free Trial
+              </Link>
             </div>
 
-            <button
-              onClick={() => (window.location.href = '/')}
-              className="flex items-center space-x-2 text-gray-600 hover:text-indigo-600 transition-colors font-medium px-4 py-2 rounded-lg hover:bg-gray-100"
-            >
-              <Home className="h-4 w-4" />
-              <span>Back to Home</span>
-            </button>
+            {/* Mobile Menu Button */}
+            <div className="md:hidden">
+              <button className="text-gray-600 hover:text-indigo-600 p-2">
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -794,13 +844,13 @@ export default function EnhancedAboutUsPage() {
                 journey.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
-                  onClick={() => (window.location.href = '/contact')}
+                <Link
+                  href="/contact"
                   className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all flex items-center justify-center"
                 >
                   <Mail className="mr-2 h-4 w-4" />
                   Get in Touch
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -878,21 +928,21 @@ export default function EnhancedAboutUsPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
-            <button
-              onClick={() => (window.location.href = '/signup')}
-              className="group bg-white hover:bg-gray-100 text-indigo-600 px-8 py-4 rounded-xl text-lg font-bold transition-all transform hover:scale-105 shadow-2xl flex items-center cursor-pointer"
+            <Link
+              href="/signup"
+              className="group bg-white hover:bg-gray-100 text-indigo-600 px-8 py-4 rounded-xl text-lg font-bold transition-all transform hover:scale-105 shadow-2xl flex items-center"
             >
               <Sparkles className="mr-2 h-5 w-5 group-hover:animate-spin" />
               Start with 10 Free Generations
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button
-              onClick={() => (window.location.href = '/contact')}
-              className="border-2 border-white hover:bg-white hover:text-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all flex items-center cursor-pointer"
+            </Link>
+            <Link
+              href="/contact"
+              className="border-2 border-white hover:bg-white hover:text-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all flex items-center"
             >
               <Mail className="mr-2 h-5 w-5" />
               Contact Our Team
-            </button>
+            </Link>
           </div>
 
           <div className="flex flex-wrap justify-center items-center gap-8 text-indigo-100">
@@ -947,20 +997,17 @@ export default function EnhancedAboutUsPage() {
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-sm text-gray-400">
                 <li>
-                  <button
-                    onClick={() => (window.location.href = '/')}
-                    className="hover:text-white transition-colors"
-                  >
+                  <Link href="/" className="hover:text-white transition-colors">
                     Features
-                  </button>
+                  </Link>
                 </li>
                 <li>
-                  <button
-                    onClick={() => (window.location.href = '/#pricing-section')}
+                  <Link
+                    href="/#pricing-section"
                     className="hover:text-white transition-colors"
                   >
                     Pricing
-                  </button>
+                  </Link>
                 </li>
                 <li>
                   <button className="hover:text-white transition-colors">
@@ -979,9 +1026,12 @@ export default function EnhancedAboutUsPage() {
               <h3 className="font-semibold mb-4">Company</h3>
               <ul className="space-y-2 text-sm text-gray-400">
                 <li>
-                  <button className="hover:text-white transition-colors">
+                  <Link
+                    href="/about"
+                    className="hover:text-white transition-colors"
+                  >
                     About
-                  </button>
+                  </Link>
                 </li>
                 <li>
                   <button className="hover:text-white transition-colors">
@@ -1010,12 +1060,12 @@ export default function EnhancedAboutUsPage() {
                   </button>
                 </li>
                 <li>
-                  <button
-                    onClick={() => (window.location.href = '/contact')}
+                  <Link
+                    href="/contact"
                     className="hover:text-white transition-colors"
                   >
                     Contact
-                  </button>
+                  </Link>
                 </li>
                 <li>
                   <button className="hover:text-white transition-colors">
