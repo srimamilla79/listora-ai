@@ -4,14 +4,34 @@ import { cookies } from 'next/headers'
 import { getServerStripe } from '@/lib/supabase'
 import OpenAI from 'openai'
 
-// 🚀 OPTIMIZED: Enhanced OpenAI configuration for better performance
+// 🚀 OPTIMIZED: Enhanced OpenAI configuration for better performance and reliability
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 30000, // 30 second timeout instead of default 60s
-  maxRetries: 1, // Reduce retries from 3 to 1 for speed
+  timeout: 45000, // 45 second timeout instead of 30s
+  maxRetries: 2, // Increase retries for reliability
 })
 
 import { createServiceRoleClient } from '@/lib/supabase-server'
+
+// 🚀 NEW: Content sections interface for type safety
+interface ContentSections {
+  title: boolean
+  sellingPoints: boolean
+  description: boolean
+  instagramCaption: boolean
+  blogIntro: boolean
+  callToAction: boolean
+}
+
+// 🚀 NEW: Default all sections enabled for backward compatibility
+const DEFAULT_CONTENT_SECTIONS: ContentSections = {
+  title: true,
+  sellingPoints: true,
+  description: true,
+  instagramCaption: true,
+  blogIntro: true,
+  callToAction: true,
+}
 
 export async function POST(req: NextRequest) {
   // 🚀 PERFORMANCE TRACKING: Monitor where time is spent
@@ -27,7 +47,9 @@ export async function POST(req: NextRequest) {
   console.log('=== GENERATE API START ===')
 
   try {
-    // Enhanced request body parsing to include voice parameters AND background job support
+    // 🔍 ADD THIS SECTION FOR DEBUGGING:
+    const requestBody = await req.json()
+    // Enhanced request body parsing to include voice parameters AND background job support AND content sections
     const {
       productName,
       features,
@@ -35,13 +57,15 @@ export async function POST(req: NextRequest) {
       imageAnalysis,
       hasImages,
       hasProcessedImages,
-      // NEW: Voice integration parameters
+      // Voice integration parameters
       voiceTranscription,
       existingContent,
-      // 🚀 NEW: Background job support
+      // Background job support
       isBackgroundJob,
       userId: backgroundUserId,
-    } = await req.json()
+      // 🚀 NEW: Content section selection
+      selectedSections,
+    } = requestBody
 
     console.log('1. Request data:', {
       productName,
@@ -53,7 +77,29 @@ export async function POST(req: NextRequest) {
       hasExistingContent: !!existingContent,
       isBackgroundJob: !!isBackgroundJob,
       backgroundUserId: backgroundUserId || 'none',
+      selectedSections: selectedSections || 'using defaults',
     })
+
+    // 🚀 NEW: Ensure we have valid content sections (backward compatibility)
+    const contentSections: ContentSections =
+      selectedSections || DEFAULT_CONTENT_SECTIONS
+    const selectedSectionCount =
+      Object.values(contentSections).filter(Boolean).length
+
+    console.log('2. Content sections:', {
+      sections: contentSections,
+      selectedCount: selectedSectionCount,
+      isFullPackage: selectedSectionCount === 6,
+    })
+
+    // Validate that at least one section is selected
+    if (selectedSectionCount === 0) {
+      console.log('❌ No content sections selected')
+      return NextResponse.json(
+        { error: 'Please select at least one content section to generate' },
+        { status: 400 }
+      )
+    }
 
     let authenticatedUser
 
@@ -62,13 +108,13 @@ export async function POST(req: NextRequest) {
 
     // Handle background job authentication differently
     if (isBackgroundJob && backgroundUserId) {
-      console.log('2. Background job detected, using service role auth')
+      console.log('3. Background job detected, using service role auth')
       authenticatedUser = { id: backgroundUserId, email: 'background@job' }
-      console.log('3. Background job user:', authenticatedUser.id)
+      console.log('4. Background job user:', authenticatedUser.id)
     } else {
       // Standard user authentication flow
       const cookieStore = await cookies()
-      console.log('2. Getting cookies...')
+      console.log('3. Getting cookies...')
 
       const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,14 +138,14 @@ export async function POST(req: NextRequest) {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser()
-      console.log('3. Auth result:', user ? `Success - ${user.id}` : 'Failed')
+      console.log('4. Auth result:', user ? `Success - ${user.id}` : 'Failed')
 
       if (authError || !user) {
-        console.log('4. Authentication failed, trying Authorization header...')
+        console.log('5. Authentication failed, trying Authorization header...')
 
         const authHeader = req.headers.get('authorization')
         if (!authHeader) {
-          console.log('4. No authorization header either')
+          console.log('5. No authorization header either')
           return NextResponse.json(
             { error: 'Authentication required' },
             { status: 401 }
@@ -107,7 +153,7 @@ export async function POST(req: NextRequest) {
         }
 
         const accessToken = authHeader.replace('Bearer ', '')
-        console.log('4. Access token found in header')
+        console.log('5. Access token found in header')
 
         const tokenSupabase = createServerClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -132,23 +178,23 @@ export async function POST(req: NextRequest) {
         } = await tokenSupabase.auth.getUser()
 
         if (tokenError || !tokenUser) {
-          console.log('4. Token authentication also failed:', tokenError)
+          console.log('5. Token authentication also failed:', tokenError)
           return NextResponse.json(
             { error: 'Invalid authentication' },
             { status: 401 }
           )
         }
 
-        console.log('4. Token authentication successful:', tokenUser.id)
+        console.log('5. Token authentication successful:', tokenUser.id)
         authenticatedUser = tokenUser
       } else {
-        console.log('3. Cookie authentication successful:', user.id)
+        console.log('4. Cookie authentication successful:', user.id)
         authenticatedUser = user
       }
     }
 
     console.log(
-      '5. Final authenticated user:',
+      '6. Final authenticated user:',
       authenticatedUser.id,
       authenticatedUser.email
     )
@@ -166,10 +212,10 @@ export async function POST(req: NextRequest) {
     console.log(`⚡ Auth completed in ${performanceLog.auth}ms`)
 
     if (isAdmin) {
-      console.log('6. 👑 ADMIN/OWNER DETECTED - Bypassing all usage limits')
+      console.log('7. 👑 ADMIN/OWNER DETECTED - Bypassing all usage limits')
 
       // Skip usage tracking for admins, go directly to content generation
-      console.log('7. Admin privilege: Unlimited generations enabled')
+      console.log('8. Admin privilege: Unlimited generations enabled')
 
       // 🚀 OPTIMIZED: Faster content generation for admins
       const generationStart = Date.now()
@@ -178,6 +224,7 @@ export async function POST(req: NextRequest) {
         productName,
         features,
         platform,
+        contentSections, // 🚀 NEW: Pass content sections
         imageAnalysis,
         hasImages,
         hasProcessedImages,
@@ -187,30 +234,47 @@ export async function POST(req: NextRequest) {
 
       const isVoiceEnhancement = !!existingContent && !!voiceTranscription
       console.log(
-        '8. Generating content with OpenAI... (ADMIN MODE)',
+        '9. Generating content with OpenAI... (ADMIN MODE)',
         isVoiceEnhancement ? '(Voice Enhancement Mode)' : '(New Generation)',
-        isBackgroundJob ? '[BACKGROUND JOB]' : '[FOREGROUND JOB]'
+        isBackgroundJob ? '[BACKGROUND JOB]' : '[FOREGROUND JOB]',
+        `[${selectedSectionCount} sections selected]`
       )
 
-      // 🚀 OPTIMIZED: Faster generation settings
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: isVoiceEnhancement
-              ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. Create compelling, conversion-focused content efficiently.'
-              : 'You are an expert copywriter specializing in e-commerce content optimization. Create compelling, conversion-focused content efficiently.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: isVoiceEnhancement ? 1000 : 1200, // Slightly reduced for speed
-        temperature: isVoiceEnhancement ? 0.6 : 0.7,
-        stream: false, // Ensure no streaming for consistent timing
-      })
+      // 🚀 OPTIMIZED: Faster generation settings with dynamic token adjustment
+      const maxTokens = calculateTokensForSections(
+        contentSections,
+        isVoiceEnhancement
+      )
+
+      console.log('🚀 Starting OpenAI generation with optimized settings...')
+
+      // 🔧 FIX: Add timeout wrapper and use faster model
+      const completion = (await Promise.race([
+        openai.chat.completions.create({
+          model: 'gpt-4o-mini', // ⚡ FASTER MODEL - was gpt-4o
+          messages: [
+            {
+              role: 'system',
+              content: isVoiceEnhancement
+                ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. Create compelling, conversion-focused content efficiently.'
+                : 'You are an expert copywriter specializing in e-commerce content optimization. Create compelling, conversion-focused content efficiently.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          max_tokens: Math.min(maxTokens, 2500), // ⚡ REDUCED MAX TOKENS
+          temperature: isVoiceEnhancement ? 0.6 : 0.7,
+          stream: false,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('OpenAI request timeout after 40 seconds')),
+            40000
+          )
+        ),
+      ])) as any
 
       performanceLog.generation = Date.now() - generationStart
       console.log(`⚡ Generation completed in ${performanceLog.generation}ms`)
@@ -218,7 +282,7 @@ export async function POST(req: NextRequest) {
       const generatedContent =
         completion.choices[0]?.message?.content ||
         'Content generated successfully!'
-      console.log('9. Content generated successfully (ADMIN MODE)')
+      console.log('10. Content generated successfully (ADMIN MODE)')
 
       // 🚀 OPTIMIZED: Smart database handling for admins
       const dbStart = Date.now()
@@ -237,6 +301,8 @@ export async function POST(req: NextRequest) {
           voice_transcription: voiceTranscription || null,
           is_voice_enhanced: isVoiceEnhancement,
           is_background_job: isBackgroundJob || false,
+          // 🚀 FIX: Change field name to match database
+          selected_sections: contentSections, // ✅ CORRECT FIELD NAME
           created_at: new Date().toISOString(),
         })
         .select()
@@ -253,9 +319,9 @@ export async function POST(req: NextRequest) {
         )
 
         if (saveError) {
-          console.log('10. Warning: Failed to save content:', saveError)
+          console.log('11. Warning: Failed to save content:', saveError)
         } else {
-          console.log('10. Content saved to database (ADMIN MODE)')
+          console.log('11. Content saved to database (ADMIN MODE)')
         }
 
         return NextResponse.json({
@@ -276,6 +342,12 @@ export async function POST(req: NextRequest) {
             isEnhancement: isVoiceEnhancement,
             transcriptionLength: voiceTranscription?.length || 0,
           },
+          // 🚀 NEW: Content section info
+          contentInfo: {
+            selectedSections: contentSections,
+            sectionsCount: selectedSectionCount,
+            isFullPackage: selectedSectionCount === 6,
+          },
           jobInfo: {
             isBackgroundJob: !!isBackgroundJob,
             processedBy: 'background-processor',
@@ -290,9 +362,9 @@ export async function POST(req: NextRequest) {
         // For real-time admin requests, return immediately and save in background
         dbSavePromise.then(({ data: savedContent, error: saveError }) => {
           if (saveError) {
-            console.log('10. Background save failed:', saveError)
+            console.log('11. Background save failed:', saveError)
           } else {
-            console.log('10. Background save completed for admin')
+            console.log('11. Background save completed for admin')
           }
         })
 
@@ -303,7 +375,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
           result: generatedContent,
-          contentId: 'saving', // Indicate DB save is in progress
+          contentId: 'saving',
           usage: {
             used: 'unlimited',
             limit: 'unlimited',
@@ -318,6 +390,12 @@ export async function POST(req: NextRequest) {
             hasVoiceInput: !!voiceTranscription,
             isEnhancement: isVoiceEnhancement,
             transcriptionLength: voiceTranscription?.length || 0,
+          },
+          // 🚀 NEW: Content section info
+          contentInfo: {
+            selectedSections: contentSections,
+            sectionsCount: selectedSectionCount,
+            isFullPackage: selectedSectionCount === 6,
           },
           jobInfo: {
             isBackgroundJob: !!isBackgroundJob,
@@ -336,19 +414,8 @@ export async function POST(req: NextRequest) {
     const usageStart = Date.now()
 
     const currentMonth = new Date().toISOString().slice(0, 7)
-    console.log('6. Checking usage for month:', currentMonth)
-    // 🔍 DEBUG: Test service role client
-    console.log('🔍 Testing service role client...')
-    try {
-      const testQuery = await serviceSupabase
-        .from('user_usage_tracking')
-        .select('count', { count: 'exact', head: true })
-      console.log('🔍 Service role test result:', testQuery)
-    } catch (testError) {
-      console.log('🔍 Service role test error:', testError)
-    }
+    console.log('7. Checking usage for month:', currentMonth)
 
-    // Parallel database queries for better performance
     const [usageResult, planResult] = await Promise.all([
       serviceSupabase
         .from('user_usage_tracking')
@@ -371,7 +438,7 @@ export async function POST(req: NextRequest) {
     const { data: planData, error: planError } = planResult
 
     if (usageError && usageError.code !== 'PGRST116') {
-      console.log('7. Usage check error:', usageError)
+      console.log('8. Usage check error:', usageError)
       return NextResponse.json(
         { error: 'Failed to check usage limits' },
         { status: 500 }
@@ -392,7 +459,7 @@ export async function POST(req: NextRequest) {
 
     // For background jobs, we still check limits but don't block (job was already approved)
     if (!isBackgroundJob && currentUsage >= limit) {
-      console.log('7. Usage limit exceeded:', currentUsage, 'of', limit)
+      console.log('8. Usage limit exceeded:', currentUsage, 'of', limit)
       return NextResponse.json(
         {
           error:
@@ -402,7 +469,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log('7. Usage check passed:', currentUsage, 'of', limit)
+    console.log('8. Usage check passed:', currentUsage, 'of', limit)
 
     // 🚀 OPTIMIZED: Faster content generation
     const generationStart = Date.now()
@@ -411,6 +478,7 @@ export async function POST(req: NextRequest) {
       productName,
       features,
       platform,
+      contentSections, // 🚀 NEW: Pass content sections
       imageAnalysis,
       hasImages,
       hasProcessedImages,
@@ -420,30 +488,49 @@ export async function POST(req: NextRequest) {
 
     const isVoiceEnhancement = !!existingContent && !!voiceTranscription
     console.log(
-      '8. Generating content with OpenAI...',
+      '9. Generating content with OpenAI...',
       isVoiceEnhancement ? '(Voice Enhancement Mode)' : '(New Generation)',
-      isBackgroundJob ? '[BACKGROUND JOB]' : '[FOREGROUND JOB]'
+      isBackgroundJob ? '[BACKGROUND JOB]' : '[FOREGROUND JOB]',
+      `[${selectedSectionCount} sections selected]`
     )
 
-    // 🚀 OPTIMIZED: Faster generation settings
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: isVoiceEnhancement
-            ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. Create compelling, conversion-focused content efficiently.'
-            : 'You are an expert copywriter specializing in e-commerce content optimization. Create compelling, conversion-focused content efficiently.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      max_tokens: isVoiceEnhancement ? 1000 : 1200, // Optimized token count
-      temperature: isVoiceEnhancement ? 0.6 : 0.7,
-      stream: false,
-    })
+    // 🚀 OPTIMIZED: Dynamic token calculation based on selected sections
+    const maxTokens = calculateTokensForSections(
+      contentSections,
+      isVoiceEnhancement
+    )
+
+    console.log(
+      '🚀 Starting OpenAI generation with gpt-4o-mini for faster response...'
+    )
+
+    // 🔧 FIX: Add timeout wrapper and use faster model for regular users too
+    const completion = (await Promise.race([
+      openai.chat.completions.create({
+        model: 'gpt-4o-mini', // ⚡ FASTER MODEL - was gpt-4o
+        messages: [
+          {
+            role: 'system',
+            content: isVoiceEnhancement
+              ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. Create compelling, conversion-focused content efficiently.'
+              : 'You are an expert copywriter specializing in e-commerce content optimization. Create compelling, conversion-focused content efficiently.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        max_tokens: Math.min(maxTokens, 2500), // ⚡ REDUCED MAX TOKENS
+        temperature: isVoiceEnhancement ? 0.6 : 0.7,
+        stream: false,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('OpenAI request timeout after 40 seconds')),
+          40000
+        )
+      ),
+    ])) as any
 
     performanceLog.generation = Date.now() - generationStart
     console.log(`⚡ Generation completed in ${performanceLog.generation}ms`)
@@ -451,7 +538,7 @@ export async function POST(req: NextRequest) {
     const generatedContent =
       completion.choices[0]?.message?.content ||
       'Content generated successfully!'
-    console.log('9. Content generated successfully')
+    console.log('10. Content generated successfully')
 
     // 🚀 OPTIMIZED: Parallel usage update and database save
     const dbStart = Date.now()
@@ -476,6 +563,8 @@ export async function POST(req: NextRequest) {
           voice_transcription: voiceTranscription || null,
           is_voice_enhanced: isVoiceEnhancement,
           is_background_job: isBackgroundJob || false,
+          // 🚀 FIX: Change field name to match database
+          selected_sections: contentSections, // ✅ CORRECT FIELD NAME
           created_at: new Date().toISOString(),
         })
         .select()
@@ -493,7 +582,7 @@ export async function POST(req: NextRequest) {
     const { data: savedContent, error: saveError } = dbSaveResult
 
     if (updateError) {
-      console.log('10. Warning: Failed to update usage count:', updateError)
+      console.log('11. Warning: Failed to update usage count:', updateError)
       if (!isBackgroundJob) {
         return NextResponse.json(
           { error: 'Failed to update usage tracking' },
@@ -502,20 +591,20 @@ export async function POST(req: NextRequest) {
       }
     } else {
       console.log(
-        '10. Usage count updated via RPC:',
+        '11. Usage count updated via RPC:',
         usageUpdateData?.usage_count || currentUsage + 1
       )
     }
 
     if (saveError) {
-      console.log('11. Warning: Failed to save content:', saveError)
+      console.log('12. Warning: Failed to save content:', saveError)
     } else {
       console.log(
-        '11. Content saved to database with voice, image, and background job metadata'
+        '12. Content saved to database with voice, image, sections, and background job metadata'
       )
     }
 
-    // Enhanced response with performance metrics
+    // Enhanced response with performance metrics and content section info
     return NextResponse.json({
       result: generatedContent,
       contentId: savedContent?.id || null,
@@ -532,6 +621,13 @@ export async function POST(req: NextRequest) {
         hasVoiceInput: !!voiceTranscription,
         isEnhancement: isVoiceEnhancement,
         transcriptionLength: voiceTranscription?.length || 0,
+      },
+      // 🚀 NEW: Content section info
+      contentInfo: {
+        selectedSections: contentSections,
+        sectionsCount: selectedSectionCount,
+        isFullPackage: selectedSectionCount === 6,
+        tokensUsed: maxTokens,
       },
       jobInfo: {
         isBackgroundJob: !!isBackgroundJob,
@@ -554,11 +650,39 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Enhanced prompt creation function with voice integration (keeping your existing sophisticated logic)
+// 🚀 NEW: Calculate optimal tokens based on selected sections
+function calculateTokensForSections(
+  contentSections: ContentSections,
+  isVoiceEnhancement: boolean = false
+): number {
+  const baseTokens = isVoiceEnhancement ? 800 : 1000
+  const sectionTokens = {
+    title: 100,
+    sellingPoints: 200,
+    description: 300,
+    instagramCaption: 250,
+    blogIntro: 300,
+    callToAction: 100,
+  }
+
+  let totalTokens = 100 // Base overhead
+
+  Object.entries(contentSections).forEach(([section, enabled]) => {
+    if (enabled) {
+      totalTokens += sectionTokens[section as keyof typeof sectionTokens] || 150
+    }
+  })
+
+  // Ensure minimum viable tokens but cap for efficiency
+  return Math.min(Math.max(totalTokens, 400), 1500)
+}
+
+// 🚀 ENHANCED: Enhanced prompt creation function with content section selection
 function createPrompt(
   productName: string,
   features: string,
   platform: string,
+  selectedSections: ContentSections, // 🚀 NEW: Content sections parameter
   imageAnalysis?: string,
   hasImages?: boolean,
   hasProcessedImages?: boolean,
@@ -570,6 +694,12 @@ function createPrompt(
       title: 'Amazon Product Listing Package',
       instructions:
         'Create a complete Amazon-optimized content package with SEO-friendly title, bullet points, description, Instagram caption, and blog intro. Focus on keywords, benefits, and conversion.',
+    },
+    ebay: {
+      // ← ADD THIS
+      title: 'eBay Listing Package',
+      instructions:
+        'Create eBay-optimized content with competitive pricing focus, condition details, shipping info, and buyer confidence elements. Emphasize value, authenticity, and quick purchase incentives.',
     },
     etsy: {
       title: 'Etsy Product Listing Package',
@@ -591,6 +721,28 @@ function createPrompt(
   const config =
     platformInstructions[platform as keyof typeof platformInstructions] ||
     platformInstructions.amazon
+
+  // 🚀 NEW: Build section list based on selections
+  const selectedSectionsList: string[] = []
+  const sectionLabels: Record<keyof ContentSections, string> = {
+    title: 'PRODUCT TITLE/HEADLINE',
+    sellingPoints: 'KEY SELLING POINTS',
+    description: 'DETAILED PRODUCT DESCRIPTION',
+    instagramCaption: 'INSTAGRAM CAPTION',
+    blogIntro: 'BLOG INTRO',
+    callToAction: 'CALL-TO-ACTION',
+  }
+
+  Object.entries(selectedSections).forEach(([section, enabled]) => {
+    if (enabled) {
+      selectedSectionsList.push(
+        sectionLabels[section as keyof typeof sectionLabels]
+      )
+    }
+  })
+
+  const sectionCount = selectedSectionsList.length
+  const isCustomSelection = sectionCount < 6
 
   // Voice enhancement mode
   if (existingContent && voiceTranscription) {
@@ -626,44 +778,72 @@ Please enhance the existing content while:
 2. Maintaining the authentic tone and intent of the speaker
 3. Improving structure, grammar, and professional presentation
 4. Optimizing for ${platform} best practices
-5. Adding any missing elements for a complete content package${
+5. ${isCustomSelection ? `Focusing ONLY on these ${sectionCount} sections: ${selectedSectionsList.join(', ')}` : 'Adding any missing elements for a complete content package'}${
       hasProcessedImages
         ? '\n6. Emphasizing the professional image quality where appropriate'
         : ''
     }
 
-Provide the enhanced content in this exact structure:
+${
+  isCustomSelection
+    ? `Provide the enhanced content for ONLY these ${sectionCount} selected sections:`
+    : 'Provide the enhanced content in this exact structure:'
+}
 
-**1. ENHANCED PRODUCT TITLE/HEADLINE:**
+${
+  selectedSections.title
+    ? `**1. ENHANCED PRODUCT TITLE/HEADLINE:**
 - Refined SEO-optimized title for ${platform}
 
-**2. REFINED KEY SELLING POINTS:**
+`
+    : ''
+}${
+      selectedSections.sellingPoints
+        ? `**${selectedSections.title ? '2' : '1'}. REFINED KEY SELLING POINTS:**
 - 5-7 polished bullet points from voice input
 
-**3. ENHANCED PRODUCT DESCRIPTION:**
+`
+        : ''
+    }${
+      selectedSections.description
+        ? `**${[selectedSections.title, selectedSections.sellingPoints].filter(Boolean).length + 1}. ENHANCED PRODUCT DESCRIPTION:**
 - Professional version of the voice description
 - Maintains original intent but improves clarity
 
-**4. ENHANCED INSTAGRAM CAPTION:**
+`
+        : ''
+    }${
+      selectedSections.instagramCaption
+        ? `**${[selectedSections.title, selectedSections.sellingPoints, selectedSections.description].filter(Boolean).length + 1}. ENHANCED INSTAGRAM CAPTION:**
 - Refined social media version (150-300 words)
 - Relevant emojis and 15-20 hashtags
 - Clear call-to-action
 
-**5. ENHANCED BLOG INTRO:**
+`
+        : ''
+    }${
+      selectedSections.blogIntro
+        ? `**${[selectedSections.title, selectedSections.sellingPoints, selectedSections.description, selectedSections.instagramCaption].filter(Boolean).length + 1}. ENHANCED BLOG INTRO:**
 - Professional blog introduction (200-400 words)
 - Preserves voice input insights
 - SEO-optimized structure
 
-**6. ENHANCED CALL-TO-ACTION:**
+`
+        : ''
+    }${
+      selectedSections.callToAction
+        ? `**${selectedSectionsList.length}. ENHANCED CALL-TO-ACTION:**
 - Platform-optimized conversion focus
 
-Make all enhancements feel natural and maintain the speaker's original passion and knowledge about the product.`
+`
+        : ''
+    }Make all enhancements feel natural and maintain the speaker's original passion and knowledge about the product.`
 
     return prompt
   }
 
   // Standard generation mode
-  let prompt = `Create a ${config.title} for the following product:
+  let prompt = `Create content for the following product:
 
 Product Name: ${productName}
 Key Features: ${features}`
@@ -705,64 +885,108 @@ Instructions: ${config.instructions}`
     prompt += ` Incorporate the natural, authentic details from the voice input to make the content more genuine and compelling.`
   }
 
-  prompt += `
+  // 🚀 NEW: Custom section selection
+  if (isCustomSelection) {
+    prompt += `
 
-Please provide a comprehensive content package with ALL of the following sections:
+🎯 IMPORTANT: Generate ONLY the following ${sectionCount} content sections (skip others):
+${selectedSectionsList.map((section, index) => `${index + 1}. ${section}`).join('\n')}
 
-**1. PRODUCT TITLE/HEADLINE:**
-- SEO-optimized main title for ${platform}${
-    hasProcessedImages
-      ? '\n- Emphasize premium/professional quality where appropriate'
-      : ''
-  }${voiceTranscription ? '\n- Incorporate key elements from voice input' : ''}
+Please provide a focused content package with ONLY these ${sectionCount} sections:`
+  } else {
+    prompt += `
 
-**2. KEY SELLING POINTS:**
-- 5-7 bullet points highlighting main benefits${
-    hasProcessedImages
-      ? '\n- Include professional presentation as a quality indicator'
-      : ''
-  }${
-    voiceTranscription
-      ? '\n- Use authentic language from voice description'
-      : ''
+Please provide a comprehensive content package with ALL of the following sections:`
   }
 
-**3. DETAILED PRODUCT DESCRIPTION:**
+  // 🚀 NEW: Dynamic section generation based on selection
+  let sectionNumber = 1
+
+  if (selectedSections.title) {
+    prompt += `
+
+**${sectionNumber}. PRODUCT TITLE/HEADLINE:**
+- SEO-optimized main title for ${platform}${
+      hasProcessedImages
+        ? '\n- Emphasize premium/professional quality where appropriate'
+        : ''
+    }${voiceTranscription ? '\n- Incorporate key elements from voice input' : ''}`
+    sectionNumber++
+  }
+
+  if (selectedSections.sellingPoints) {
+    prompt += `
+
+**${sectionNumber}. KEY SELLING POINTS:**
+- 5-7 bullet points highlighting main benefits${
+      hasProcessedImages
+        ? '\n- Include professional presentation as a quality indicator'
+        : ''
+    }${
+      voiceTranscription
+        ? '\n- Use authentic language from voice description'
+        : ''
+    }`
+    sectionNumber++
+  }
+
+  if (selectedSections.description) {
+    prompt += `
+
+**${sectionNumber}. DETAILED PRODUCT DESCRIPTION:**
 - Comprehensive description optimized for ${platform}
 - Focus on benefits, features, and value proposition${
-    hasProcessedImages
-      ? '\n- Subtly reference professional quality and presentation'
-      : ''
-  }${
-    voiceTranscription
-      ? '\n- Weave in natural product insights from voice input'
-      : ''
+      hasProcessedImages
+        ? '\n- Subtly reference professional quality and presentation'
+        : ''
+    }${
+      voiceTranscription
+        ? '\n- Weave in natural product insights from voice input'
+        : ''
+    }`
+    sectionNumber++
   }
 
-**4. INSTAGRAM CAPTION:**
+  if (selectedSections.instagramCaption) {
+    prompt += `
+
+**${sectionNumber}. INSTAGRAM CAPTION:**
 - Engaging social media caption (150-300 words)
 - Include relevant emojis
 - Add 15-20 strategic hashtags
 - Call-to-action for engagement${
-    hasProcessedImages ? '\n- Use visual appeal as a hook' : ''
-  }${voiceTranscription ? '\n- Capture the enthusiasm from voice input' : ''}
+      hasProcessedImages ? '\n- Use visual appeal as a hook' : ''
+    }${voiceTranscription ? '\n- Capture the enthusiasm from voice input' : ''}`
+    sectionNumber++
+  }
 
-**5. BLOG INTRO:**
+  if (selectedSections.blogIntro) {
+    prompt += `
+
+**${sectionNumber}. BLOG INTRO:**
 - Compelling blog post introduction (200-400 words)
 - Hook readers with an interesting opening
 - Set up the problem/solution narrative
 - SEO-friendly and shareable content${
-    voiceTranscription
-      ? '\n- Use authentic insights from voice description'
-      : ''
+      voiceTranscription
+        ? '\n- Use authentic insights from voice description'
+        : ''
+    }`
+    sectionNumber++
   }
 
-**6. CALL-TO-ACTION:**
+  if (selectedSections.callToAction) {
+    prompt += `
+
+**${sectionNumber}. CALL-TO-ACTION:**
 - Platform-specific conversion-focused CTA${
-    hasProcessedImages
-      ? '\n- Leverage professional presentation for trust-building'
-      : ''
+      hasProcessedImages
+        ? '\n- Leverage professional presentation for trust-building'
+        : ''
+    }`
   }
+
+  prompt += `
 
 Make all content compelling, professional, and optimized for ${platform} while ensuring each section works together as a cohesive content strategy.${
     voiceTranscription
@@ -776,6 +1000,13 @@ Make all content compelling, professional, and optimized for ${platform} while e
     if (hasProcessedImages) {
       prompt += ` Highlight the clean, professional presentation that comes from expertly processed product photography.`
     }
+  }
+
+  // 🚀 NEW: Add efficiency note for custom selections
+  if (isCustomSelection) {
+    prompt += `
+
+🚀 EFFICIENCY NOTE: Focus only on the ${sectionCount} requested sections above. Do not generate content for sections not listed.`
   }
 
   return prompt

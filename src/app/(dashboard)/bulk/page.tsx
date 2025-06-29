@@ -35,6 +35,8 @@ import {
   Cpu,
   Timer,
   Globe,
+  MessageSquare,
+  Share2,
 } from 'lucide-react'
 
 interface CSVRow {
@@ -98,6 +100,16 @@ interface BulkJob {
   avgProcessingTime?: number
 }
 
+// 🚀 NEW: Content sections interface
+interface ContentSections {
+  title: boolean
+  sellingPoints: boolean
+  description: boolean
+  instagramCaption: boolean
+  blogIntro: boolean
+  callToAction: boolean
+}
+
 interface BulkJobSession {
   id: string
   userId: string
@@ -126,6 +138,7 @@ interface BulkJobSession {
     userPlan: string
     showingProgress: boolean
   }
+  selectedSections?: ContentSections
 }
 
 // 🚀 HELPER FUNCTION: Get job stats from any data structure
@@ -223,6 +236,17 @@ export default function EnhancedBulkCSVUploadPage() {
   const [monthlyUsage, setMonthlyUsage] = useState(0)
   const [monthlyLimit, setMonthlyLimit] = useState(10)
 
+  // 🚀 NEW: Content section selection state
+  const [selectedSections, setSelectedSections] = useState<ContentSections>({
+    title: true,
+    sellingPoints: true,
+    description: true,
+    instagramCaption: true,
+    blogIntro: true,
+    callToAction: true,
+  })
+  const [showContentSections, setShowContentSections] = useState(false)
+
   // Enhanced progress tracking states
   const [currentProcessingStats, setCurrentProcessingStats] = useState({
     total: 0,
@@ -252,6 +276,36 @@ export default function EnhancedBulkCSVUploadPage() {
   // Session management for frontend mode
   const SESSION_KEY = 'listora_bulk_session'
   const PROCESSING_KEY = 'listora_processing_lock'
+
+  // 🚀 NEW: Content section handlers
+  const toggleSection = (section: keyof ContentSections) => {
+    setSelectedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }
+
+  const toggleAllSections = () => {
+    const allSelected = Object.values(selectedSections).every(Boolean)
+    const newState = allSelected
+      ? Object.keys(selectedSections).reduce(
+          (acc, key) => ({ ...acc, [key]: false }),
+          {} as ContentSections
+        )
+      : {
+          title: true,
+          sellingPoints: true,
+          description: true,
+          instagramCaption: true,
+          blogIntro: true,
+          callToAction: true,
+        }
+    setSelectedSections(newState)
+  }
+
+  const getSelectedSectionCount = () => {
+    return Object.values(selectedSections).filter(Boolean).length
+  }
 
   // Initialize Supabase client after component mounts
   useEffect(() => {
@@ -286,6 +340,8 @@ export default function EnhancedBulkCSVUploadPage() {
         body: JSON.stringify({
           products,
           userId: user.id,
+          // 🚀 NEW: Pass selected content sections
+          selectedSections: selectedSections,
         }),
       })
 
@@ -522,6 +578,7 @@ export default function EnhancedBulkCSVUploadPage() {
       monthlyLimit,
       userPlan,
       lastUpdated: Date.now(),
+      selectedSections, // 🚀 NEW: Save content sections
     }
 
     try {
@@ -548,6 +605,7 @@ export default function EnhancedBulkCSVUploadPage() {
     monthlyLimit,
     userPlan,
     useBackgroundProcessing,
+    selectedSections, // 🚀 NEW: Include in dependencies
   ])
 
   const loadAndRestoreSession = useCallback(() => {
@@ -570,7 +628,7 @@ export default function EnhancedBulkCSVUploadPage() {
         return false
       }
 
-      // Restore state
+      // Restore state including content sections
       setCSVData(session.csvData || [])
       setColumnMappings(session.columnMappings || [])
       setProcessingJobs(session.processingJobs || [])
@@ -592,6 +650,11 @@ export default function EnhancedBulkCSVUploadPage() {
       setMonthlyUsage(session.monthlyUsage || 0)
       setMonthlyLimit(session.monthlyLimit || 10)
       setUserPlan(session.userPlan || 'starter')
+
+      // 🚀 NEW: Restore content sections
+      if (session.selectedSections) {
+        setSelectedSections(session.selectedSections)
+      }
 
       const hasActiveWork = (session.processingJobs || []).some(
         (job: ProcessingJob) =>
@@ -1130,6 +1193,8 @@ export default function EnhancedBulkCSVUploadPage() {
                   productName: job.productName,
                   features: job.features,
                   platform: job.platform,
+                  // 🚀 NEW: Pass selected content sections
+                  selectedSections: selectedSections,
                 }),
               })
 
@@ -1213,6 +1278,12 @@ export default function EnhancedBulkCSVUploadPage() {
       return
     }
 
+    // 🚀 NEW: Validate content sections
+    if (getSelectedSectionCount() === 0) {
+      alert('Please select at least one content section to generate')
+      return
+    }
+
     const productNameCol = columnMappings.find(
       (m) => m.mappedTo === 'product_name'
     )
@@ -1257,10 +1328,14 @@ export default function EnhancedBulkCSVUploadPage() {
 
     // Choose processing mode
     if (useBackgroundProcessing) {
-      console.log(`🚀 Starting background job with ${products.length} products`)
+      console.log(
+        `🚀 Starting background job with ${products.length} products and ${getSelectedSectionCount()} content sections`
+      )
       await startBackgroundJob(products)
     } else {
-      console.log(`🚀 Starting frontend job with ${products.length} products`)
+      console.log(
+        `🚀 Starting frontend job with ${products.length} products and ${getSelectedSectionCount()} content sections`
+      )
       await startFrontendProcessing(products)
     }
   }
@@ -1361,6 +1436,16 @@ export default function EnhancedBulkCSVUploadPage() {
     setShowRecoveryModal(false)
     setRecoverySession(null)
     setCurrentJobId('')
+    // 🚀 NEW: Reset content sections to default
+    setSelectedSections({
+      title: true,
+      sellingPoints: true,
+      description: true,
+      instagramCaption: true,
+      blogIntro: true,
+      callToAction: true,
+    })
+    setShowContentSections(false)
   }
 
   const handleUpgrade = () => {
@@ -1444,6 +1529,10 @@ export default function EnhancedBulkCSVUploadPage() {
                   setProcessingJobs(recoverySession.processingJobs || [])
                   setCurrentStep(recoverySession.currentStep || 'processing')
                   setCurrentJobId(recoverySession.id)
+                  // 🚀 NEW: Restore content sections from session
+                  if (recoverySession.selectedSections) {
+                    setSelectedSections(recoverySession.selectedSections)
+                  }
                   setShowRecoveryModal(false)
                 }}
                 className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-semibold transition-all cursor-pointer"
@@ -1821,7 +1910,7 @@ export default function EnhancedBulkCSVUploadPage() {
                     </label>
                   </div>
 
-                  {csvFile && !isAnalyzing && (
+                  {csvFile && csvFile.name && !isAnalyzing && (
                     <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
                       <div className="flex items-center space-x-4">
                         <CheckCircle className="h-8 w-8 text-green-600" />
@@ -1929,7 +2018,196 @@ export default function EnhancedBulkCSVUploadPage() {
               ))}
             </div>
 
-            <div className="flex justify-center space-x-6">
+            {/* 🚀 NEW: Content Section Selection in Mapping Step */}
+            <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      📝 Content Sections for Bulk Generation
+                    </h3>
+                    <p className="text-gray-600 text-sm">
+                      Choose which content sections to generate for all{' '}
+                      {csvData.length} products
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowContentSections(!showContentSections)}
+                  className="flex items-center space-x-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>{showContentSections ? 'Hide' : 'Customize'}</span>
+                </button>
+              </div>
+
+              {/* Quick Summary */}
+              <div className="mb-4 p-4 bg-white rounded-xl border border-indigo-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                      <CheckCircle className="h-3 w-3 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-sm">
+                        {getSelectedSectionCount() === 6
+                          ? `Complete Content Package for ${csvData.length} Products`
+                          : `${getSelectedSectionCount()} Content Sections for ${csvData.length} Products`}
+                      </h4>
+                      <p className="text-xs text-gray-600">
+                        {getSelectedSectionCount() === 6
+                          ? 'Full package generation for maximum efficiency'
+                          : `Custom ${getSelectedSectionCount()}-section generation`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={toggleAllSections}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    {Object.values(selectedSections).every(Boolean)
+                      ? 'Deselect All'
+                      : 'Select All'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Expandable Content Sections */}
+              {showContentSections && (
+                <div className="space-y-3 bg-white rounded-xl border border-gray-200 p-4">
+                  <h5 className="font-semibold text-gray-900 mb-3 text-sm">
+                    Bulk Content Sections:
+                  </h5>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      {
+                        key: 'title' as keyof ContentSections,
+                        label: 'Product Title',
+                        description: 'SEO-optimized titles',
+                        icon: Target,
+                        color: 'from-blue-500 to-blue-600',
+                      },
+                      {
+                        key: 'sellingPoints' as keyof ContentSections,
+                        label: 'Key Selling Points',
+                        description: '5-7 bullet points per product',
+                        icon: Sparkles,
+                        color: 'from-green-500 to-green-600',
+                      },
+                      {
+                        key: 'description' as keyof ContentSections,
+                        label: 'Product Description',
+                        description: 'Comprehensive descriptions',
+                        icon: FileText,
+                        color: 'from-purple-500 to-purple-600',
+                      },
+                      {
+                        key: 'instagramCaption' as keyof ContentSections,
+                        label: 'Instagram Caption',
+                        description: 'Social media content + hashtags',
+                        icon: Share2,
+                        color: 'from-pink-500 to-pink-600',
+                      },
+                      {
+                        key: 'blogIntro' as keyof ContentSections,
+                        label: 'Blog Introduction',
+                        description: 'Blog post introductions',
+                        icon: MessageSquare,
+                        color: 'from-orange-500 to-orange-600',
+                      },
+                      {
+                        key: 'callToAction' as keyof ContentSections,
+                        label: 'Call-to-Action',
+                        description: 'Conversion-focused CTAs',
+                        icon: Target,
+                        color: 'from-red-500 to-red-600',
+                      },
+                    ].map((section) => {
+                      const Icon = section.icon
+                      return (
+                        <div
+                          key={section.key}
+                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center space-x-2 flex-1">
+                            <div
+                              className={`w-6 h-6 bg-gradient-to-r ${section.color} rounded-lg flex items-center justify-center`}
+                            >
+                              <Icon className="h-3 w-3 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900 text-sm">
+                                {section.label}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {section.description}
+                              </div>
+                            </div>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedSections[section.key]}
+                              onChange={() => toggleSection(section.key)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                          </label>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {getSelectedSectionCount() === 0 && (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-amber-800 text-sm">
+                        ⚠️ Please select at least one content section for bulk
+                        generation.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Efficiency Info */}
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Zap className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-semibold text-blue-900">
+                        Bulk Processing Efficiency
+                      </span>
+                    </div>
+                    <div className="text-xs text-blue-700 space-y-1">
+                      <div>
+                        • Selected sections: {getSelectedSectionCount()}/6
+                      </div>
+                      <div>
+                        • Estimated time per product: ~
+                        {getSelectedSectionCount() * 3}-
+                        {getSelectedSectionCount() * 8} seconds
+                      </div>
+                      <div>
+                        • Total estimated time: ~
+                        {Math.ceil(
+                          (csvData.length * getSelectedSectionCount() * 5) / 60
+                        )}{' '}
+                        minutes
+                      </div>
+                      <div className="text-green-700 font-medium">
+                        •{' '}
+                        {getSelectedSectionCount() < 6
+                          ? `${Math.round(((6 - getSelectedSectionCount()) / 6) * 100)}% faster than full package`
+                          : 'Complete package selected'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-center space-x-6 mt-8">
               <button
                 onClick={() => setCurrentStep('upload')}
                 className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer flex items-center space-x-2"
@@ -1941,7 +2219,8 @@ export default function EnhancedBulkCSVUploadPage() {
                 onClick={startBulkProcessing}
                 disabled={
                   !columnMappings.some((m) => m.mappedTo === 'product_name') ||
-                  isSubmittingJob
+                  isSubmittingJob ||
+                  getSelectedSectionCount() === 0
                 }
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
               >
@@ -1955,7 +2234,11 @@ export default function EnhancedBulkCSVUploadPage() {
                 <span>
                   {isSubmittingJob
                     ? 'Starting Job...'
-                    : `Start ${useBackgroundProcessing ? 'Background' : 'Bulk'} Processing (${csvData.length} products)`}
+                    : getSelectedSectionCount() === 0
+                      ? 'Select Content Sections First'
+                      : getSelectedSectionCount() === 6
+                        ? `Start ${useBackgroundProcessing ? 'Background' : 'Bulk'} Processing (${csvData.length} complete packages)`
+                        : `Start ${useBackgroundProcessing ? 'Background' : 'Bulk'} Processing (${csvData.length} products, ${getSelectedSectionCount()} sections)`}
                 </span>
               </button>
             </div>
@@ -2058,17 +2341,24 @@ export default function EnhancedBulkCSVUploadPage() {
                       Overall Progress
                     </h3>
                     <span className="text-lg font-bold text-indigo-600">
-                      {(currentJob.progress || 0).toFixed(1)}%
+                      {currentJob && currentJob.progress
+                        ? currentJob.progress.toFixed(1)
+                        : '0.0'}
+                      %
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
                     <div
                       className="bg-gradient-to-r from-green-500 to-emerald-600 h-4 rounded-full transition-all duration-500 ease-out shadow-lg"
-                      style={{ width: `${currentJob.progress || 0}%` }}
+                      style={{
+                        width: `${currentJob && currentJob.progress ? currentJob.progress : 0}%`,
+                      }}
                     />
                   </div>
-                  {currentJob.status === 'processing' &&
-                    (currentJob.estimatedTimeRemaining || 0) > 0 && (
+                  {currentJob &&
+                    currentJob.status === 'processing' &&
+                    currentJob.estimatedTimeRemaining &&
+                    currentJob.estimatedTimeRemaining > 0 && (
                       <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
                         <div className="flex items-center space-x-2">
                           <Timer className="h-4 w-4" />
@@ -2077,16 +2367,18 @@ export default function EnhancedBulkCSVUploadPage() {
                             {formatTime(currentJob.estimatedTimeRemaining || 0)}
                           </span>
                         </div>
-                        {(currentJob.avgProcessingTime || 0) > 0 && (
-                          <div className="flex items-center space-x-2">
-                            <Activity className="h-4 w-4" />
-                            <span>
-                              Avg:{' '}
-                              {formatTime(currentJob.avgProcessingTime || 0)}
-                              /product
-                            </span>
-                          </div>
-                        )}
+                        {currentJob &&
+                          currentJob.avgProcessingTime &&
+                          currentJob.avgProcessingTime > 0 && (
+                            <div className="flex items-center space-x-2">
+                              <Activity className="h-4 w-4" />
+                              <span>
+                                Avg:{' '}
+                                {formatTime(currentJob.avgProcessingTime || 0)}
+                                /product
+                              </span>
+                            </div>
+                          )}
                       </div>
                     )}
                 </div>
@@ -2185,7 +2477,7 @@ export default function EnhancedBulkCSVUploadPage() {
                   ))}
                 </div>
 
-                {currentJob.status === 'completed' && (
+                {currentJob && currentJob.status === 'completed' && (
                   <div className="mt-10 flex justify-center space-x-6">
                     <button
                       onClick={() => {
@@ -2219,7 +2511,8 @@ export default function EnhancedBulkCSVUploadPage() {
                     >
                       <Download className="h-5 w-5" />
                       <span>
-                        View Results ({getJobStats(currentJob).completed}{' '}
+                        View Results (
+                        {currentJob && getJobStats(currentJob).completed}{' '}
                         completed)
                       </span>
                     </button>

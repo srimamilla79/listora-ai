@@ -1,5 +1,5 @@
 // src/app/api/ebay/oauth/callback/route.ts
-// eBay OAuth callback handler
+// Fixed eBay OAuth callback with RuName
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -98,7 +98,7 @@ async function exchangeCodeForToken(code: string) {
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code: code,
-      redirect_uri: process.env.EBAY_REDIRECT_URI!,
+      redirect_uri: process.env.EBAY_RUNAME!, // ✅ Use RuName here too
     }),
   })
 

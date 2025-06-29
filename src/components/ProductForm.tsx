@@ -1,9 +1,12 @@
-// src/components/ProductForm.tsx - Enhanced with SSR Safety (COMPLETE)
+// src/components/ProductForm.tsx - Enhanced with Multilingual Voice Integration
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { LanguagePreferencesManager } from '@/components/LanguagePreferencesManager'
+import { useLanguagePreferences } from '@/hooks/useLanguagePreferences'
+
 import {
   Upload,
   Wand2,
@@ -30,11 +33,55 @@ import {
   Clock,
   AlertTriangle,
   Rocket,
+  Settings,
+  FileText,
+  MessageSquare,
+  Share2,
+  Target,
 } from 'lucide-react'
 
 // Import Amazon Components
 import MarketplaceConnections from '@/components/MarketplaceConnections'
 import UnifiedPublisher from '@/components/UnifiedPublisher'
+import MultilingualVoiceRecorder from '@/components/VoiceRecorder'
+
+// 🧠 FINAL FIX: Base64 conversion utility added here
+const convertToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result as string
+      if (!result || !result.startsWith('data:image')) {
+        reject('Invalid base64 image')
+      } else {
+        resolve(result)
+      }
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+// 🚀 NEW: Content sections interface
+interface ContentSections {
+  title: boolean
+  sellingPoints: boolean
+  description: boolean
+  instagramCaption: boolean
+  blogIntro: boolean
+  callToAction: boolean
+}
+
+// 🚀 NEW: Default all sections enabled for backward compatibility
+const DEFAULT_CONTENT_SECTIONS: ContentSections = {
+  title: true,
+  sellingPoints: true,
+  description: true,
+  instagramCaption: true,
+  blogIntro: true,
+  callToAction: true,
+}
+
 interface ProcessedImage {
   original: File
   processed?: string
@@ -71,12 +118,14 @@ interface ProductFormProps {
   onGenerationSuccess?: () => void
   currentUsage?: number
   monthlyLimit?: number
+  user?: any
 }
 
 export default function ProductForm({
   onGenerationSuccess,
   currentUsage,
   monthlyLimit,
+  user: userProp,
 }: ProductFormProps) {
   // Basic state
   const [productName, setProductName] = useState('')
@@ -84,7 +133,7 @@ export default function ProductForm({
   const [platform, setPlatform] = useState('amazon')
   const [generatedContent, setGeneratedContent] = useState('')
   const [loading, setLoading] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const user = userProp
   const [copied, setCopied] = useState(false)
   const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
   const [imageProcessingEnabled, setImageProcessingEnabled] = useState(false)
@@ -95,6 +144,12 @@ export default function ProductForm({
   >(null)
   const [notifications, setNotifications] = useState<ToastNotification[]>([])
 
+  // 🚀 NEW: Content section selection state
+  const [selectedSections, setSelectedSections] = useState<ContentSections>(
+    DEFAULT_CONTENT_SECTIONS
+  )
+  const [showContentSections, setShowContentSections] = useState(false)
+
   // Smart promotion features
   const [userGenerationCount, setUserGenerationCount] = useState(0)
   const [showPostGenerationPrompt, setShowPostGenerationPrompt] =
@@ -104,19 +159,23 @@ export default function ProductForm({
   const [componentMounted, setComponentMounted] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
 
-  // Voice integration state
+  // Voice integration state - CLEANED UP VERSION
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [recordingTime, setRecordingTime] = useState(0)
-  const [isProcessingVoice, setIsProcessingVoice] = useState(false)
   const [transcription, setTranscription] = useState('')
   const [isVoiceContentAvailable, setIsVoiceContentAvailable] = useState(false)
-  const [contentType, setContentType] = useState('product')
   const [hasGeneratedFinalContent, setHasGeneratedFinalContent] =
     useState(false)
+
+  // 🌍 NEW: Multilingual voice state
+  const { updateUsageStats } = useLanguagePreferences()
+  const [selectedLanguages, setSelectedLanguages] = useState({
+    input: 'auto',
+    output: 'en',
+  })
+
+  // 🔧 CRITICAL FIX: Add generation attempt counter to prevent infinite blocking
+  const [generationAttempts, setGenerationAttempts] = useState(0)
+  const [lastResetTime, setLastResetTime] = useState(Date.now())
 
   // Usage validation state
   const [isAdmin, setIsAdmin] = useState(false)
@@ -138,12 +197,6 @@ export default function ProductForm({
   const actualMonthlyLimit =
     monthlyLimit !== undefined ? monthlyLimit : localLimit
 
-  // Voice recording refs
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-
   const router = useRouter()
 
   // ✅ Initialize Supabase client after component mounts
@@ -152,6 +205,11 @@ export default function ProductForm({
     setComponentMounted(true)
     const supabaseClient = createClient()
     setSupabase(supabaseClient)
+
+    // 🔧 FIX: Make Supabase available globally for VoiceRecorder
+    if (typeof window !== 'undefined') {
+      ;(window as any).supabase = supabaseClient
+    }
   }, [])
 
   // Update local state when props change
@@ -164,20 +222,25 @@ export default function ProductForm({
     }
   }, [currentUsage, monthlyLimit])
 
-  // Check if user can generate (usage validation)
+  // 🔧 CRITICAL FIX: Enhanced canGenerate with reset detection
   const canGenerate = () => {
-    console.log('🔍 Usage Check:', {
-      isAdmin,
-      actualCurrentUsage,
-      actualMonthlyLimit,
-      passedCurrentUsage: currentUsage,
-      passedMonthlyLimit: monthlyLimit,
-      canGenerate: isAdmin || actualCurrentUsage < actualMonthlyLimit,
-    })
-
     if (isAdmin) {
       console.log('👑 Admin bypass enabled')
       return true
+    }
+
+    // 🔧 FIX: If user recently reset (within 5 seconds), allow generation regardless of flags
+    const timeSinceReset = Date.now() - lastResetTime
+    if (timeSinceReset < 5000) {
+      console.log('✅ Recent reset detected, allowing generation')
+      return actualCurrentUsage < actualMonthlyLimit
+    }
+
+    // 🔧 FIX: If user has attempted multiple times, reset the blocking flag
+    if (generationAttempts >= 2 && hasGeneratedFinalContent) {
+      console.log('🔄 Multiple attempts detected, resetting final content flag')
+      setHasGeneratedFinalContent(false)
+      return actualCurrentUsage < actualMonthlyLimit
     }
 
     const canGen = actualCurrentUsage < actualMonthlyLimit
@@ -197,6 +260,30 @@ export default function ProductForm({
 
   const remainingGenerations = actualMonthlyLimit - actualCurrentUsage
   const usagePercentage = (actualCurrentUsage / actualMonthlyLimit) * 100
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // 🚀 NEW: Content section handlers
+  const toggleSection = (section: keyof ContentSections) => {
+    setSelectedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }
+
+  const toggleAllSections = () => {
+    const allSelected = Object.values(selectedSections).every(Boolean)
+    const newState = allSelected
+      ? Object.keys(selectedSections).reduce(
+          (acc, key) => ({ ...acc, [key]: false }),
+          {} as ContentSections
+        )
+      : DEFAULT_CONTENT_SECTIONS
+    setSelectedSections(newState)
+  }
+
+  const getSelectedSectionCount = () => {
+    return Object.values(selectedSections).filter(Boolean).length
+  }
 
   // Unified publish success handler
   const handlePublishSuccess = (result: any) => {
@@ -273,13 +360,10 @@ export default function ProductForm({
   }
 
   // Notification functions
-  // Replace your addNotification function with this fixed version:
-
   const addNotification = (
     message: string,
     type: 'success' | 'error' | 'info' = 'success'
   ) => {
-    // 🔧 FIX: Generate unique ID using timestamp + random number
     const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     const notification = { id, message, type }
 
@@ -294,41 +378,12 @@ export default function ProductForm({
     setNotifications((prev) => prev.filter((n) => n.id !== id))
   }
 
-  // Get user on mount
-  useEffect(() => {
-    if (supabase) {
-      const getUser = async () => {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        setUser(user)
-      }
-      getUser()
-
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((event: any, session: any) => {
-        setUser(session?.user || null)
-      })
-
-      return () => {
-        subscription.unsubscribe()
-      }
-    }
-  }, [supabase])
-
-  // Cleanup effects
+  // Cleanup effects - SIMPLIFIED
   useEffect(() => {
     return () => {
       setComponentMounted(false)
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl)
-      }
     }
-  }, [audioUrl])
+  }, [])
 
   // Fetch generation count when user changes
   useEffect(() => {
@@ -363,322 +418,64 @@ export default function ProductForm({
     }
   }, [actualCurrentUsage, actualMonthlyLimit, isAdmin])
 
-  // Voice recording functions
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const startRecording = async () => {
-    try {
-      // Debug environment
-      console.log('🔍 Environment Debug:', {
-        protocol: location.protocol,
-        hostname: location.hostname,
-        isSecureContext: window.isSecureContext,
-        hasMediaDevices: !!navigator.mediaDevices,
-        hasGetUserMedia: !!navigator.mediaDevices?.getUserMedia,
-      })
-
-      // Check permission state if available
-      if ('permissions' in navigator) {
-        try {
-          const permission = await navigator.permissions.query({
-            name: 'microphone' as PermissionName,
-          })
-          console.log('🎤 Permission state:', permission.state)
-
-          if (permission.state === 'denied') {
-            addNotification(
-              "Microphone access was previously denied. Please click the camera/microphone icon in your browser's address bar and allow access, then try again.",
-              'error'
-            )
-            return
-          }
-        } catch (permError) {
-          console.log('Permission check failed:', permError)
-        }
-      }
-
-      // Check if we're on HTTPS (required for microphone access)
-      if (
-        location.protocol !== 'https:' &&
-        location.hostname !== 'localhost' &&
-        location.hostname !== '127.0.0.1'
-      ) {
-        addNotification(
-          'Microphone access requires HTTPS. Please use a secure connection.',
-          'error'
-        )
-        return
-      }
-
-      // Check if getUserMedia is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        addNotification(
-          'Your browser does not support microphone access. Please use a modern browser.',
-          'error'
-        )
-        return
-      }
-
-      console.log('🎤 Requesting microphone access...')
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // Remove potentially problematic constraints for better compatibility
-          // sampleRate: { ideal: 22050, min: 16000, max: 44100 },
-          // channelCount: 1,
-        },
-      })
-
-      console.log('✅ Microphone access granted')
-
-      const mimeTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/mp4',
-        'audio/ogg;codecs=opus',
-      ]
-
-      let mimeType = 'audio/webm'
-      for (const type of mimeTypes) {
-        if (MediaRecorder.isTypeSupported(type)) {
-          mimeType = type
-          break
-        }
-      }
-
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType,
-        audioBitsPerSecond: 64000,
-      })
-
-      mediaRecorderRef.current = mediaRecorder
-      chunksRef.current = []
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data)
-        }
-      }
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType })
-        setAudioBlob(blob)
-        const url = URL.createObjectURL(blob)
-        setAudioUrl(url)
-        stream.getTracks().forEach((track) => track.stop())
-      }
-
-      mediaRecorder.start(500)
-      setIsRecording(true)
-      setRecordingTime(0)
-
-      intervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1)
-      }, 1000)
-
-      addNotification(
-        '🎤 Recording started! Speak clearly about your product.',
-        'success'
-      )
-    } catch (error) {
-      console.error('Microphone access error:', error)
-
-      // Provide specific error messages based on error type
-      if (error instanceof Error) {
-        if (error.name === 'NotAllowedError') {
-          addNotification(
-            'Microphone access denied. Please allow microphone permissions in your browser settings and try again.',
-            'error'
-          )
-        } else if (error.name === 'NotFoundError') {
-          addNotification(
-            'No microphone found. Please check that a microphone is connected to your device.',
-            'error'
-          )
-        } else if (error.name === 'NotSupportedError') {
-          addNotification(
-            'Your browser does not support microphone recording. Please try a different browser.',
-            'error'
-          )
-        } else if (error.name === 'NotReadableError') {
-          addNotification(
-            'Microphone is being used by another application. Please close other apps using the microphone and try again.',
-            'error'
-          )
-        } else if (error.message && error.message.trim()) {
-          addNotification(
-            `Microphone error: ${error.message}. Please check your microphone settings.`,
-            'error'
-          )
-        } else {
-          addNotification(
-            'Failed to access microphone. Please check permissions and try again.',
-            'error'
-          )
-        }
-      } else {
-        addNotification(
-          'Failed to access microphone. Please check permissions and try again.',
-          'error'
-        )
-      }
-    }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-      addNotification(
-        '🎤 Recording stopped! Click "Generate Content" to process.',
-        'success'
-      )
-    }
-  }
-
-  const playAudio = () => {
-    if (audioRef.current && audioUrl) {
-      audioRef.current.play()
-      setIsPlaying(true)
-    }
-  }
-
-  const pauseAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      setIsPlaying(false)
-    }
-  }
-
-  async function optimizeAudioBlob(blob: Blob): Promise<Blob> {
-    if (blob.size > 10 * 1024 * 1024) {
-      console.log('🗜️ Audio file is large, compressing...')
-      return blob
-    }
-    return blob
-  }
-
+  // 🌍 NEW: Enhanced voice content handler for multilingual results (Phase 1 only)
   async function updateFormWithVoiceContent(result: any) {
     const updates = []
 
     if (result.transcription) {
       updates.push(() => setTranscription(result.transcription))
+      // 🎯 NEW: Use transcription as features if features field is empty
+
+      updates.push(() => setFeatures(result.transcription))
     }
 
     if (result.productName) {
       updates.push(() => setProductName(result.productName))
     }
 
-    if (result.generatedContent) {
-      updates.push(() => setGeneratedContent(result.generatedContent))
+    // 🎯 IMPORTANT: Only set voice content available, NOT final content
+    if (result.transcription || result.productName) {
       updates.push(() => setIsVoiceContentAvailable(true))
+      // 🔧 CRITICAL FIX: Reset final content flag to ensure button works
+      updates.push(() => setHasGeneratedFinalContent(false))
+    }
 
-      if (!features.trim() && result.transcription) {
-        updates.push(() => setFeatures(result.transcription))
+    // 🚫 REMOVED: No generatedContent handling here - that's Phase 2
+
+    // 🌍 Handle multilingual results
+    if (result.detectedLanguage) {
+      console.log('🌍 Detected language:', result.detectedLanguage)
+
+      // Show language detection feedback
+      if (result.wasTranslated) {
+        addNotification(
+          `🌍 Detected ${result.detectedLanguage.toUpperCase()} and translated to ${result.targetLanguage.toUpperCase()}!`,
+          'success'
+        )
+      } else {
+        addNotification(
+          `🎯 Detected ${result.detectedLanguage.toUpperCase()} with ${Math.round((result.confidence || 0.9) * 100)}% confidence`,
+          'info'
+        )
       }
     }
+
+    // 🎯 NEW: Show Phase 1 complete message
+    addNotification(
+      '🎤 Voice processed! Form filled successfully. Add images and generate content.',
+      'success'
+    )
 
     updates.forEach((update) => update())
   }
 
-  const processVoiceToContent = async () => {
-    if (!audioBlob) {
-      addNotification('No audio recorded', 'error')
-      return
-    }
-
-    if (!supabase) {
-      addNotification('Please wait for the component to load', 'error')
-      return
-    }
-
-    setIsProcessingVoice(true)
-    const startTime = Date.now()
-
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session?.access_token) {
-        addNotification('Please log in to use voice features', 'error')
-        return
-      }
-
-      const optimizedBlob = await optimizeAudioBlob(audioBlob)
-
-      const formData = new FormData()
-      formData.append('audio', optimizedBlob, 'recording.webm')
-      formData.append('contentType', contentType)
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 60000)
-
-      const response = await fetch('/api/voice-to-content', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: formData,
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to process voice')
-      }
-
-      const result = await response.json()
-      const endTime = Date.now()
-
-      await updateFormWithVoiceContent(result)
-
-      addNotification(
-        `🎤 Voice content generated in ${Math.round(
-          (endTime - startTime) / 1000
-        )}s! Form auto-filled.`,
-        'success'
-      )
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        addNotification(
-          'Voice processing timed out. Please try a shorter recording.',
-          'error'
-        )
-      } else {
-        console.error('Error processing voice:', error)
-        addNotification(
-          error instanceof Error ? error.message : 'Failed to process voice',
-          'error'
-        )
-      }
-    } finally {
-      setIsProcessingVoice(false)
-    }
-  }
-
+  // 🌍 SIMPLIFIED: Reset voice recorder function
   const resetVoiceRecorder = () => {
-    setAudioBlob(null)
-    setAudioUrl(null)
-    setRecordingTime(0)
-    setIsPlaying(false)
     setTranscription('')
     setIsVoiceContentAvailable(false)
     setHasGeneratedFinalContent(false)
+    setProductName('')
+    setFeatures('')
   }
 
   // Platform configurations
@@ -687,6 +484,12 @@ export default function ProductForm({
       value: 'amazon',
       label: '🛒 Amazon',
       description: 'Complete listing + social content',
+      imageSize: '1000x1000',
+    },
+    {
+      value: 'ebay',
+      label: '🏷️ eBay',
+      description: 'Auction-style + competitive listing',
       imageSize: '1000x1000',
     },
     {
@@ -801,10 +604,6 @@ export default function ProductForm({
     return resizedCanvas.toDataURL('image/jpeg', 0.9)
   }
 
-  // Replace your storeImagesToSupabase function with this no-refresh version:
-
-  // Replace your storeImagesToSupabase function with this:
-
   const storeImagesToSupabase = async (contentId?: string) => {
     console.log('💾 Starting automatic image storage...')
 
@@ -847,15 +646,12 @@ export default function ProductForm({
         '🚀 Making API call with cookie authentication (no session call)...'
       )
 
-      // 🔧 KEY FIX: Use cookie auth exactly like /api/generate does
-      // No Authorization header, no getSession() call
       const response = await fetch('/api/store-images-auto', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // No Authorization header
         },
-        credentials: 'include', // Use cookies like /api/generate
+        credentials: 'include',
         body: JSON.stringify({
           productName,
           originalImages,
@@ -871,7 +667,6 @@ export default function ProductForm({
         console.log('❌ API error:', errorData)
 
         if (response.status === 404) {
-          // Fallback to original API endpoint
           console.log('🔄 Falling back to manual save approach...')
           throw new Error(
             'Automatic save not available - use manual save button'
@@ -886,7 +681,6 @@ export default function ProductForm({
 
       console.log('✅ Images stored automatically in', duration, 'seconds')
 
-      // Update UI state
       setProcessedImages((prev) =>
         prev.map((img, index) => ({
           ...img,
@@ -911,7 +705,6 @@ export default function ProductForm({
       const duration = Math.round((Date.now() - startTime) / 1000)
       console.error('❌ Automatic storage failed:', error)
 
-      // Show manual save option instead of failing completely
       addNotification(
         '🎉 Content generated successfully! Click "Save Images" button to store your images.',
         'success'
@@ -920,6 +713,7 @@ export default function ProductForm({
       setStoringImages(false)
     }
   }
+
   const processImage = async (file: File, index: number) => {
     setProcessedImages((prev) =>
       prev.map((img, i) =>
@@ -1057,7 +851,7 @@ export default function ProductForm({
 
     console.log('🔍 Starting enhanced image analysis...', {
       imageCount: images.length,
-      hasProcessedImages: images.some((img) => img.processed),
+      hasProcessedImages: false,
     })
 
     try {
@@ -1067,8 +861,7 @@ export default function ProductForm({
 
       if (!session?.access_token) {
         console.log('⚠️ No session for image analysis, using basic fallback')
-        // Fallback to original basic analysis
-        const hasProcessedImages = images.some((img) => img.processed)
+        const hasProcessedImages = false
         const imageCount = images.length
 
         let analysis = `${imageCount} high-quality product image${
@@ -1085,7 +878,6 @@ export default function ProductForm({
         return analysis
       }
 
-      // Use the first processed image, or first original if no processed images
       const imageToAnalyze =
         images.find((img) => img.processedPreview) || images[0]
       const imageUrl =
@@ -1095,18 +887,21 @@ export default function ProductForm({
         imageType: imageToAnalyze.processedPreview ? 'processed' : 'original',
       })
 
-      // Convert blob URL to base64 on CLIENT SIDE
       let imageBase64 = ''
 
       if (imageUrl.startsWith('blob:')) {
         try {
           console.log('🔄 Converting blob URL to base64...')
 
-          // Fetch the blob and convert to base64
-          const response = await fetch(imageUrl)
-          const blob = await response.blob()
+          const blobResp = await fetch(imageUrl)
+          if (!blobResp.ok) {
+            throw new Error(
+              `Blob fetch failed: ${blobResp.status} ${blobResp.statusText}`
+            )
+          }
 
-          // Convert blob to base64
+          const blob = await blobResp.blob()
+
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
             reader.onloadend = () => {
@@ -1124,10 +919,10 @@ export default function ProductForm({
           console.log('✅ Blob converted to base64 successfully')
         } catch (conversionError) {
           console.error('❌ Blob conversion failed:', conversionError)
-          throw new Error('Image conversion failed')
+          addNotification('Image analysis failed due to blob error.', 'error')
+          return 'Fallback analysis: image info unavailable'
         }
       } else if (imageUrl.startsWith('data:')) {
-        // Already base64
         imageBase64 = imageUrl
       } else {
         throw new Error('Unsupported image format')
@@ -1140,9 +935,9 @@ export default function ProductForm({
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          imageData: imageBase64, // Send base64 data instead of blob URL
+          imageData: imageBase64,
           imageCount: images.length,
-          hasProcessedImages: images.some((img) => img.processed),
+          hasProcessedImages: false,
           productName: productName || undefined,
         }),
       })
@@ -1172,7 +967,6 @@ export default function ProductForm({
     } catch (error) {
       console.error('Image analysis error:', error)
 
-      // Graceful fallback to original basic analysis
       console.log('🔄 Using basic image analysis fallback')
 
       addNotification(
@@ -1180,7 +974,7 @@ export default function ProductForm({
         'info'
       )
 
-      const hasProcessedImages = images.some((img) => img.processed)
+      const hasProcessedImages = false
       const imageCount = images.length
 
       let analysis = `${imageCount} high-quality product image${
@@ -1199,84 +993,141 @@ export default function ProductForm({
     }
   }
 
-  // Handle generate with usage validation
-  // Replace your handleGenerate function with this optimized version
-  // Alternative: Original behavior - wait for image storage to complete
-  // Replace your handleGenerate function with this state-corrected version
+  // 🔧 FIXED: Enhanced handleGenerate with better state management
   const handleGenerate = async () => {
-    // 🚀 PERFORMANCE: Add timing
     const startTime = Date.now()
     console.log('🚀 Starting content generation process...')
 
-    // Pre-validation checks
-    if (!productName.trim() || !features.trim()) {
-      addNotification('Please fill in both product name and features', 'error')
-      return
-    }
+    // 🔧 CRITICAL FIX: Increment generation attempts to help with blocking detection
+    setGenerationAttempts((prev) => prev + 1)
 
-    if (!user) {
-      addNotification('Please log in to generate content', 'error')
-      return
-    }
-
-    if (!supabase) {
-      addNotification('Please wait for the component to load', 'error')
-      return
-    }
-
-    // Usage limit validation (unless admin)
-    const canUserGenerate = canGenerate()
-    console.log('🔍 Final usage validation:', {
-      canUserGenerate,
-      isAdmin,
+    console.log('📊 Initial State Check:', {
+      productName: productName.trim(),
+      features: features.trim(),
+      user: !!user,
+      supabase: !!supabase,
+      loading,
+      hasGeneratedFinalContent,
       actualCurrentUsage,
       actualMonthlyLimit,
-      hasGeneratedFinalContent,
+      isAdmin,
+      generationAttempts: generationAttempts + 1,
+      selectedSectionCount: getSelectedSectionCount(),
     })
 
-    if (!canUserGenerate) {
-      console.log('❌ BLOCKED: Usage limit reached')
-      addNotification(
-        `Monthly generation limit reached (${actualCurrentUsage}/${actualMonthlyLimit}). Please upgrade your plan to continue.`,
-        'error'
-      )
-      router.push('/pricing')
-      return
+    let hasSetLoadingToFalse = false
+    const clearLoadingState = () => {
+      if (!hasSetLoadingToFalse) {
+        console.log('🔄 Clearing loading state...')
+        setLoading(false)
+        hasSetLoadingToFalse = true
+      }
     }
 
-    if (hasGeneratedFinalContent) {
-      addNotification(
-        'Content already generated! Check your dashboard.',
-        'info'
-      )
-      return
-    }
-
-    setLoading(true)
-    if (!isVoiceContentAvailable) {
-      setGeneratedContent('')
-    }
+    // 🛡 Timeout fallback (force UI reset if blocked)
+    setTimeout(() => {
+      if (!hasSetLoadingToFalse) {
+        console.warn('⚠️ Timeout hit — forcing loading reset')
+        clearLoadingState()
+        addNotification('Response timeout. Try again or refresh.', 'error')
+      }
+    }, 45000) // 30 seconds hard limit
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session?.access_token) {
-        throw new Error('No access token found')
+      // Pre-validation checks
+      if (!productName.trim()) {
+        console.log('❌ Validation failed: Missing product name')
+        addNotification('Please enter a product name', 'error')
+        return
       }
 
-      // 🚀 OPTIMIZED: Get image analysis first (if needed)
+      if (!features.trim()) {
+        console.log('❌ Validation failed: Missing features')
+        addNotification('Please enter product features', 'error')
+        return
+      }
+
+      if (!user) {
+        console.log('❌ Validation failed: No user')
+        addNotification('Please log in to generate content', 'error')
+        return
+      }
+
+      if (!supabase) {
+        console.log('❌ Validation failed: Supabase not initialized')
+        addNotification('Please wait for the component to load', 'error')
+        return
+      }
+
+      // 🚀 NEW: Validate that at least one section is selected
+      if (getSelectedSectionCount() === 0) {
+        console.log('❌ Validation failed: No content sections selected')
+        addNotification(
+          'Please select at least one content section to generate',
+          'error'
+        )
+        return
+      }
+
+      // 🔧 FIXED: Fresh usage validation
+      const freshCanGenerate = canGenerate()
+      console.log('🔍 Fresh usage validation:', {
+        isAdmin,
+        actualCurrentUsage,
+        actualMonthlyLimit,
+        freshCanGenerate,
+        hasGeneratedFinalContent,
+        generationAttempts: generationAttempts + 1,
+      })
+
+      if (!freshCanGenerate) {
+        console.log('❌ BLOCKED: Usage limit reached')
+        addNotification(
+          `Monthly generation limit reached (${actualCurrentUsage}/${actualMonthlyLimit}). Please upgrade your plan to continue.`,
+          'error'
+        )
+        router.push('/pricing')
+        return
+      }
+
+      console.log('⚡ Setting loading state to true...')
+      setLoading(true)
+      hasSetLoadingToFalse = false
+
+      // Clear previous content if not voice enhancement
+      if (!isVoiceContentAvailable) {
+        setGeneratedContent('')
+      }
+
+      // 🔧 ROBUST FIX: Use cookie-based authentication (same as voice processing)
+      console.log('🔐 Using cookie-based authentication...')
+
+      // ✅ Force-refresh blob URLs before image analysis
+      // 🔄 Force revoke old object URLs before refreshing
+      processedImages.forEach((img) => {
+        if (img.originalPreview) URL.revokeObjectURL(img.originalPreview)
+        if (img.processedPreview) URL.revokeObjectURL(img.processedPreview)
+      })
+
+      const refreshedImages = processedImages.map((img) => ({
+        ...img,
+        processedPreview: img.processedPreview
+          ? URL.createObjectURL(img.original)
+          : img.processedPreview,
+      }))
+
+      setProcessedImages(refreshedImages)
+
+      // ⏩ Use the fresh list for analysis
       let imageAnalysis = ''
-      if (processedImages.length > 0) {
+      if (refreshedImages.length > 0) {
         console.log('🖼️ Starting image analysis...')
         const imageStart = Date.now()
-
         try {
-          imageAnalysis = await analyzeImagesWithAI(processedImages)
-          const imageTime = Date.now() - imageStart
+          imageAnalysis = await analyzeImagesWithAI(refreshedImages)
+          const imageDuration = Date.now() - imageStart
           console.log(
-            `✅ Image analysis completed in ${Math.round(imageTime / 1000)}s`
+            `✅ Image analysis completed in ${Math.floor(imageDuration / 1000)}s`
           )
         } catch (imageError) {
           console.error(
@@ -1290,63 +1141,111 @@ export default function ProductForm({
         }
       }
 
-      // 🚀 OPTIMIZED: Generate content with enhanced error handling
+      // 🚀 ENHANCED: Generate content with section selection
       console.log('📝 Starting content generation...')
       const generationStart = Date.now()
 
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          productName,
-          features,
-          platform,
-          imageAnalysis,
-          hasImages: processedImages.length > 0,
-          hasProcessedImages: processedImages.some((img) => img.processed),
-          voiceTranscription: transcription || undefined,
-          existingContent: isVoiceContentAvailable
-            ? generatedContent
-            : undefined,
-        }),
+      const requestBody = {
+        productName,
+        features,
+        platform,
+        imageAnalysis,
+        hasImages: processedImages.length > 0,
+        hasProcessedImages: false,
+        voiceTranscription: transcription || undefined,
+        existingContent: isVoiceContentAvailable ? generatedContent : undefined,
+        // 🚀 NEW: Pass selected content sections
+        selectedSections: selectedSections,
+      }
+
+      console.log('📤 Sending generation request:', {
+        ...requestBody,
+        imageAnalysis: imageAnalysis ? 'included' : 'none',
+        hasVoiceInput: !!transcription,
+        selectedSectionCount: getSelectedSectionCount(),
       })
+
+      // Make the API call using cookie authentication (same as voice processing)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+        console.warn('⏰ Generation manually aborted after timeout')
+        setLoading(false)
+        addNotification('Generation took too long and was aborted.', 'error')
+      }, 60000) // 60 seconds timeout
+
+      let response
+      try {
+        response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // use cookies
+          body: JSON.stringify(requestBody),
+          signal: controller.signal, // attach abort controller
+        })
+      } finally {
+        clearTimeout(timeoutId) // ✅ always clear timeout
+      }
 
       const generationTime = Date.now() - generationStart
       console.log(
-        `✅ Content generation completed in ${Math.round(generationTime / 1000)}s`
+        `📊 Content generation API completed in ${Math.round(generationTime / 1000)}s`
       )
+      console.log('📊 Response status:', response.status, response.statusText)
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || `HTTP error! status: ${response.status}`)
+        let errorMessage = `HTTP error! status: ${response.status}`
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+          console.log('❌ API Error Data:', errorData)
+        } catch (parseError) {
+          console.error('❌ Failed to parse error response:', parseError)
+        }
+        throw new Error(errorMessage)
       }
 
-      const data = await response.json()
+      let data
+      try {
+        data = await response.json()
+        console.log('✅ Successfully parsed response data')
+      } catch (parseError) {
+        console.error('❌ Failed to parse success response:', parseError)
+        throw new Error('Invalid response from server')
+      }
 
-      // 🚀 PERFORMANCE: Log API performance if available
       if (data.performance) {
         console.log('📊 API Performance Breakdown:', data.performance)
       }
 
+      // Update content state
+      const newContent = data.result || 'Content generated successfully!'
+
       if (!isVoiceContentAvailable) {
-        setGeneratedContent(data.result || 'Content generated successfully!')
+        setGeneratedContent(newContent)
       } else {
-        setGeneratedContent(data.result || generatedContent)
+        setGeneratedContent(newContent)
       }
 
+      // Handle success state updates
       if (data.contentId) {
+        console.log('✅ Content ID received:', data.contentId)
         setLastGeneratedContentId(data.contentId)
         setHasGeneratedFinalContent(true)
 
         // Call success callback to update usage display
         if (onGenerationSuccess) {
           console.log('🎉 Calling generation success callback...')
-          onGenerationSuccess()
+          try {
+            onGenerationSuccess()
+          } catch (callbackError) {
+            console.error('❌ Success callback failed:', callbackError)
+          }
         }
 
+        // Update prompts and counters
         if (!dismissedPrompts.includes('post-generation') && componentMounted) {
           setShowPostGenerationPrompt(true)
         }
@@ -1364,8 +1263,7 @@ export default function ProductForm({
         }
       }
 
-      // 🔧 FIXED: Use the existing storeImagesToSupabase function properly
-      // 🔧 COMPATIBLE: Simple direct call to server-side auth function
+      // Enhanced image storage
       if (
         processedImages.length > 0 &&
         !processedImages.some((img) => img.isStored) &&
@@ -1384,20 +1282,27 @@ export default function ProductForm({
                 ? storageError.message
                 : 'Unknown error'
             }. You can try saving images again later.`,
-            'error'
+            'info'
           )
         }
       }
 
       const totalTime = Date.now() - startTime
       console.log(
-        `🎉 Total process completed in ${Math.round(totalTime / 1000)}s`
+        `🎉 Total process completed successfully in ${Math.round(totalTime / 1000)}s`
       )
+
+      // 🚀 NEW: Enhanced success message with section info
+      const sectionCount = getSelectedSectionCount()
+      const sectionText =
+        sectionCount === 6
+          ? 'complete content package'
+          : `${sectionCount} content sections`
 
       addNotification(
         isVoiceContentAvailable
-          ? '🎤 Voice content enhanced and saved to dashboard!'
-          : `🎉 Content generated successfully in ${Math.round(totalTime / 1000)}s and saved to dashboard!`,
+          ? `🎤 Voice content enhanced (${sectionText}) and saved to dashboard!`
+          : `🎉 ${sectionText} generated successfully in ${Math.round(totalTime / 1000)}s and saved to dashboard!`,
         'success'
       )
     } catch (error) {
@@ -1406,16 +1311,30 @@ export default function ProductForm({
         `❌ Error generating content after ${Math.round(errorTime / 1000)}s:`,
         error
       )
-      addNotification(
-        `Error: ${
-          error instanceof Error ? error.message : 'Failed to generate content'
-        }`,
-        'error'
-      )
+
+      // Provide user-friendly error messages
+      let userMessage = 'Failed to generate content. Please try again.'
+
+      if (error instanceof Error) {
+        if (error.message.includes('Authentication')) {
+          userMessage = 'Please refresh the page and log in again.'
+        } else if (error.message.includes('Network')) {
+          userMessage =
+            'Network error. Please check your connection and try again.'
+        } else if (error.message.includes('limit')) {
+          userMessage = error.message
+        } else {
+          userMessage = error.message
+        }
+      }
+
+      addNotification(userMessage, 'error')
     } finally {
-      // 🔧 CRITICAL: Always clear loading state
-      console.log('🔄 Clearing loading state...')
-      setLoading(false)
+      clearLoadingState()
+      const finalTime = Date.now() - startTime
+      console.log(
+        `🏁 handleGenerate completed in ${Math.round(finalTime / 1000)}s`
+      )
     }
   }
 
@@ -1465,6 +1384,82 @@ export default function ProductForm({
     processedImages.some((img) => !img.isStored && img.platforms.amazon)
 
   const shouldShowPromotions = componentMounted && dataLoaded
+
+  // 🔧 CRITICAL FIX: Enhanced reset function with proper state cleanup
+  const handleStartNewProduct = async () => {
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    console.log('🔄 Starting new product - comprehensive reset...')
+
+    // Reset form state
+    setHasGeneratedFinalContent(false)
+    setGenerationAttempts(0)
+    setLastResetTime(Date.now())
+    setGeneratedContent('')
+    setProductName('')
+    setFeatures('')
+    setLastGeneratedContentId(null)
+
+    // Reset image state
+    processedImages.forEach((img) => {
+      URL.revokeObjectURL(img.originalPreview)
+      if (img.processedPreview) {
+        URL.revokeObjectURL(img.processedPreview)
+      }
+    })
+    processedImages.forEach((img) => {
+      if (img.originalPreview) {
+        URL.revokeObjectURL(img.originalPreview)
+      }
+      if (img.processedPreview) {
+        URL.revokeObjectURL(img.processedPreview)
+      }
+    })
+    setProcessedImages([]) // ✅ now fully clears old blob URLs
+
+    // Reset voice state
+    setShowVoiceRecorder(false)
+    setTranscription('')
+    setIsVoiceContentAvailable(false)
+
+    // Remount voice recorder
+    setTimeout(() => {
+      setShowVoiceRecorder(false)
+    }, 100)
+
+    // Reset content section state
+    setSelectedSections(DEFAULT_CONTENT_SECTIONS)
+    setShowContentSections(false)
+
+    // Reset notifications/prompts
+    setShowPostGenerationPrompt(false)
+    setNotifications([])
+
+    // Optional: Refresh session just in case
+    try {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession()
+      if (error || !session) {
+        console.warn(
+          '⚠️ Supabase session refresh failed or returned null',
+          error
+        )
+        addNotification(
+          'Session refresh issue. Please refresh the page.',
+          'error'
+        )
+      } else {
+        console.log('🔁 Supabase session refreshed after reset:', session)
+      }
+    } catch (err) {
+      console.error('❌ Supabase session fetch error:', err)
+      addNotification('Supabase error during reset. Try re-logging.', 'error')
+    }
+
+    console.log('✅ New product reset completed')
+    addNotification('Ready for new product! All components reset.', 'info')
+  }
 
   // ✅ Wait for SSR safety before rendering
   if (!mounted || !supabase) {
@@ -1689,15 +1684,6 @@ export default function ProductForm({
           return null
         })()}
 
-      {!user && (
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-          <p className="text-amber-800 text-sm">
-            ⚠️ Authentication Required - Please log in to use the content
-            generator.
-          </p>
-        </div>
-      )}
-
       {/* Storage Status Banner */}
       {hasUnstoredImages && !storingImages && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
@@ -1738,11 +1724,11 @@ export default function ProductForm({
           </h2>
           <p className="text-slate-200 mt-3 text-lg">
             Create comprehensive product content packages with professional
-            image processing and voice input
+            image processing and multilingual voice input
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-              ✓ Optimized Voice Processing
+              ✓ Multilingual Voice Input
             </span>
             <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
               ✓ Product Descriptions
@@ -1769,207 +1755,68 @@ export default function ProductForm({
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">
-                    🎤 Voice to Content - Optimized
+                    🎤 Voice to Content - Multilingual
                   </h3>
                   <p className="text-gray-600">
-                    Speak your product details, get instant professional content
-                    (50-70% faster!)
+                    Speak in any language, get professional content worldwide
                   </p>
                 </div>
               </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <select
-                    value={contentType}
-                    onChange={(e) => setContentType(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  >
-                    <option value="product">Product Content</option>
-                    <option value="service">Service Content</option>
-                    <option value="listing">Marketplace Listing</option>
-                  </select>
-                </div>
-
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
-                    className={`px-6 py-3 rounded-lg transition-all font-medium ${
-                      showVoiceRecorder
-                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg'
-                    }`}
-                    style={{
-                      minHeight: '48px',
-                      minWidth: '180px',
-                      touchAction: 'manipulation',
-                    }}
-                  >
-                    {showVoiceRecorder
-                      ? 'Hide Voice Recorder'
-                      : '🎤 Start Voice Input'}
-                  </button>
-                </div>
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
+                  className={`px-6 py-3 rounded-lg transition-all font-medium ${
+                    showVoiceRecorder
+                      ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg'
+                  }`}
+                  style={{
+                    minHeight: '48px',
+                    minWidth: '180px',
+                    touchAction: 'manipulation',
+                  }}
+                >
+                  {showVoiceRecorder
+                    ? 'Hide Voice Recorder'
+                    : '🎤 Start Voice Input'}
+                </button>
               </div>
             </div>
+
             {showVoiceRecorder && (
-              <div className="mb-4">
-                <div className="flex items-center space-x-2 text-sm text-gray-600 bg-blue-50 rounded-lg p-3">
-                  <div className="flex items-center space-x-1">
-                    <span>🔒</span>
-                    <span>Protocol: {location.protocol}</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <span>🎤</span>
-                    <span>
-                      Permission:{' '}
-                      {typeof navigator !== 'undefined' &&
-                      'permissions' in navigator
-                        ? 'Available'
-                        : 'Basic'}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <span>🌐</span>
-                    <span>
-                      Browser:{' '}
-                      {typeof navigator !== 'undefined' &&
-                      navigator.userAgent.includes('Chrome')
-                        ? 'Chrome'
-                        : 'Other'}
-                    </span>
-                  </div>
+              <>
+                {/* Revert to static keys to stop infinite re-renders */}
+                <div key={`lang-prefs-${showVoiceRecorder}`}>
+                  <LanguagePreferencesManager
+                    selectedPlatform={platform}
+                    onPreferencesChange={(input, output) => {
+                      setSelectedLanguages({ input, output })
+                    }}
+                  />
                 </div>
-              </div>
+
+                <div className="mt-4">
+                  <MultilingualVoiceRecorder
+                    key={`voice-recorder-${showVoiceRecorder}`}
+                    supabase={supabase}
+                    onContentGenerated={async (result) => {
+                      await updateFormWithVoiceContent(result)
+                      // Update usage statistics
+                      if (result.detectedLanguage && result.targetLanguage) {
+                        await updateUsageStats(
+                          result.detectedLanguage,
+                          result.targetLanguage,
+                          result.wasTranslated || false,
+                          platform
+                        )
+                      }
+                    }}
+                    onTranscriptionComplete={setTranscription}
+                  />
+                </div>
+              </>
             )}
-            {/* Voice Recorder */}
-            {showVoiceRecorder && (
-              <div className="mt-4 bg-white rounded-xl p-6 border border-gray-200">
-                {/* Recording Status */}
-                {isRecording && (
-                  <div className="flex items-center justify-center space-x-2 text-red-600 mb-4">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="font-medium">
-                      Recording: {formatTime(recordingTime)}
-                    </span>
-                  </div>
-                )}
 
-                {/* Main Controls */}
-                <div className="flex justify-center items-center space-x-4 mb-4">
-                  {!isRecording ? (
-                    <button
-                      onClick={startRecording}
-                      className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg"
-                      style={{
-                        minHeight: '48px',
-                        minWidth: '160px',
-                        touchAction: 'manipulation',
-                      }}
-                    >
-                      <Mic className="h-5 w-5" />
-                      <span>Start Recording</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={stopRecording}
-                      className="flex items-center space-x-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-6 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg"
-                    >
-                      <Square className="h-5 w-5" />
-                      <span>Stop Recording</span>
-                    </button>
-                  )}
-
-                  {(audioBlob || transcription) && (
-                    <button
-                      onClick={resetVoiceRecorder}
-                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-
-                {/* Audio Playback Controls */}
-                {audioUrl && (
-                  <div className="flex items-center space-x-4 bg-gray-50 rounded-lg p-4 mb-4">
-                    <button
-                      onClick={isPlaying ? pauseAudio : playAudio}
-                      className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-colors"
-                    >
-                      {isPlaying ? (
-                        <Pause className="h-4 w-4" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                    </button>
-
-                    <div className="flex-1 flex items-center space-x-2">
-                      <Volume2 className="h-4 w-4 text-gray-500" />
-                      <span className="text-sm text-gray-600">
-                        Recording: {formatTime(recordingTime)}
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={processVoiceToContent}
-                      disabled={isProcessingVoice}
-                      className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 shadow-lg disabled:transform-none disabled:shadow-none"
-                    >
-                      <Wand2
-                        className={`h-4 w-4 ${
-                          isProcessingVoice ? 'animate-spin' : ''
-                        }`}
-                      />
-                      <span>
-                        {isProcessingVoice
-                          ? 'Processing...'
-                          : 'Generate Content'}
-                      </span>
-                    </button>
-
-                    {/* Hidden Audio Element */}
-                    <audio
-                      ref={audioRef}
-                      src={audioUrl}
-                      onEnded={() => setIsPlaying(false)}
-                      onPause={() => setIsPlaying(false)}
-                      onPlay={() => setIsPlaying(true)}
-                      className="hidden"
-                    />
-                  </div>
-                )}
-
-                {/* Transcription Display */}
-                {transcription && (
-                  <div className="mb-4">
-                    <h5 className="text-sm font-semibold text-gray-700 mb-2">
-                      Transcription:
-                    </h5>
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-blue-900 text-sm">{transcription}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Usage Tips */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h5 className="font-semibold text-gray-900 mb-2 text-sm">
-                    💡 Tips for better results (Now 50-70% faster!):
-                  </h5>
-                  <ul className="text-xs text-gray-600 space-y-1">
-                    <li>• Speak clearly and mention key product features</li>
-                    <li>• Include pricing, dimensions, or technical specs</li>
-                    <li>• Describe the problem your product solves</li>
-                    <li>
-                      • Mention target platforms (Amazon, eBay, Shopify, etc.)
-                    </li>
-                    <li className="text-green-600 font-medium">
-                      • ⚡ Optimized processing: ~15-25 seconds vs 30-60 seconds
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            )}
             {/* Voice Status */}
             {isVoiceContentAvailable && (
               <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -1998,6 +1845,7 @@ export default function ProductForm({
                   Product Name
                 </label>
                 <input
+                  ref={fileInputRef}
                   type="text"
                   id="productName"
                   value={productName}
@@ -2043,6 +1891,149 @@ export default function ProductForm({
                       : 'border-gray-200'
                   }`}
                 />
+              </div>
+
+              {/* 🚀 NEW: Content Section Selection */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <label className="block text-sm font-semibold text-gray-700">
+                    📝 Content Sections to Generate
+                  </label>
+                  <button
+                    onClick={() => setShowContentSections(!showContentSections)}
+                    className="flex items-center space-x-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    <Settings className="h-4 w-4" />
+                    <span>{showContentSections ? 'Hide' : 'Customize'}</span>
+                  </button>
+                </div>
+
+                {/* Quick Summary */}
+                <div className="mb-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">
+                          {getSelectedSectionCount() === 6
+                            ? 'Complete Content Package'
+                            : `${getSelectedSectionCount()} Content Sections`}
+                        </h4>
+                        <p className="text-sm text-gray-600">
+                          {getSelectedSectionCount() === 6
+                            ? 'All sections selected - full package generation'
+                            : `Generating ${getSelectedSectionCount()} of 6 available sections`}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={toggleAllSections}
+                      className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      {Object.values(selectedSections).every(Boolean)
+                        ? 'Deselect All'
+                        : 'Select All'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expandable Content Sections */}
+                {showContentSections && (
+                  <div className="space-y-3 bg-white rounded-xl border border-gray-200 p-6">
+                    <h5 className="font-semibold text-gray-900 mb-4">
+                      Choose what to generate:
+                    </h5>
+
+                    {[
+                      {
+                        key: 'title' as keyof ContentSections,
+                        label: 'Product Title/Headline',
+                        description: 'SEO-optimized main title',
+                        icon: Target,
+                        color: 'from-blue-500 to-blue-600',
+                      },
+                      {
+                        key: 'sellingPoints' as keyof ContentSections,
+                        label: 'Key Selling Points',
+                        description: '5-7 bullet points highlighting benefits',
+                        icon: Sparkles,
+                        color: 'from-green-500 to-green-600',
+                      },
+                      {
+                        key: 'description' as keyof ContentSections,
+                        label: 'Detailed Product Description',
+                        description: 'Comprehensive description with benefits',
+                        icon: FileText,
+                        color: 'from-purple-500 to-purple-600',
+                      },
+                      {
+                        key: 'instagramCaption' as keyof ContentSections,
+                        label: 'Instagram Caption',
+                        description: 'Social media caption with hashtags',
+                        icon: Share2,
+                        color: 'from-pink-500 to-pink-600',
+                      },
+                      {
+                        key: 'blogIntro' as keyof ContentSections,
+                        label: 'Blog Introduction',
+                        description: 'Compelling blog post introduction',
+                        icon: MessageSquare,
+                        color: 'from-orange-500 to-orange-600',
+                      },
+                      {
+                        key: 'callToAction' as keyof ContentSections,
+                        label: 'Call-to-Action',
+                        description: 'Platform-specific conversion focus',
+                        icon: Target,
+                        color: 'from-red-500 to-red-600',
+                      },
+                    ].map((section) => {
+                      const Icon = section.icon
+                      return (
+                        <div
+                          key={section.key}
+                          className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center space-x-3 flex-1">
+                            <div
+                              className={`w-8 h-8 bg-gradient-to-r ${section.color} rounded-lg flex items-center justify-center`}
+                            >
+                              <Icon className="h-4 w-4 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">
+                                {section.label}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {section.description}
+                              </div>
+                            </div>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedSections[section.key]}
+                              onChange={() => toggleSection(section.key)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                          </label>
+                        </div>
+                      )
+                    })}
+
+                    {getSelectedSectionCount() === 0 && (
+                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-amber-800 text-sm">
+                          ⚠️ Please select at least one content section to
+                          generate.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Image Upload Section */}
@@ -2375,7 +2366,9 @@ export default function ProductForm({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Complete Content Package
+                  {getSelectedSectionCount() === 6
+                    ? 'Complete Content Package'
+                    : `Custom Content (${getSelectedSectionCount()} sections)`}
                 </h3>
                 {generatedContent && (
                   <div className="flex space-x-2">
@@ -2411,9 +2404,22 @@ export default function ProductForm({
                     <Upload className="h-12 w-12 mb-4" />
                     <p className="text-center">
                       {loading
-                        ? 'AI is creating your complete content package...'
-                        : 'Your complete content package will appear here'}
+                        ? `AI is creating your ${getSelectedSectionCount() === 6 ? 'complete content package' : 'custom content'}...`
+                        : `Your ${getSelectedSectionCount() === 6 ? 'complete content package' : 'custom content'} will appear here`}
                     </p>
+                    {!loading && getSelectedSectionCount() > 0 && (
+                      <p className="text-sm text-gray-500 mt-2">
+                        Selected:{' '}
+                        {Object.entries(selectedSections)
+                          .filter(([_, selected]) => selected)
+                          .map(([key, _]) =>
+                            key
+                              .replace(/([A-Z])/g, ' $1')
+                              .replace(/^./, (str) => str.toUpperCase())
+                          )
+                          .join(', ')}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -2428,13 +2434,15 @@ export default function ProductForm({
                 loading ||
                 !user ||
                 hasGeneratedFinalContent ||
-                (!isAdmin && !canGenerate())
+                (!isAdmin && !canGenerate()) ||
+                getSelectedSectionCount() === 0
               }
               className={`flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
                 loading ||
                 !user ||
                 hasGeneratedFinalContent ||
-                (!isAdmin && !canGenerate())
+                (!isAdmin && !canGenerate()) ||
+                getSelectedSectionCount() === 0
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-slate-600 to-gray-700 hover:from-slate-700 hover:to-gray-800 transform hover:scale-105 shadow-lg hover:shadow-xl'
               }`}
@@ -2442,9 +2450,9 @@ export default function ProductForm({
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                  {isVoiceContentAvailable
-                    ? 'Enhancing Voice Content...'
-                    : 'Generating Content...'}
+                  {getSelectedSectionCount() === 6
+                    ? 'Generating Complete Package...'
+                    : `Generating ${getSelectedSectionCount()} Sections...`}
                 </>
               ) : hasGeneratedFinalContent ? (
                 <>
@@ -2457,12 +2465,20 @@ export default function ProductForm({
                   Monthly Limit Reached ({actualCurrentUsage}/
                   {actualMonthlyLimit}) - Upgrade to Continue
                 </>
+              ) : getSelectedSectionCount() === 0 ? (
+                <>
+                  <AlertTriangle className="mr-3 h-5 w-5" />
+                  Select Content Sections First
+                </>
               ) : (
                 <>
                   <Wand2 className="mr-3 h-5 w-5" />
-                  {isVoiceContentAvailable
-                    ? 'Enhance & Finalize Content'
-                    : 'Generate Complete Content Package'}
+                  {getSelectedSectionCount() === 6
+                    ? 'Generate Complete Content Package'
+                    : `Generate ${getSelectedSectionCount()} Content Sections`}
+                  {isVoiceContentAvailable && (
+                    <span className="text-xs ml-2">(with Voice + Images)</span>
+                  )}
                 </>
               )}
             </button>
@@ -2484,15 +2500,7 @@ export default function ProductForm({
 
             {hasGeneratedFinalContent && (
               <button
-                onClick={() => {
-                  setHasGeneratedFinalContent(false)
-                  setGeneratedContent('')
-                  setProductName('')
-                  setFeatures('')
-                  setProcessedImages([])
-                  resetVoiceRecorder()
-                  setShowPostGenerationPrompt(false)
-                }}
+                onClick={handleStartNewProduct}
                 className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
               >
                 Start New Product
@@ -2500,7 +2508,7 @@ export default function ProductForm({
             )}
           </div>
 
-          {/* Marketplace Integration Section - SINGLE CLEAN VERSION */}
+          {/* Marketplace Integration Section */}
           {generatedContent && user && (
             <div className="mt-8 space-y-6">
               <div className="border-t border-gray-200 pt-8">

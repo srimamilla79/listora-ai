@@ -28,7 +28,7 @@ function createServiceRoleClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { products, userId } = await request.json()
+    const { products, userId, selectedSections } = await request.json()
 
     if (!products || !Array.isArray(products) || products.length === 0) {
       return NextResponse.json(
@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
         completed_products: 0,
         failed_products: 0,
         products: productsWithIds,
+        selected_sections: selectedSections, // 🚀 ADD THIS LINE
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -87,7 +88,13 @@ export async function POST(request: NextRequest) {
     console.log(`🚀 Starting background processing for job: ${jobId}`)
 
     // Start background processing (don't await - let it run in background)
-    processProductsInBackground(jobId, productsWithIds, userId, supabase)
+    processProductsInBackground(
+      jobId,
+      productsWithIds,
+      userId,
+      selectedSections,
+      supabase
+    )
 
     return NextResponse.json({
       success: true,
@@ -109,6 +116,7 @@ async function processProductsInBackground(
   jobId: string,
   products: BulkProduct[],
   userId: string,
+  selectedSections: any,
   supabase: any
 ) {
   const batchSize = 3 // Process 3 at a time
@@ -126,7 +134,13 @@ async function processProductsInBackground(
       // Process batch in parallel
       await Promise.all(
         batch.map(async (product) => {
-          await processProduct(jobId, product, userId, supabase)
+          await processProduct(
+            jobId,
+            product,
+            userId,
+            selectedSections,
+            supabase
+          )
         })
       )
 
@@ -165,6 +179,7 @@ async function processProduct(
   jobId: string,
   product: BulkProduct,
   userId: string,
+  selectedSections: any,
   supabase: any
 ) {
   try {
@@ -192,6 +207,7 @@ async function processProduct(
           platform: product.platform,
           isBackgroundJob: true,
           userId: userId,
+          selectedSections: selectedSections, // 🚀 ADD THIS LINE
         }),
       }
     )

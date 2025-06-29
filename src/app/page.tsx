@@ -35,6 +35,7 @@ import {
   Volume2,
   Store,
   Package,
+  Languages,
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 import Link from 'next/link'
@@ -46,10 +47,25 @@ export default function HomePage() {
   const [typingIndex, setTypingIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [activePlatform, setActivePlatform] = useState(0)
+  const [activeLanguage, setActiveLanguage] = useState(0)
 
   // Enhanced typing effect
   const sampleContent =
     'Premium Wireless Headphones - Experience crystal-clear audio with our premium wireless headphones featuring noise cancellation, 30-hour battery life, and comfortable over-ear design perfect for music lovers and professionals.'
+
+  // Language examples for showcase
+  const languageExamples = [
+    {
+      flag: '🇪🇸',
+      name: 'Spanish',
+      text: 'Auriculares inalámbricos premium...',
+    },
+    { flag: '🇫🇷', name: 'French', text: 'Casque sans fil premium...' },
+    { flag: '🇩🇪', name: 'German', text: 'Premium kabellose Kopfhörer...' },
+    { flag: '🇮🇳', name: 'Hindi', text: 'प्रीमियम वायरलेस हेडफोन्स...' },
+    { flag: '🇨🇳', name: 'Chinese', text: '高级无线耳机...' },
+    { flag: '🇯🇵', name: 'Japanese', text: 'プレミアムワイヤレスヘッドホン...' },
+  ]
 
   useEffect(() => {
     if (activeFeature === 0 && typingIndex < sampleContent.length) {
@@ -66,26 +82,42 @@ export default function HomePage() {
     const timer = setInterval(() => {
       setActivePlatform((prev) => (prev + 1) % 2)
     }, 4000)
-    return () => clearTimeout(timer)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Auto-rotate language examples
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveLanguage((prev) => (prev + 1) % languageExamples.length)
+    }, 3000)
+    return () => clearInterval(timer)
   }, [])
 
   const features = [
     {
       icon: Mic,
-      title: 'Voice-to-Content Magic',
+      title: '🌍 Multilingual Voice-to-Content Magic (99+ Languages)',
       description:
-        'Simply speak naturally about your product features, and our advanced AI instantly transforms your words into professional, conversion-optimized content.',
+        'Speak naturally in ANY of 99+ languages about your product features, and our advanced AI instantly detects your language, translates if needed, and transforms your words into professional, conversion-optimized content in your target market language.',
       benefit:
-        'Turn 30 seconds of speaking into $500 worth of professional copywriting',
-      stats: '3x faster than traditional writing',
+        'Speak Spanish, get English content - or any language combination. Perfect for global sellers!',
+
       demo: (
         <div className="relative">
           <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 border border-blue-200">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                <Mic className="h-5 w-5 text-white" />
+                <Languages className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span className="text-lg">
+                    {languageExamples[activeLanguage].flag}
+                  </span>
+                  <span className="text-sm font-semibold text-blue-700">
+                    🎯 Detected: {languageExamples[activeLanguage].name}
+                  </span>
+                </div>
                 <div className="flex items-center space-x-1 mb-2">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div
@@ -98,14 +130,22 @@ export default function HomePage() {
                   ))}
                 </div>
                 <p className="text-sm text-blue-700 font-medium">
-                  "Wireless headphones with great sound and long battery..."
+                  "{languageExamples[activeLanguage].text}"
                 </p>
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="text-xs text-gray-600">
+                    🔄 Auto-translating to:
+                  </span>
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                    🇺🇸 English
+                  </span>
+                </div>
               </div>
             </div>
             <div className="bg-white rounded-lg p-4 border border-blue-200">
               <div className="text-xs text-green-600 font-semibold mb-2 flex items-center">
                 <Sparkles className="h-3 w-3 mr-1" />
-                AI Generated Content:
+                🌍 AI Generated English Content:
               </div>
               <div className="text-sm text-gray-800 leading-relaxed">
                 {contentPreview}
@@ -123,7 +163,7 @@ export default function HomePage() {
         'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions. Then automatically optimize for Amazon, Shopify, and other major platforms.',
       benefit:
         'AI sees your product and writes descriptions based on actual visual details',
-      stats: 'OpenAI Vision + 5 platform optimization',
+
       demo: (
         <div className="bg-gradient-to-br from-purple-50 to-pink-100 rounded-xl p-6 border border-purple-200">
           <div className="text-center mb-4">
@@ -199,7 +239,7 @@ export default function HomePage() {
         'Get professional Amazon listing optimization with step-by-step guidance and optimized data, plus direct one-click publishing to Shopify with seamless seller account integration.',
       benefit:
         'From voice input to Amazon-ready listings + live Shopify in under 2 minutes',
-      stats: 'Direct API integration with both platforms',
+
       demo: (
         <div className="bg-gradient-to-br from-orange-50 to-green-100 rounded-xl p-6 border border-orange-200">
           <div className="space-y-4">
@@ -293,7 +333,7 @@ export default function HomePage() {
         'Upload a CSV with hundreds of products and let our servers generate professional content for all of them in the background. Navigate freely while your job keeps running - no waiting around!',
       benefit:
         'Process 500+ products while you sleep - background processing never stops',
-      stats: 'Background jobs + CSV automation',
+
       demo: (
         <div className="bg-gradient-to-br from-indigo-50 to-blue-100 rounded-xl p-6 border border-indigo-200">
           <div className="space-y-4">
@@ -364,7 +404,7 @@ export default function HomePage() {
       description:
         'Powered by cutting-edge artificial intelligence that creates compelling product descriptions, catchy titles, and persuasive marketing copy optimized for both Amazon and Shopify.',
       benefit: 'AI-generated content that outperforms traditional copywriting',
-      stats: '99.2% accuracy rate',
+
       demo: (
         <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 border border-green-200">
           <div className="space-y-3">
@@ -442,7 +482,7 @@ export default function HomePage() {
       description:
         'Your content and images are safely stored with guaranteed 99.9% uptime, automatic backups, and access from anywhere.',
       benefit: 'Never lose your valuable content and images again',
-      stats: '99.9% uptime guarantee',
+
       demo: (
         <div className="bg-gradient-to-br from-cyan-50 to-blue-100 rounded-xl p-6 border border-cyan-200">
           <div className="flex items-center justify-between mb-4">
@@ -619,10 +659,10 @@ export default function HomePage() {
           <div className="text-center mb-16">
             {/* Enhanced Badge */}
             <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-4 py-2 mb-8">
-              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <Languages className="h-4 w-4 text-indigo-600" />
               <span className="text-sm font-medium text-indigo-800">
-                Revolutionary AI platform combining Voice + Vision + Bulk
-                Processing + Direct Publishing
+                🌍 Revolutionary AI platform: Voice (99+ Languages) + Vision +
+                Bulk Processing + Direct Publishing
               </span>
               <Star className="h-4 w-4 text-yellow-500 fill-current" />
             </div>
@@ -630,22 +670,30 @@ export default function HomePage() {
             {/* Enhanced Title */}
             <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-8 leading-tight">
               <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                Complete Content Automation Platform
+                Multilingual Content Automation Platform
+              </span>
+              <br />
+              <span className="text-2xl md:text-3xl lg:text-4xl text-gray-700">
+                🌍 Speak in 99+ Languages → Get Professional Content
               </span>
             </h1>
 
             {/* Enhanced Subtitle */}
             <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
-              The world's first AI that combines voice recognition, OpenAI
-              Vision analysis, bulk CSV processing, and
+              The world's first AI that combines
+              <span className="font-semibold text-blue-600">
+                {' '}
+                multilingual voice recognition (99+ languages)
+              </span>
+              , OpenAI Vision analysis, bulk CSV processing, and
               <span className="font-semibold text-orange-600">
                 {' '}
-                Amazon listing optimization
+                Multi-platform optimization
               </span>{' '}
-              +
+              and
               <span className="font-semibold text-green-600">
                 {' '}
-                Shopify direct publishing
+                direct publishing
               </span>
               . Scale from 1 product to 500+ with background automation.
               <span className="font-semibold text-gray-800">
@@ -654,6 +702,48 @@ export default function HomePage() {
               </span>
             </p>
 
+            {/* Multilingual Language Showcase */}
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 max-w-5xl mx-auto mb-8 border border-white/50 shadow-2xl">
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  🌍 Speak in ANY Language - Get Professional Content
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Our AI automatically detects and processes 99+ languages
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                {languageExamples.map((lang, index) => (
+                  <div
+                    key={lang.name}
+                    className={`text-center p-3 rounded-lg transition-all duration-300 ${
+                      activeLanguage === index
+                        ? 'bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-300 transform scale-105'
+                        : 'bg-gray-50 border border-gray-200 hover:bg-blue-50'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{lang.flag}</div>
+                    <div className="text-xs font-semibold text-gray-700">
+                      {lang.name}
+                    </div>
+                    {activeLanguage === index && (
+                      <div className="text-xs text-blue-600 mt-1 font-medium">
+                        ✓ Active
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 text-center">
+                <p className="text-xs text-gray-500">
+                  + 93 more languages including Arabic, Russian, Korean,
+                  Portuguese, Italian, Dutch, and many others
+                </p>
+              </div>
+            </div>
+
             {/* Platform Showcase */}
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 max-w-6xl mx-auto mb-12 border border-white/50 shadow-2xl">
               <div className="grid md:grid-cols-3 gap-8 items-center">
@@ -661,28 +751,32 @@ export default function HomePage() {
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center animate-pulse">
-                      <Mic className="h-6 w-6 text-white" />
+                      <Languages className="h-6 w-6 text-white" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        You Speak (30 sec)
+                        🌍 You Speak (Any Language)
                       </h3>
                       <p className="text-sm text-gray-600">
-                        Natural conversation about your product
+                        99+ languages automatically detected
                       </p>
                     </div>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <div className="flex items-center space-x-2 mb-2">
-                      <Volume2 className="h-4 w-4 text-gray-500" />
+                      <span className="text-lg">
+                        {languageExamples[activeLanguage].flag}
+                      </span>
                       <span className="text-sm text-gray-500">
-                        Recording...
+                        🎯 {languageExamples[activeLanguage].name} Detected
                       </span>
                     </div>
                     <p className="text-gray-700 italic text-sm">
-                      "These wireless headphones have amazing sound quality,
-                      30-hour battery, perfect for both work and leisure..."
+                      "{languageExamples[activeLanguage].text}"
                     </p>
+                    <div className="mt-2 text-xs text-blue-600">
+                      🔄 Auto-translating to English...
+                    </div>
                   </div>
                 </div>
 
@@ -780,8 +874,8 @@ export default function HomePage() {
                 onClick={handleSignup}
                 className="group bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all transform hover:scale-105 shadow-2xl flex items-center cursor-pointer"
               >
-                <Mic className="mr-2 h-5 w-5 group-hover:animate-pulse" />
-                Start Creating Amazing Content
+                <Languages className="mr-2 h-5 w-5 group-hover:animate-pulse" />
+                Start Creating in ANY Language
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
@@ -795,7 +889,7 @@ export default function HomePage() {
                     <Play className="h-5 w-5 ml-0.5" />
                   )}
                 </div>
-                <span>Watch Demo Video</span>
+                <span>Watch Multilingual Demo</span>
               </button>
             </div>
 
@@ -804,6 +898,10 @@ export default function HomePage() {
               <div className="flex items-center space-x-2">
                 <Check className="h-4 w-4 text-green-500" />
                 <span>Free 14-day trial</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Check className="h-4 w-4 text-green-500" />
+                <span>99+ languages supported</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Check className="h-4 w-4 text-green-500" />
@@ -820,9 +918,9 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
               {
-                number: '2 min',
-                label: 'Voice to Live Products',
-                icon: Timer,
+                number: '99+',
+                label: 'Languages Supported Automatically',
+                icon: Languages,
                 color: 'from-blue-500 to-cyan-500',
               },
               {
@@ -838,8 +936,8 @@ export default function HomePage() {
                 color: 'from-purple-500 to-indigo-500',
               },
               {
-                number: '2 Platforms',
-                label: 'Amazon Optimization + Shopify Direct',
+                number: 'Publishing Power',
+                label: 'Multi-Platform Optimization & Publishing',
                 icon: ShoppingCart,
                 color: 'from-orange-500 to-red-500',
               },
@@ -871,23 +969,23 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
             <div className="inline-flex items-center space-x-2 bg-indigo-50 border border-indigo-200 rounded-full px-4 py-2 mb-6">
-              <Zap className="h-4 w-4 text-indigo-600" />
+              <Languages className="h-4 w-4 text-indigo-600" />
               <span className="text-sm font-medium text-indigo-800">
-                Powerful Features
+                🌍 Multilingual Powerful Features
               </span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
               Everything you need to create
               <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 {' '}
-                content that converts
+                global content that converts
               </span>
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Our revolutionary AI platform combines voice recognition, OpenAI
-              Vision analysis, bulk CSV processing with background jobs, and
-              direct Amazon & Shopify integration to scale your business faster
-              than ever.
+              Our revolutionary AI platform combines multilingual voice
+              recognition (99+ languages), OpenAI Vision analysis, bulk CSV
+              processing with background jobs, and direct Amazon & Shopify
+              integration to scale your business globally faster than ever.
             </p>
           </div>
 
@@ -934,9 +1032,7 @@ export default function HomePage() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <div className="text-sm font-semibold text-indigo-600">
-                              {feature.stats}
-                            </div>
+                            <div className="text-sm font-semibold text-indigo-600"></div>
                           </div>
                         </div>
                       </div>
@@ -983,7 +1079,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Enhanced Pricing Section - TESTIMONIALS SECTION REMOVED */}
+      {/* Enhanced Pricing Section */}
       <section
         id="pricing-section"
         className="py-24 bg-gradient-to-br from-gray-50 to-indigo-50"
@@ -993,20 +1089,21 @@ export default function HomePage() {
             <div className="inline-flex items-center space-x-2 bg-purple-50 border border-purple-200 rounded-full px-4 py-2 mb-6">
               <DollarSign className="h-4 w-4 text-purple-600" />
               <span className="text-sm font-medium text-purple-800">
-                Simple, Transparent Pricing
+                🌍 Simple, Global Pricing
               </span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
               Choose the perfect plan for your
               <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                 {' '}
-                business growth
+                global business growth
               </span>
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Start with our generous free plan and scale as your business
-              grows. All plans include enterprise-grade security and our
-              complete feature set with Amazon & Shopify integration.
+              Start with our generous free plan (includes multilingual support)
+              and scale as your business grows globally. All plans include
+              enterprise-grade security, 99+ language support, and our complete
+              feature set with Amazon & Shopify integration.
             </p>
           </div>
 
@@ -1016,11 +1113,12 @@ export default function HomePage() {
                 name: 'Starter (Free)',
                 price: 'Free',
                 period: 'forever',
-                description: 'Perfect for testing our AI platform',
+                description: 'Perfect for testing our multilingual AI platform',
                 limit: '10 content generations/month',
                 badge: null,
                 topBorderColor: 'bg-gray-300',
                 features: [
+                  '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Manual content generation (text input)',
                   'Voice-to-content generation (up to 1 minute)',
                   'AI Vision analysis (brands, colors, features)',
@@ -1043,12 +1141,14 @@ export default function HomePage() {
                 name: 'Business',
                 price: '$29',
                 period: 'per month',
-                description: 'Scale your content creation with bulk processing',
+                description:
+                  'Scale your multilingual content creation with bulk processing',
                 limit: '250 content generations/month',
                 badge: 'Most Popular',
                 topBorderColor:
                   'bg-gradient-to-r from-indigo-400 to-purple-500',
                 features: [
+                  '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Starter plan',
                   'Bulk CSV upload (up to 50 products)',
                   'Background job processing',
@@ -1057,8 +1157,8 @@ export default function HomePage() {
                   'Priority email support',
                 ],
                 newCapabilities: [
-                  'Bulk workflow automation',
-                  'Background processing',
+                  'Global bulk workflow automation',
+                  'Background processing for any language',
                   'Higher generation limits',
                 ],
                 cta: '🎯 Start Free Trial',
@@ -1071,27 +1171,29 @@ export default function HomePage() {
                 name: 'Premium',
                 price: '$59',
                 period: 'per month',
-                description: 'Professional scale with marketplace integration',
+                description:
+                  'Professional global scale with marketplace integration',
                 limit: '1,000 content generations/month',
                 badge: null,
                 topBorderColor:
                   'bg-gradient-to-r from-green-400 to-emerald-500',
                 features: [
+                  '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Business plan',
                   'Large bulk CSV upload (up to 200 products)',
                   'Amazon optimization & Direct Shopify publishing integration',
-                  'Enhanced voice processing (full 1-minute)',
+                  'Enhanced voice processing (full 1-minute in any language)',
                   'Advanced AI Vision analysis',
                   'Bulk export options (CSV, Excel)',
                 ],
                 differentiators: [
                   'Amazon optimization & Direct Shopify publishing integration',
-                  'Higher bulk limits',
-                  'Enhanced AI features',
+                  'Higher bulk limits for global markets',
+                  'Enhanced multilingual AI features',
                 ],
                 newCapabilities: [
                   'Direct marketplace integration',
-                  'Advanced AI processing',
+                  'Advanced multilingual AI processing',
                   'Large-scale bulk processing',
                 ],
                 cta: '💎 Start Free Trial',
@@ -1104,16 +1206,18 @@ export default function HomePage() {
                 name: 'Enterprise',
                 price: '$99',
                 period: 'per month',
-                description: 'Unlimited scale for enterprise needs',
+                description: 'Unlimited global scale for enterprise needs',
                 limit: 'Unlimited content generations',
                 badge: null,
                 topBorderColor: 'bg-gradient-to-r from-gray-600 to-gray-800',
                 features: [
+                  '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Premium plan',
                   'Enterprise bulk processing (up to 1,000 products)',
-                  'Amazon optimization & Direct Shopify publishing (unlimited)',
+                  'Amazon optimization & Shopify publishing (unlimited)',
                   'Priority support (faster response)',
                   'Large-scale background processing',
+                  'Global marketplace optimization',
                 ],
                 futureFeatures: [
                   'Custom integrations (contact us)',
@@ -1194,7 +1298,13 @@ export default function HomePage() {
                               className="flex items-start space-x-2"
                             >
                               <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                              <span className="text-sm text-gray-700">
+                              <span
+                                className={`text-sm ${
+                                  feature.includes('99+ languages')
+                                    ? 'text-blue-700 font-semibold'
+                                    : 'text-gray-700'
+                                }`}
+                              >
                                 {feature}
                               </span>
                             </li>
@@ -1271,8 +1381,8 @@ export default function HomePage() {
                   {/* Money back guarantee */}
                   <div className="mt-6 text-center text-xs text-gray-500">
                     {plan.name === 'Starter (Free)'
-                      ? '✓ No credit card required • ✓ Forever free'
-                      : '30-Day Money Back Guarantee'}
+                      ? '✓ No credit card required • ✓ Forever free • 🌍 99+ languages'
+                      : '30-Day Money Back Guarantee • 🌍 99+ languages included'}
                   </div>
                 </div>
               </div>
@@ -1280,8 +1390,79 @@ export default function HomePage() {
           </div>
 
           <div className="mt-16 text-center">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 max-w-4xl mx-auto mb-8 border border-blue-200">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                🌍 Global Language Support Included in ALL Plans
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="font-semibold text-blue-700">
+                    European Languages
+                  </div>
+                  <div className="text-gray-600">
+                    🇪🇸 Spanish • 🇫🇷 French
+                    <br />
+                    🇩🇪 German • 🇮🇹 Italian
+                    <br />
+                    🇳🇱 Dutch • 🇵🇹 Portuguese
+                    <br />
+                    🇷🇺 Russian • 🇵🇱 Polish
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-semibold text-blue-700">
+                    Asian Languages
+                  </div>
+                  <div className="text-gray-600">
+                    🇨🇳 Chinese • 🇯🇵 Japanese
+                    <br />
+                    🇰🇷 Korean • 🇮🇳 Hindi
+                    <br />
+                    🇮🇳 Tamil • 🇮🇳 Bengali
+                    <br />
+                    🇹🇭 Thai • 🇻🇳 Vietnamese
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-semibold text-blue-700">
+                    Middle Eastern
+                  </div>
+                  <div className="text-gray-600">
+                    🇸🇦 Arabic • 🇮🇷 Persian
+                    <br />
+                    🇹🇷 Turkish • 🇮🇱 Hebrew
+                    <br />
+                    🇵🇰 Urdu • 🇦🇫 Pashto
+                    <br />
+                    🇮🇶 Kurdish • + more
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="font-semibold text-blue-700">
+                    African & Others
+                  </div>
+                  <div className="text-gray-600">
+                    🇿🇦 Afrikaans • 🇳🇬 Yoruba
+                    <br />
+                    🇪🇹 Amharic • 🇰🇪 Swahili
+                    <br />
+                    🇫🇮 Finnish • 🇸🇪 Swedish
+                    <br />
+                    🇳🇴 Norwegian • + 70 more
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 text-center">
+                <p className="text-sm text-gray-600">
+                  <strong>Auto-Detection:</strong> Just speak naturally - our AI
+                  automatically detects your language and processes accordingly
+                </p>
+              </div>
+            </div>
+
             <p className="text-gray-600 mb-6">
-              Need a custom solution for your enterprise?
+              Need a custom solution for your enterprise or additional language
+              support?
             </p>
             <button
               onClick={handleContact}
@@ -1302,13 +1483,13 @@ export default function HomePage() {
 
         <div className="relative max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Ready to 10X your content creation speed?
+            Ready to 10X your global content creation speed?
           </h2>
           <p className="text-xl text-indigo-100 mb-12 max-w-3xl mx-auto">
-            Ready to 10X your content creation speed? Experience the power of
-            voice-driven content creation with Amazon optimization & direct
-            Shopify publishing. Start your free trial today and transform your
-            business forever.
+            Experience the power of multilingual voice-driven content creation
+            with Amazon optimization & direct Shopify publishing. Speak in ANY
+            of 99+ languages and get professional content for global markets.
+            Start your free trial today and transform your business forever.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
@@ -1316,8 +1497,8 @@ export default function HomePage() {
               onClick={handleSignup}
               className="group bg-white hover:bg-gray-100 text-indigo-600 px-8 py-4 rounded-xl text-lg font-bold transition-all transform hover:scale-105 shadow-2xl flex items-center cursor-pointer"
             >
-              <Mic className="mr-2 h-5 w-5 group-hover:animate-pulse" />
-              Start Your Free Trial
+              <Languages className="mr-2 h-5 w-5 group-hover:animate-pulse" />
+              Start Your Free Multilingual Trial
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
@@ -1333,6 +1514,10 @@ export default function HomePage() {
             <div className="flex items-center space-x-2">
               <Check className="h-5 w-5 text-green-400" />
               <span>No credit card required</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Check className="h-5 w-5 text-green-400" />
+              <span>99+ languages supported</span>
             </div>
             <div className="flex items-center space-x-2">
               <Check className="h-5 w-5 text-green-400" />
@@ -1356,9 +1541,10 @@ export default function HomePage() {
                 <span className="text-xl font-bold">Listora AI</span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
-                Revolutionizing product marketing with advanced AI technology.
-                Transform your voice into professional content and optimize
-                images for various e-commerce platforms.
+                Revolutionizing global product marketing with advanced
+                multilingual AI technology. Transform your voice in 99+
+                languages into professional content and optimize images for
+                various e-commerce platforms worldwide.
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
@@ -1381,7 +1567,7 @@ export default function HomePage() {
                     onClick={() => scrollToSection('features-section')}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
-                    Features
+                    Multilingual Features
                   </button>
                 </li>
                 <li>
@@ -1389,11 +1575,11 @@ export default function HomePage() {
                     onClick={() => scrollToSection('pricing-section')}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
-                    Pricing
+                    Global Pricing
                   </button>
                 </li>
                 <li>
-                  <span className="text-gray-500">API Documentation</span>
+                  <span className="text-gray-500">99+ Languages Support</span>
                 </li>
                 <li>
                   <span className="text-gray-500">Platform Integrations</span>
@@ -1474,7 +1660,7 @@ export default function HomePage() {
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
             <p>
               &copy; 2025 Listora AI. All rights reserved. Built with ❤️ for
-              entrepreneurs worldwide.
+              global entrepreneurs worldwide. 🌍 Supporting 99+ languages.
             </p>
           </div>
         </div>

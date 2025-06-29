@@ -8,8 +8,8 @@ const openai = new OpenAI({
 })
 
 export async function POST(req: NextRequest) {
+  const apiStart = Date.now()
   console.log('=== IMAGE ANALYSIS API START ===')
-
   try {
     // Authentication (same pattern as generate route)
     const cookieStore = await cookies()
@@ -86,14 +86,15 @@ export async function POST(req: NextRequest) {
     console.log('1. Authenticated user:', authenticatedUser.id)
 
     // Get request data
+    const reqParseStart = Date.now()
     const { imageData, imageCount, hasProcessedImages, productName } =
       await req.json()
-
     console.log('2. Request data:', {
       imageCount,
       hasProcessedImages,
       productName: productName || 'not provided',
       hasImageData: !!imageData,
+      parseMs: Date.now() - reqParseStart,
     })
 
     if (!imageData) {
@@ -116,16 +117,38 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('3. Starting OpenAI vision analysis...')
+    const visionStart = Date.now()
+    // Add a timeout for the OpenAI call (14s)
+    function withTimeout(promise: Promise<any>, ms: number) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('OpenAI vision timed out')),
+          ms
+        )
+        promise
+          .then((val) => {
+            clearTimeout(timer)
+            resolve(val)
+          })
+          .catch((err) => {
+            clearTimeout(timer)
+            reject(err)
+          })
+      })
+    }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
+    let completion
+    try {
+      completion = await withTimeout(
+        openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
             {
-              type: 'text',
-              text: `Analyze this product image for e-commerce content generation. Describe:
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `Analyze this product image for e-commerce content generation. Describe:
               
 1. VISUAL FEATURES: Colors, materials, design elements, style
 2. BRAND IDENTIFICATION: Read any visible brand names, logos, model numbers, or text on the product - be specific about what text you can see
@@ -137,25 +160,51 @@ export async function POST(req: NextRequest) {
 IMPORTANT: Please identify any visible brand names, logos, or text on the product. If you can see brand markings like Nike swoosh, Apple logo, Samsung text, etc., please mention them specifically as they are important for accurate product descriptions.
 
 Keep response focused and under 250 words. This will be used to enhance product descriptions.${
-                productName ? ` Product name: "${productName}"` : ''
-              }`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: imageData,
-              },
+                    productName ? ` Product name: "${productName}"` : ''
+                  }`,
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: imageData,
+                  },
+                },
+              ],
             },
           ],
+          max_tokens: 300,
+          temperature: 0.7,
+        }),
+        14000
+      )
+    } catch (openaiError) {
+      console.error('4. OpenAI Vision API timed out or failed:', openaiError)
+      // Fallback response if OpenAI is too slow or errors
+      return NextResponse.json({
+        analysis: `${imageCount} high-quality product image${imageCount > 1 ? 's' : ''} available${
+          hasProcessedImages ? ' with professional background removal' : ''
+        }. Images showcase key product features and visual appeal for enhanced product presentations.`,
+        fallback: true,
+        reason:
+          openaiError instanceof Error
+            ? openaiError.message
+            : 'OpenAI Vision failed',
+        metadata: {
+          imageCount,
+          hasProcessedImages,
+          visionMs: Date.now() - visionStart,
+          totalMs: Date.now() - apiStart,
+          timestamp: new Date().toISOString(),
         },
-      ],
-      max_tokens: 300,
-      temperature: 0.7,
-    })
+      })
+    }
 
     const visionAnalysis =
       completion.choices[0]?.message?.content || 'Visual analysis unavailable'
-    console.log('4. Vision analysis completed successfully')
+    console.log('4. Vision analysis completed successfully', {
+      visionMs: Date.now() - visionStart,
+      totalMs: Date.now() - apiStart,
+    })
 
     // Enhanced analysis combining vision with metadata
     const enhancedAnalysis = `${visionAnalysis}
@@ -174,6 +223,8 @@ TECHNICAL SPECS: ${imageCount} high-quality product image${imageCount > 1 ? 's' 
       metadata: {
         imageCount,
         hasProcessedImages,
+        visionMs: Date.now() - visionStart,
+        totalMs: Date.now() - apiStart,
         timestamp: new Date().toISOString(),
       },
       fallback: false,

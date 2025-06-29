@@ -356,6 +356,7 @@ export default function EnhancedGeneratePage() {
                 onGenerationSuccess={handleGenerationSuccess}
                 currentUsage={currentUsage}
                 monthlyLimit={monthlyLimit}
+                user={user}
               />
             </div>
           </div>

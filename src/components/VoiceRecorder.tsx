@@ -1,56 +1,61 @@
-// src/components/VoiceRecorder.tsx - Mobile Optimized
+// src/components/VoiceRecorder.tsx - Fixed Audio Constraints
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import {
-  Mic,
-  MicOff,
-  Square,
-  Play,
-  Pause,
-  Volume2,
-  Upload,
-  Wand2,
-} from 'lucide-react'
-import { createClient } from '@/lib/supabase'
+import { Mic, Square, Play, Pause, RotateCcw, Loader2 } from 'lucide-react'
 
-interface VoiceRecorderProps {
-  onContentGenerated?: (content: any) => void
-  onTranscriptionComplete?: (transcription: string) => void
+interface VoiceResult {
+  transcription: string
+  detectedLanguage?: string
+  targetLanguage?: string
+  wasTranslated?: boolean
+  confidence?: number
+  productName?: string
+  generatedContent?: string
 }
 
-export default function VoiceRecorder({
+interface MultilingualVoiceRecorderProps {
+  onContentGenerated: (result: VoiceResult) => void
+  onTranscriptionComplete?: (transcription: string) => void
+  supabase?: any // Add supabase as a prop
+  sessionToken?: string // Add session token as alternative
+  contentType?: string // <-- RESTORED: allow contentType prop
+  onReRecord?: () => void // Optional callback for re-recording
+  showReRecordButton?: boolean // Show re-record button instead of reset
+  onProcessingChange?: (isProcessing: boolean) => void // Notifies parent when processing starts/ends
+}
+
+export default function MultilingualVoiceRecorder({
   onContentGenerated,
   onTranscriptionComplete,
-}: VoiceRecorderProps) {
+  supabase,
+  sessionToken,
+  contentType = 'product', // <-- default to product if not provided
+  onReRecord,
+  showReRecordButton = false,
+  onProcessingChange,
+}: MultilingualVoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
+  const isProcessingRef = useRef(false)
   const [transcription, setTranscription] = useState('')
-  const [generatedContent, setGeneratedContent] = useState('')
-  const [error, setError] = useState('')
-  const [contentType, setContentType] = useState('product')
-
-  // ✅ SSR-safe Supabase state management
-  const [supabase, setSupabase] = useState<any>(null)
-  const [mounted, setMounted] = useState(false)
+  const [detectionResult, setDetectionResult] = useState<{
+    language: string
+    confidence: number
+    wasTranslated: boolean
+  } | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
 
-  // ✅ Initialize Supabase client after component mounts
-  useEffect(() => {
-    setMounted(true)
-    const supabaseClient = createClient()
-    setSupabase(supabaseClient)
-  }, [])
-
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
@@ -59,160 +64,249 @@ export default function VoiceRecorder({
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl)
       }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+      }
     }
   }, [audioUrl])
 
-  // 📱 MOBILE-OPTIMIZED: Enhanced startRecording function
-  const startRecording = async () => {
-    try {
-      setError('')
-      console.log('📱 Starting mobile-optimized recording...')
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
 
-      // Mobile-optimized audio constraints
-      const constraints = {
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // Mobile-friendly settings
-          sampleRate: { ideal: 22050, min: 16000, max: 44100 },
-          channelCount: 1,
-        },
+  const startRecording = async () => {
+    // Always reset all state before starting a new recording
+    resetRecording()
+    try {
+      console.log('📱 Starting multilingual recording...')
+
+      // Check for HTTPS requirement
+      if (
+        location.protocol !== 'https:' &&
+        location.hostname !== 'localhost' &&
+        location.hostname !== '127.0.0.1'
+      ) {
+        throw new Error(
+          'Microphone access requires HTTPS. Please use a secure connection.'
+        )
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      // Check browser support
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error(
+          'Your browser does not support microphone access. Please use a modern browser.'
+        )
+      }
 
-      // Enhanced mobile browser compatibility for MediaRecorder
-      const mimeTypes = [
-        'audio/webm;codecs=opus', // Android Chrome, newer browsers
-        'audio/mp4', // Safari, iOS
-        'audio/webm', // Fallback Chrome
-        'audio/ogg;codecs=opus', // Firefox
-        'audio/wav', // Legacy fallback
-        'audio/mpeg', // Another fallback
-      ]
-
-      let mimeType = 'audio/webm' // Default
-      let supportedType = ''
-
-      // Find the first supported MIME type
-      for (const type of mimeTypes) {
-        if (MediaRecorder.isTypeSupported(type)) {
-          mimeType = type
-          supportedType = type
-          break
+      // 🔧 FIX: Use progressive audio constraints - start simple, add features if supported
+      const tryGetUserMedia = async (constraints: MediaStreamConstraints) => {
+        try {
+          return await navigator.mediaDevices.getUserMedia(constraints)
+        } catch (error) {
+          console.log('⚠️ Constraint failed, trying simpler version...', error)
+          throw error
         }
       }
 
-      console.log('📱 Using MIME type:', supportedType || 'default fallback')
+      let stream: MediaStream | null = null
 
-      // Mobile-optimized MediaRecorder options
-      const recorderOptions = {
-        mimeType: supportedType || undefined,
-        audioBitsPerSecond: 64000, // Good quality but not too heavy for mobile
+      // Try progressively simpler constraints
+      const constraintOptions = [
+        // Ideal constraints with audio enhancements
+        {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 44100,
+            channelCount: 1,
+          },
+        },
+        // Good quality but flexible
+        {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        },
+        // Basic quality with minimal constraints
+        {
+          audio: {
+            echoCancellation: true,
+          },
+        },
+        // Minimal - just audio
+        {
+          audio: true,
+        },
+      ]
+
+      for (const constraints of constraintOptions) {
+        try {
+          console.log('🎤 Trying audio constraints:', constraints)
+          stream = await tryGetUserMedia(constraints)
+          console.log('✅ Audio constraints successful:', constraints)
+          break
+        } catch (error) {
+          console.log('❌ Constraints failed, trying next option...')
+          continue
+        }
       }
 
-      // Only include mimeType if it's supported to avoid errors
-      const mediaRecorder = supportedType
-        ? new MediaRecorder(stream, recorderOptions)
-        : new MediaRecorder(stream, { audioBitsPerSecond: 64000 })
+      if (!stream) {
+        throw new Error(
+          'Unable to access microphone with any configuration. Please check your microphone settings.'
+        )
+      }
+
+      streamRef.current = stream
+
+      // 🔧 FIX: Use progressive MediaRecorder options
+      let mediaRecorder: MediaRecorder | null = null
+      const mimeTypeOptions = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+        'audio/wav',
+      ]
+
+      for (const mimeType of mimeTypeOptions) {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          try {
+            console.log('🎵 Trying MIME type:', mimeType)
+            mediaRecorder = new MediaRecorder(stream, {
+              mimeType,
+              audioBitsPerSecond: 64000,
+            })
+            console.log('✅ MediaRecorder created with:', mimeType)
+            break
+          } catch (error) {
+            console.log('❌ MediaRecorder failed for:', mimeType)
+            continue
+          }
+        }
+      }
+
+      // Fallback: try without bitrate specification
+      if (!mediaRecorder) {
+        for (const mimeType of mimeTypeOptions) {
+          if (MediaRecorder.isTypeSupported(mimeType)) {
+            try {
+              console.log('🎵 Trying MIME type without bitrate:', mimeType)
+              mediaRecorder = new MediaRecorder(stream, { mimeType })
+              console.log('✅ MediaRecorder created (no bitrate):', mimeType)
+              break
+            } catch (error) {
+              continue
+            }
+          }
+        }
+      }
+
+      // Final fallback: basic MediaRecorder
+      if (!mediaRecorder) {
+        console.log('🎵 Using basic MediaRecorder...')
+        mediaRecorder = new MediaRecorder(stream)
+      }
+
+      if (!mediaRecorder) {
+        throw new Error(
+          'Unable to create MediaRecorder. Your browser may not support audio recording.'
+        )
+      }
 
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
 
+      // Always set up event handlers for the new mediaRecorder instance
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data)
-          console.log('📱 Audio chunk received:', event.data.size, 'bytes')
         }
       }
 
       mediaRecorder.onstop = () => {
-        console.log('📱 Recording stopped, processing audio...')
-
-        const finalMimeType = supportedType || mimeType
-        const blob = new Blob(chunksRef.current, { type: finalMimeType })
-
-        console.log('📱 Final audio blob:', {
-          size: blob.size,
-          type: blob.type,
-          chunks: chunksRef.current.length,
+        const blob = new Blob(chunksRef.current, {
+          type: mediaRecorder?.mimeType || 'audio/webm',
         })
-
         setAudioBlob(blob)
         const url = URL.createObjectURL(blob)
         setAudioUrl(url)
 
-        // Stop all tracks to free up the microphone
-        stream.getTracks().forEach((track) => {
-          track.stop()
-          console.log('📱 Audio track stopped')
-        })
+        // Clean up stream
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop())
+          streamRef.current = null
+        }
+
+        // Always process voice after recording stops
+        if (blob) {
+          processVoiceToContent(blob)
+        }
       }
 
       mediaRecorder.onerror = (event) => {
         console.error('📱 MediaRecorder error:', event)
-        setError('Recording error occurred. Please try again.')
+        throw new Error('Recording failed. Please try again.')
       }
 
-      // Start recording with mobile-optimized timeslice
-      mediaRecorder.start(1000) // 1 second chunks for better mobile performance
+      // Start recording
+      mediaRecorder.start(500) // Capture data every 500ms
       setIsRecording(true)
       setRecordingTime(0)
 
-      console.log('📱 Recording started successfully')
-
-      // Mobile-optimized timer with auto-stop
+      // Start timer
       intervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          const newTime = prev + 1
-          // Auto-stop after 2 minutes to prevent mobile issues
-          if (newTime >= 120) {
-            console.log('📱 Auto-stopping recording at 2 minutes')
-            stopRecording()
-          }
-          return newTime
-        })
+        setRecordingTime((prev) => prev + 1)
       }, 1000)
-    } catch (error) {
-      console.error('📱 Mobile recording error:', error)
 
-      let errorMessage = 'Failed to access microphone.'
+      console.log('✅ Recording started successfully')
+    } catch (error) {
+      console.error('📱 Recording error:', error)
+
+      // Clean up on error
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+
+      setIsRecording(false)
+
+      // User-friendly error messages
+      let errorMessage =
+        'Failed to access microphone. Please check permissions.'
 
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError') {
           errorMessage =
-            'Microphone access denied. Please enable microphone permissions in your browser settings.'
+            'Microphone access denied. Please allow microphone permissions and try again.'
         } else if (error.name === 'NotFoundError') {
           errorMessage =
-            'No microphone found. Please ensure your device has a working microphone.'
-        } else if (error.name === 'NotSupportedError') {
-          errorMessage = 'Audio recording not supported on this device/browser.'
+            'No microphone found. Please connect a microphone and try again.'
+        } else if (error.name === 'NotReadableError') {
+          errorMessage =
+            'Microphone is busy. Please close other apps using the microphone and try again.'
         } else if (error.name === 'OverconstrainedError') {
           errorMessage =
-            'Microphone constraints not supported. Trying with basic settings...'
-
-          // Fallback: Try with minimal constraints
-          try {
-            console.log(
-              '📱 Trying fallback recording with minimal constraints...'
-            )
-            const fallbackStream = await navigator.mediaDevices.getUserMedia({
-              audio: true, // Minimal constraint
-            })
-
-            const fallbackRecorder = new MediaRecorder(fallbackStream)
-            // Continue with fallback recorder setup...
-            console.log('📱 Fallback recording setup successful')
-          } catch (fallbackError) {
-            console.error('📱 Fallback recording also failed:', fallbackError)
-            errorMessage =
-              'Unable to start recording on this device. Please try on a different device or browser.'
-          }
+            'Microphone configuration issue. Please try again or use a different microphone.'
+        } else if (error.name === 'NotSupportedError') {
+          errorMessage =
+            'Your browser does not support audio recording. Please try a different browser.'
+        } else if (error.message) {
+          errorMessage = error.message
         }
       }
 
-      setError(errorMessage)
+      alert(errorMessage)
     }
   }
 
@@ -239,50 +333,103 @@ export default function VoiceRecorder({
     if (audioRef.current) {
       audioRef.current.pause()
       setIsPlaying(false)
-      setIsPaused(true)
     }
   }
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+  const resetRecording = () => {
+    // Clear all audio state
+    setAudioBlob(null)
+    setAudioUrl(null)
+    setRecordingTime(0)
+    setIsPlaying(false)
+    setTranscription('')
+    setDetectionResult(null)
+    setIsProcessing(false) // 🔧 FIX: Reset processing state
+    isProcessingRef.current = false
+
+    // Clear media recorder ref to avoid stale event handlers
+    mediaRecorderRef.current = null
+
+    // Also clear any pending timeouts or intervals
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+
+    // Clean up audio element
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
+
+    // Clean up stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+
+    // Clear any pending chunks
+    if (chunksRef.current) {
+      chunksRef.current = []
+    }
   }
 
-  const processVoiceToContent = async () => {
-    if (!audioBlob) {
-      setError('No audio recorded')
-      return
-    }
-
-    if (!supabase) {
-      setError('Please wait for the component to load')
-      return
-    }
+  const processVoiceToContent = async (blobArg?: Blob) => {
+    const blobToProcess = blobArg || audioBlob
+    if (!blobToProcess) return
 
     setIsProcessing(true)
-    setError('')
+    isProcessingRef.current = true
+    if (onProcessingChange) onProcessingChange(true)
+    // Optional: Timeout for auto-cancel (e.g., 45s)
+    let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
+      setIsProcessing(false)
+      isProcessingRef.current = false
+      if (onProcessingChange) onProcessingChange(false)
+      alert('Voice processing timed out. Please try again.')
+    }, 45000)
 
+    const startTime = Date.now()
     try {
-      // Get session for authorization
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const formData = new FormData()
+      formData.append('audio', blobToProcess, 'recording.webm')
+      if (contentType) {
+        formData.append('contentType', contentType)
+      }
+      let headers: HeadersInit = {}
 
-      if (!session?.access_token) {
-        setError('Please log in to use voice features')
+      if (supabase) {
+        let session, accessToken
+        try {
+          const sessionResult = await supabase.auth.getSession()
+          session = sessionResult?.data?.session
+          accessToken = session?.access_token
+        } catch (authError) {
+          console.log('⚠️ Auth error:', authError)
+        }
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`
+          console.log('✅ Auth token added to voice request')
+        } else {
+          alert(
+            'Authentication failed. Please log in again or refresh the page.'
+          )
+          setIsProcessing(false)
+          isProcessingRef.current = false
+          return
+        }
+      } else {
+        console.log('⚠️ No supabase instance provided to voice recorder')
+        alert('Internal error: Supabase client not available.')
+        setIsProcessing(false)
+        isProcessingRef.current = false
         return
       }
 
-      const formData = new FormData()
-      formData.append('audio', audioBlob, 'recording.webm')
-      formData.append('contentType', contentType)
-
-      const response = await fetch('/api/voice-to-content', {
+      const response = await fetch('/api/voice-to-form', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers,
+        credentials: 'include',
         body: formData,
       })
 
@@ -292,80 +439,75 @@ export default function VoiceRecorder({
       }
 
       const result = await response.json()
+      const processingTime = Math.round((Date.now() - startTime) / 1000)
 
-      setTranscription(result.transcription)
-      setGeneratedContent(result.generatedContent)
+      // Handle multilingual results
+      if (result.detectedLanguage) {
+        setDetectionResult({
+          language: result.detectedLanguage,
+          confidence: result.confidence || 0.9,
+          wasTranslated: result.wasTranslated || false,
+        })
+      }
 
-      // Call parent callbacks
-      onTranscriptionComplete?.(result.transcription)
-      onContentGenerated?.(result)
+      if (result.transcription) {
+        setTranscription(result.transcription)
+        if (onTranscriptionComplete) {
+          onTranscriptionComplete(result.transcription)
+        }
+      }
+
+      // Call the callback with all results
+      onContentGenerated({
+        transcription: result.transcription,
+        detectedLanguage: result.detectedLanguage,
+        targetLanguage: result.targetLanguage,
+        wasTranslated: result.wasTranslated,
+        confidence: result.confidence,
+        productName: result.productName,
+        generatedContent: result.generatedContent,
+      })
+
+      console.log(`✅ Voice processed in ${processingTime}s`)
     } catch (error) {
-      console.error('Error processing voice:', error)
-      setError(
-        error instanceof Error ? error.message : 'Failed to process voice'
-      )
+      console.error('❌ Voice processing error:', error)
+
+      let errorMessage = 'Failed to process voice'
+
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage =
+            'Voice processing timed out (45s). Please try a shorter recording or check your internet connection.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+
+      alert(`Voice processing failed: ${errorMessage}`)
     } finally {
       setIsProcessing(false)
+      isProcessingRef.current = false
+      if (onProcessingChange) onProcessingChange(false)
+      if (timeoutId) clearTimeout(timeoutId)
     }
   }
 
-  const resetRecorder = () => {
-    setAudioBlob(null)
-    setAudioUrl(null)
-    setRecordingTime(0)
-    setIsPlaying(false)
-    setIsPaused(false)
-    setTranscription('')
-    setGeneratedContent('')
-    setError('')
-    chunksRef.current = []
-  }
-
-  // ✅ Wait for SSR safety before rendering
-  if (!mounted || !supabase) {
-    return (
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-2xl mx-auto">
-        <div className="flex items-center justify-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg">
-            <Mic className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-gray-900">
-              Voice to Content
-            </h3>
-            <p className="text-gray-600">
-              Speak your product details, get professional content
-            </p>
-          </div>
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            🎤 Multilingual Voice Recorder
+          </h3>
+          <p className="text-sm text-gray-600">
+            Record in any language - we'll detect and process it automatically
+          </p>
         </div>
 
-        <select
-          value={contentType}
-          onChange={(e) => setContentType(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-h-[48px]"
-          style={{ touchAction: 'manipulation' }}
-        >
-          <option value="product">Product Content</option>
-          <option value="service">Service Content</option>
-          <option value="listing">Marketplace Listing</option>
-        </select>
-      </div>
-
-      {/* Recording Controls */}
-      <div className="flex flex-col items-center space-y-4">
         {/* Recording Status */}
         {isRecording && (
-          <div className="flex items-center space-x-2 text-red-600">
+          <div className="flex items-center justify-center space-x-2 text-red-600 bg-red-50 rounded-lg p-4">
             <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
             <span className="font-medium">
               Recording: {formatTime(recordingTime)}
@@ -373,17 +515,51 @@ export default function VoiceRecorder({
           </div>
         )}
 
-        {/* 📱 MOBILE-OPTIMIZED: Main Controls */}
-        <div className="flex items-center space-x-4">
+        {/* Language Detection Results */}
+        {detectionResult && (
+          <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-4 border border-blue-200">
+            <h4 className="font-semibold text-gray-900 mb-2">
+              🌍 Language Detection Results
+            </h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center space-x-2">
+                <span className="font-medium">🎯 Detected:</span>
+                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  {detectionResult.language.toUpperCase()}
+                </span>
+                <span className="text-gray-600">
+                  ({Math.round(detectionResult.confidence * 100)}% confidence)
+                </span>
+              </div>
+              {detectionResult.wasTranslated && (
+                <div className="flex items-center space-x-2">
+                  <span className="font-medium">🔄 Status:</span>
+                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                    Translated to English
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Transcription Display */}
+        {transcription && (
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h4 className="font-semibold text-gray-900 mb-2">
+              📝 Transcription
+            </h4>
+            <p className="text-gray-700 italic">"{transcription}"</p>
+          </div>
+        )}
+
+        {/* Main Controls */}
+        <div className="flex justify-center items-center space-x-4">
           {!isRecording ? (
             <button
               onClick={startRecording}
-              className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 active:from-red-700 active:to-red-800 text-white px-6 py-3 rounded-full transition-all transform active:scale-95 shadow-lg text-base font-medium min-h-[48px] min-w-[160px] justify-center"
-              style={{
-                minHeight: '48px',
-                minWidth: '160px',
-                touchAction: 'manipulation', // Prevents zoom on double-tap
-              }}
+              disabled={isProcessing}
+              className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg font-medium"
             >
               <Mic className="h-5 w-5" />
               <span>Start Recording</span>
@@ -391,127 +567,73 @@ export default function VoiceRecorder({
           ) : (
             <button
               onClick={stopRecording}
-              className="flex items-center space-x-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 active:from-gray-800 active:to-gray-900 text-white px-6 py-3 rounded-full transition-all transform active:scale-95 shadow-lg text-base font-medium min-h-[48px] min-w-[160px] justify-center"
-              style={{
-                minHeight: '48px',
-                minWidth: '160px',
-                touchAction: 'manipulation',
-              }}
+              disabled={isProcessing}
+              className="flex items-center space-x-2 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-6 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg font-medium"
             >
               <Square className="h-5 w-5" />
               <span>Stop Recording</span>
             </button>
           )}
 
-          {/* Reset Button - Mobile Optimized */}
-          {(audioBlob || transcription) && (
-            <button
-              onClick={resetRecorder}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded-lg transition-colors min-h-[48px]"
-              style={{ touchAction: 'manipulation' }}
-            >
-              Reset
-            </button>
+          {audioBlob && !isRecording && (
+            <>
+              <button
+                onClick={isPlaying ? pauseAudio : playAudio}
+                disabled={isProcessing}
+                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                {isPlaying ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                <span>{isPlaying ? 'Pause' : 'Play'}</span>
+              </button>
+
+              {showReRecordButton ? (
+                <button
+                  onClick={() => {
+                    resetRecording()
+                    if (onReRecord) onReRecord()
+                  }}
+                  disabled={isProcessing}
+                  className="flex items-center space-x-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Re-record</span>
+                </button>
+              ) : (
+                <button
+                  onClick={resetRecording}
+                  disabled={isProcessing}
+                  className="flex items-center space-x-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Reset</span>
+                </button>
+              )}
+            </>
           )}
         </div>
 
-        {/* 📱 MOBILE-OPTIMIZED: Audio Playback Controls */}
-        {audioUrl && (
-          <div className="flex items-center space-x-4 bg-gray-50 rounded-lg p-4 w-full">
-            <button
-              onClick={isPlaying ? pauseAudio : playAudio}
-              className="p-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-full transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-              style={{ touchAction: 'manipulation' }}
-            >
-              {isPlaying ? (
-                <Pause className="h-4 w-4" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-            </button>
+        {/* Process Button - removed, voice is processed automatically after stop */}
+        {/* No manual process button, UX is now automatic */}
 
-            <div className="flex-1 flex items-center space-x-2">
-              <Volume2 className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                Recording: {formatTime(recordingTime)}
-              </span>
-            </div>
-
-            <button
-              onClick={processVoiceToContent}
-              disabled={isProcessing}
-              className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 active:from-indigo-800 active:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 text-white px-4 py-2 rounded-lg transition-all transform active:scale-95 shadow-lg disabled:transform-none disabled:shadow-none min-h-[44px]"
-              style={{ touchAction: 'manipulation' }}
-            >
-              <Wand2
-                className={`h-4 w-4 ${isProcessing ? 'animate-spin' : ''}`}
-              />
-              <span>{isProcessing ? 'Processing...' : 'Generate Content'}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Hidden Audio Element */}
+        {/* Audio Element */}
         {audioUrl && (
           <audio
             ref={audioRef}
             src={audioUrl}
             onEnded={() => setIsPlaying(false)}
-            onPause={() => setIsPlaying(false)}
-            onPlay={() => setIsPlaying(true)}
             className="hidden"
           />
         )}
-      </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600 font-medium">{error}</p>
+        {/* Help Text */}
+        <div className="text-center text-sm text-gray-500 space-y-1">
+          <p>💡 Tip: Speak clearly about your product in any language</p>
+          <p>🌍 Supports 99+ languages with automatic detection</p>
         </div>
-      )}
-
-      {/* Transcription Display */}
-      {transcription && (
-        <div className="mt-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">
-            Transcription:
-          </h4>
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-900">{transcription}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Generated Content Display */}
-      {generatedContent && (
-        <div className="mt-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">
-            Generated Content:
-          </h4>
-          <div className="p-4 bg-green-50 border border-green-200 rounded-lg max-h-96 overflow-y-auto">
-            <pre className="text-green-900 whitespace-pre-wrap font-sans">
-              {generatedContent}
-            </pre>
-          </div>
-        </div>
-      )}
-
-      {/* 📱 MOBILE-OPTIMIZED: Usage Tips */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-        <h5 className="font-semibold text-gray-900 mb-2">
-          💡 Tips for better results:
-        </h5>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Speak clearly and at a normal pace</li>
-          <li>• Mention key product features, benefits, and target audience</li>
-          <li>• Include pricing, dimensions, or technical specifications</li>
-          <li>• Describe the problem your product solves</li>
-          <li>• Mention target platforms (Amazon, eBay, Shopify, etc.)</li>
-          <li className="text-blue-600 font-medium">
-            📱 For mobile: Ensure microphone permissions are enabled
-          </li>
-        </ul>
       </div>
     </div>
   )

@@ -398,9 +398,9 @@ This is a demo request - please follow up soon to schedule a personalized demons
                 {[
                   {
                     icon: Play,
-                    title: 'Live Voice-to-Content',
+                    title: 'Multilingual Voice-to-Content',
                     description:
-                      'Speak about your product and watch AI create professional copy instantly',
+                      'Speak in any of 99+ languages and watch AI create professional copy instantly',
                     color: 'from-red-500 to-red-600',
                   },
                   {
@@ -412,9 +412,9 @@ This is a demo request - please follow up soon to schedule a personalized demons
                   },
                   {
                     icon: Target,
-                    title: 'Platform Optimization',
+                    title: 'Marketplace Optimization',
                     description:
-                      'See content optimized for Amazon listings and published directly to Shopify',
+                      'Professional optimization and direct publishing across major e-commerce platforms',
                     color: 'from-orange-500 to-green-600',
                   },
                   {

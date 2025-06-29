@@ -1,4 +1,4 @@
-// src/components/MarketplaceConnections.tsx - Updated with eBay/Etsy Coming Soon
+// src/components/MarketplaceConnections.tsx - eBay Enabled
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -54,8 +54,6 @@ export default function MarketplaceConnections({
     {
       platform: 'ebay',
       connected: false,
-      disabled: true,
-      comingSoon: true,
     },
     {
       platform: 'etsy',
@@ -148,6 +146,27 @@ export default function MarketplaceConnections({
         )
       }
 
+      // ✅ NEW: Query eBay connections
+      console.log('🔍 MarketplaceConnections: Querying eBay connections...')
+      const { data: ebayConnections, error: ebayError } = await supabase
+        .from('ebay_connections')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('status', 'active')
+
+      if (ebayError) {
+        console.error(
+          '❌ MarketplaceConnections: eBay connection error:',
+          ebayError
+        )
+      } else {
+        console.log(
+          '✅ MarketplaceConnections: eBay query successful, found:',
+          ebayConnections?.length || 0,
+          'connections'
+        )
+      }
+
       clearTimeout(timeoutId)
 
       // Filter valid connections
@@ -161,6 +180,12 @@ export default function MarketplaceConnections({
           ? shopifyConnections[0]
           : null
 
+      // ✅ NEW: Filter valid eBay connections
+      const validEbayConnection =
+        ebayConnections?.find(
+          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
+        ) || null
+
       console.log(
         '🔍 MarketplaceConnections: Valid Amazon connection:',
         !!validAmazonConnection
@@ -168,6 +193,10 @@ export default function MarketplaceConnections({
       console.log(
         '🔍 MarketplaceConnections: Valid Shopify connection:',
         !!validShopifyConnection
+      )
+      console.log(
+        '🔍 MarketplaceConnections: Valid eBay connection:',
+        !!validEbayConnection
       )
 
       const updatedConnections = [
@@ -189,11 +218,16 @@ export default function MarketplaceConnections({
           },
           connectedAt: validShopifyConnection?.created_at,
         },
+        // ✅ NEW: Add eBay connection
         {
           platform: 'ebay',
-          connected: false,
-          disabled: true,
-          comingSoon: true,
+          connected: !!validEbayConnection?.access_token,
+          storeInfo: {
+            seller_id:
+              validEbayConnection?.seller_info?.seller_id || 'Connected',
+            environment: process.env.EBAY_ENVIRONMENT || 'sandbox',
+          },
+          connectedAt: validEbayConnection?.created_at,
         },
         {
           platform: 'etsy',
@@ -206,11 +240,11 @@ export default function MarketplaceConnections({
       setConnections(updatedConnections)
       console.log('✅ Marketplace connections loaded:', updatedConnections)
 
-      // Notify parent components (only for active platforms)
+      // Notify parent components
       if (onConnectionChange) {
         onConnectionChange('amazon', !!validAmazonConnection?.access_token)
         onConnectionChange('shopify', !!validShopifyConnection)
-        onConnectionChange('ebay', false) // Always false for coming soon
+        onConnectionChange('ebay', !!validEbayConnection?.access_token) // ✅ NEW
         onConnectionChange('etsy', false) // Always false for coming soon
       }
     } catch (error) {
@@ -221,12 +255,7 @@ export default function MarketplaceConnections({
       setConnections([
         { platform: 'amazon', connected: false },
         { platform: 'shopify', connected: false },
-        {
-          platform: 'ebay',
-          connected: false,
-          disabled: true,
-          comingSoon: true,
-        },
+        { platform: 'ebay', connected: false }, // ✅ NEW
         {
           platform: 'etsy',
           connected: false,
@@ -238,7 +267,7 @@ export default function MarketplaceConnections({
       if (onConnectionChange) {
         onConnectionChange('amazon', false)
         onConnectionChange('shopify', false)
-        onConnectionChange('ebay', false)
+        onConnectionChange('ebay', false) // ✅ NEW
         onConnectionChange('etsy', false)
       }
     } finally {
@@ -254,7 +283,7 @@ export default function MarketplaceConnections({
     }
 
     // Only allow connection for enabled platforms
-    if (platform === 'ebay' || platform === 'etsy') {
+    if (platform === 'etsy') {
       return // Do nothing for disabled platforms
     }
 
@@ -263,6 +292,9 @@ export default function MarketplaceConnections({
       window.location.href = `/api/amazon/oauth?user_id=${currentUserId}`
     } else if (platform === 'shopify') {
       window.location.href = `/api/shopify/oauth?user_id=${currentUserId}`
+    } else if (platform === 'ebay') {
+      // ✅ NEW: eBay OAuth redirect
+      window.location.href = `/api/ebay/oauth?user_id=${currentUserId}`
     }
   }
 
@@ -289,6 +321,17 @@ export default function MarketplaceConnections({
 
         if (response.ok) {
           loadConnections()
+        }
+      } else if (platform === 'ebay') {
+        // ✅ NEW: Call eBay disconnect endpoint
+        const response = await fetch('/api/ebay/disconnect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUserId }),
+        })
+
+        if (response.ok) {
+          loadConnections() // Refresh connections
         }
       }
     } catch (error) {
@@ -458,16 +501,17 @@ export default function MarketplaceConnections({
                           ✓ Store management tools
                         </span>
                       </>
-                    ) : isEbay && connection.comingSoon ? (
+                    ) : isEbay && !connection.comingSoon ? (
+                      // ✅ UPDATED: Active eBay features
                       <>
-                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
-                          ⏳ Auction & Buy-It-Now
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                          ✓ Auction & Buy-It-Now
                         </span>
-                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
-                          ⏳ 190M active buyers
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                          ✓ 190M active buyers
                         </span>
-                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
-                          ⏳ Lower seller fees
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                          ✓ Lower seller fees
                         </span>
                       </>
                     ) : isEtsy && connection.comingSoon ? (
@@ -505,6 +549,9 @@ export default function MarketplaceConnections({
                             `https://${connection.storeInfo.shop_domain}/admin`,
                             '_blank'
                           )
+                        } else if (isEbay) {
+                          // ✅ NEW: eBay seller hub link
+                          window.open('https://www.ebay.com/sh/ovw', '_blank')
                         }
                       }}
                       className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors border border-gray-300 rounded-lg"
@@ -531,11 +578,19 @@ export default function MarketplaceConnections({
                         ? 'bg-orange-600 hover:bg-orange-700'
                         : isShopify
                           ? 'bg-green-600 hover:bg-green-700'
-                          : 'bg-gray-600 hover:bg-gray-700'
+                          : isEbay
+                            ? 'bg-blue-600 hover:bg-blue-700'
+                            : 'bg-gray-600 hover:bg-gray-700'
                     }`}
                   >
                     Connect{' '}
-                    {isAmazon ? 'Amazon' : isShopify ? 'Shopify' : 'Platform'}
+                    {isAmazon
+                      ? 'Amazon'
+                      : isShopify
+                        ? 'Shopify'
+                        : isEbay
+                          ? 'eBay'
+                          : 'Platform'}
                   </button>
                 )}
               </div>

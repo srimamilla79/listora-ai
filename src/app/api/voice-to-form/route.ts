@@ -1,4 +1,4 @@
-// src/app/api/voice-to-content/route.ts - MULTILINGUAL ENHANCED VERSION
+// src/app/api/voice-to-form/route.ts - Voice-to-Form Only API
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import OpenAI from 'openai'
@@ -34,10 +34,10 @@ const SUPPORTED_LANGUAGES = {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🎤 Multilingual Voice to Content API called')
+    console.log('🎤 Voice-to-Form API called (Phase 1)')
     const startTime = Date.now()
 
-    // OPTIMIZATION 1: Parallel auth and form data parsing
+    // Get auth and form data in parallel
     const [authResult, formDataResult] = await Promise.all([
       getAuthUser(request),
       request.formData(),
@@ -51,11 +51,8 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 401 })
     }
-    const audioFile = formDataResult.get('audio') as File
-    const contentType =
-      (formDataResult.get('contentType') as string) || 'product'
 
-    // 🌍 NEW: Get language preference from form data
+    const audioFile = formDataResult.get('audio') as File
     const selectedLanguage =
       (formDataResult.get('language') as string) || 'auto'
     const targetLanguage =
@@ -71,67 +68,51 @@ export async function POST(request: NextRequest) {
     console.log('✅ User authenticated:', user.id, '- Audio received:', {
       size: audioFile.size,
       type: audioFile.type,
-      contentType,
       selectedLanguage,
       targetLanguage,
     })
 
-    // OPTIMIZATION 2: Optimized audio processing
+    // Optimize audio file
     const optimizedAudioFile = await optimizeAudioFile(audioFile)
 
-    console.log('🔄 Starting multilingual processing...')
+    console.log('🔄 Starting voice-to-form processing...')
 
-    // 🌍 ENHANCED: Multilingual transcription with language detection
-    const transcriptionPromise = transcribeAudioMultilingual(
+    // Phase 1: Only transcription and translation (NO content generation)
+    const transcriptionResult = await transcribeAndTranslate(
       optimizedAudioFile,
       selectedLanguage,
       targetLanguage
     )
-    const contentPromptTemplate = generateContentPromptTemplate(
-      contentType,
-      targetLanguage
-    )
 
-    // Wait for transcription
-    const transcriptionResult = await transcriptionPromise
-    console.log('✅ Multilingual transcription completed:', {
+    console.log('✅ Transcription and translation completed:', {
       detectedLanguage: transcriptionResult.detectedLanguage,
       confidence: transcriptionResult.confidence,
       textLength: transcriptionResult.text.length,
       wasTranslated: transcriptionResult.wasTranslated,
     })
 
-    // OPTIMIZATION 4: Parallel content generation and product name extraction
-    const [generatedContent, productName] = await Promise.all([
-      generateContentMultilingual(
-        transcriptionResult.text,
-        contentPromptTemplate,
-        targetLanguage,
-        transcriptionResult.detectedLanguage
-      ),
-      extractProductNameOptimized(transcriptionResult.text),
-    ])
-
-    console.log('✅ Multilingual content generated successfully')
+    // Extract product name (simple text parsing, no AI)
+    const productName = extractProductNameOptimized(transcriptionResult.text)
 
     const endTime = Date.now()
-    console.log(`⚡ Total processing time: ${endTime - startTime}ms`)
+    console.log(`⚡ Voice-to-form processing time: ${endTime - startTime}ms`)
 
+    // 🎯 NEW: Only return form data, NO generatedContent
     return NextResponse.json({
       success: true,
       transcription: transcriptionResult.text,
+      productName,
       detectedLanguage: transcriptionResult.detectedLanguage,
       confidence: transcriptionResult.confidence,
       wasTranslated: transcriptionResult.wasTranslated,
       targetLanguage: targetLanguage,
-      generatedContent,
-      productName,
-      message: `Voice successfully converted to content! ${
+      message: `Voice successfully processed! ${
         transcriptionResult.wasTranslated
           ? `(Translated from ${transcriptionResult.detectedLanguage} to ${targetLanguage})`
           : ''
-      }`,
+      } Now add images and click Generate Content.`,
       processingTime: endTime - startTime,
+      phase: 'form-filling', // Indicate this is phase 1
       multilingualInfo: {
         supportedLanguages: Object.keys(SUPPORTED_LANGUAGES),
         selectedLanguage,
@@ -140,10 +121,10 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('❌ Multilingual Voice to Content API error:', error)
+    console.error('❌ Voice-to-Form API error:', error)
     return NextResponse.json(
       {
-        error: 'Failed to process voice content',
+        error: 'Failed to process voice to form',
         isMultilingualError:
           error instanceof Error && error.message.includes('language'),
       },
@@ -152,14 +133,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 🌍 ENHANCED: Multilingual transcription function
-async function transcribeAudioMultilingual(
+// 🌍 Transcription and translation only (no content generation)
+async function transcribeAndTranslate(
   audioFile: File,
   selectedLanguage: string = 'auto',
   targetLanguage: string = 'en'
 ) {
   try {
-    console.log('🎙️ Starting multilingual transcription:', {
+    console.log('🎙️ Starting transcription and translation:', {
       selectedLanguage,
       targetLanguage,
       fileSize: audioFile.size,
@@ -169,11 +150,11 @@ async function transcribeAudioMultilingual(
     const transcriptionParams: any = {
       file: audioFile,
       model: 'whisper-1',
-      response_format: 'verbose_json', // 🌍 CHANGED: Get detailed response with language detection
+      response_format: 'verbose_json',
       temperature: 0.2,
     }
 
-    // 🌍 NEW: Only set language if not auto-detect
+    // Set language if not auto-detect
     if (
       selectedLanguage !== 'auto' &&
       SUPPORTED_LANGUAGES[selectedLanguage as keyof typeof SUPPORTED_LANGUAGES]
@@ -187,22 +168,17 @@ async function transcribeAudioMultilingual(
       }
     }
 
-    console.log('🔄 Calling Whisper API with params:', transcriptionParams)
+    console.log('🔄 Calling Whisper API...')
 
     // Call Whisper API
     const transcription =
       await openai.audio.transcriptions.create(transcriptionParams)
 
-    console.log('✅ Whisper response received:', {
-      detectedLanguage: (transcription as any).language,
-      textLength: transcription.text?.length || 0,
-    })
-
     let finalText = transcription.text
     let wasTranslated = false
     let detectedLanguage = (transcription as any).language || 'unknown'
 
-    // 🌍 NEW: Translate if detected language != target language
+    // Translate if needed
     if (detectedLanguage !== targetLanguage && targetLanguage !== 'auto') {
       try {
         console.log(
@@ -221,7 +197,7 @@ async function transcribeAudioMultilingual(
               content: finalText,
             },
           ],
-          max_tokens: 1000,
+          max_tokens: 500, // Reduced since we're not generating full content
           temperature: 0.1,
         })
 
@@ -229,27 +205,25 @@ async function transcribeAudioMultilingual(
         if (translatedText) {
           finalText = translatedText
           wasTranslated = true
-          console.log('✅ Translation completed successfully')
+          console.log('✅ Translation completed')
         }
       } catch (translationError) {
         console.warn(
           '⚠️ Translation failed, using original text:',
           translationError
         )
-        // Continue with original text if translation fails
       }
     }
 
     return {
       text: finalText,
       detectedLanguage,
-      confidence: (transcription as any).language ? 0.95 : 0.8, // Estimate confidence
+      confidence: (transcription as any).language ? 0.95 : 0.8,
       wasTranslated,
     }
   } catch (error) {
-    console.error('❌ Multilingual transcription failed:', error)
+    console.error('❌ Transcription failed:', error)
 
-    // Enhanced error handling for multilingual scenarios
     if (error instanceof Error) {
       if (error.message.includes('language not supported')) {
         throw new Error(
@@ -270,100 +244,7 @@ async function transcribeAudioMultilingual(
   }
 }
 
-// 🌍 ENHANCED: Multilingual content generation
-async function generateContentMultilingual(
-  transcription: string,
-  promptTemplate: string,
-  targetLanguage: string = 'en',
-  detectedLanguage?: string
-): Promise<string> {
-  // 🌍 NEW: Language-specific system prompt
-  const languageInstruction =
-    targetLanguage === 'en'
-      ? 'Create compelling, conversion-focused content in English.'
-      : `Create compelling, conversion-focused content in ${getLanguageName(targetLanguage)}. Use natural, native-speaking tone and cultural context appropriate for ${targetLanguage} markets.`
-
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content: `You are an expert multilingual e-commerce copywriter. ${languageInstruction} ${
-          detectedLanguage && detectedLanguage !== targetLanguage
-            ? `The original input was in ${detectedLanguage} but has been translated.`
-            : ''
-        }`,
-      },
-      {
-        role: 'user',
-        content: `Voice Input: "${transcription}"\n\n${promptTemplate}`,
-      },
-    ],
-    max_tokens: 1500,
-    temperature: 0.7,
-    top_p: 0.9,
-    frequency_penalty: 0.1,
-    presence_penalty: 0.1,
-  })
-
-  return completion.choices[0]?.message?.content || ''
-}
-
-// 🌍 HELPER: Get language name from code
-function getLanguageName(code: string): string {
-  const language = Object.entries(SUPPORTED_LANGUAGES).find(
-    ([key, value]) => key === code || value.code === code
-  )
-  return language ? language[1].name : code
-}
-
-// 🌍 ENHANCED: Multilingual content prompt templates
-function generateContentPromptTemplate(
-  contentType: string,
-  targetLanguage: string = 'en'
-): string {
-  const baseTemplates = {
-    product: `Transform this voice input into professional product content with:
-• Compelling title with key features
-• 4-6 selling points (benefits over features)  
-• 2-3 paragraph description with story and CTA
-• Platform optimization for Amazon/eBay/Shopify/Etsy/Instagram
-• 8-10 SEO keywords
-
-Make it conversion-focused and ready for immediate use.`,
-
-    service: `Transform this voice input into professional service content with:
-• Service headline emphasizing outcomes
-• Core benefits and methodology
-• Credibility and process details
-• Client-focused messaging
-• Service packages overview
-
-Focus on expertise, results, and client success.`,
-
-    listing: `Transform this voice input into marketplace listing content with:
-• Descriptive title with condition/features
-• Detailed condition assessment
-• Authenticity and value details
-• Collector/resale appeal
-• Competitive positioning
-
-Emphasize condition, authenticity, and value proposition.`,
-  }
-
-  const template =
-    baseTemplates[contentType as keyof typeof baseTemplates] ||
-    baseTemplates.product
-
-  // 🌍 NEW: Add language-specific instructions
-  if (targetLanguage !== 'en') {
-    return `${template}\n\nIMPORTANT: Write all content in ${getLanguageName(targetLanguage)} using natural, native-speaking language and cultural context appropriate for ${targetLanguage} markets.`
-  }
-
-  return template
-}
-
-// EXISTING HELPER FUNCTIONS (unchanged)
+// Authentication helper
 async function getAuthUser(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
   if (!authHeader) {
@@ -384,6 +265,7 @@ async function getAuthUser(request: NextRequest) {
   return { success: true, user }
 }
 
+// Audio optimization helper
 async function optimizeAudioFile(audioFile: File): Promise<File> {
   if (audioFile.size > 5 * 1024 * 1024) {
     console.log('🗜️ Compressing large audio file...')
@@ -397,6 +279,7 @@ async function optimizeAudioFile(audioFile: File): Promise<File> {
   })
 }
 
+// Simple product name extraction (no AI)
 function extractProductNameOptimized(transcription: string): string {
   const words = transcription.split(/\s+/).slice(0, 15)
   const productIndicators = ['this', 'the', 'a', 'an', 'my', 'our']

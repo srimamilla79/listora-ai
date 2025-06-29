@@ -267,17 +267,18 @@ export default function EnhancedDashboardPage() {
           .from('product_contents')
           .select(
             `
-          id,
-          product_name,
-          platform,
-          features,
-          generated_content,
-          created_at,
-          has_images,
-          image_folder,
-          original_images,
-          processed_images
-        `
+    id,
+    product_name,
+    platform,
+    features,
+    generated_content,
+    created_at,
+    has_images,
+    image_folder,
+    original_images,
+    processed_images,
+    selected_sections
+  `
           )
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
