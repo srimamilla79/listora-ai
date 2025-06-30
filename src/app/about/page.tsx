@@ -28,6 +28,7 @@ import {
   Play,
   Pause,
   Languages,
+  Store,
 } from 'lucide-react'
 
 export default function EnhancedAboutUsPage() {
@@ -46,6 +47,7 @@ export default function EnhancedAboutUsPage() {
     { flag: '🇯🇵', name: 'Japanese', example: 'プレミアムヘッドホン...' },
   ]
 
+  // ✅ UPDATED: Stats with eBay integration
   const stats = [
     {
       number: '99+',
@@ -66,11 +68,11 @@ export default function EnhancedAboutUsPage() {
       description: 'Smart product analysis and description generation',
     },
     {
-      number: 'Multi-Platform',
-      label: 'Amazon Optimization + Shopify Direct',
-      icon: Globe,
+      number: 'Multi-Platforms',
+      label: 'Amazon + Shopify & eBay Direct Publishing',
+      icon: Store,
       description:
-        'Amazon optimization + Shopify direct publishing with more platforms coming soon',
+        'Amazon optimization + Shopify direct publishing + revolutionary eBay direct listing with AI category detection',
     },
   ]
 
@@ -109,6 +111,7 @@ export default function EnhancedAboutUsPage() {
     },
   ]
 
+  // ✅ UPDATED: Milestones with eBay integration
   const milestones = [
     {
       phase: 'Discovery',
@@ -136,17 +139,25 @@ export default function EnhancedAboutUsPage() {
     },
     {
       phase: 'Integration',
-      title: 'Amazon Optimization + Shopify Publishing',
+      title: 'Triple Platform Power: Amazon + Shopify + eBay Direct Publishing',
       description:
-        'Professional Amazon listing optimization with step-by-step guidance and optimized data, plus direct one-click publishing to Shopify with seamless seller account integration.',
+        'Professional Amazon listing optimization with step-by-step guidance, direct one-click publishing to Shopify with seamless seller integration, and revolutionary eBay direct listing with AI-powered category detection and Taxonomy API.',
       icon: ShoppingCart,
       color: 'from-orange-400 to-red-500',
+    },
+    {
+      phase: 'Innovation',
+      title: '🏪 eBay AI-Powered Direct Listing Revolution',
+      description:
+        "World's first eBay integration with dual-token authentication, real-time Taxonomy API category suggestions, and automatic item specifics generation. AI analyzes content and suggests perfect eBay categories with all required fields automatically.",
+      icon: Store,
+      color: 'from-blue-400 to-cyan-500',
     },
     {
       phase: 'Scale',
       title: 'Global Bulk Processing Revolution',
       description:
-        'Background job processing for hundreds of products simultaneously in multiple languages - scale your global business while you sleep.',
+        'Background job processing for hundreds of products simultaneously in multiple languages across Amazon, Shopify, and eBay - scale your global business while you sleep.',
       icon: Upload,
       color: 'from-cyan-400 to-blue-500',
     },
@@ -161,59 +172,61 @@ export default function EnhancedAboutUsPage() {
     expertise: 'Multilingual AI Innovation & Global Entrepreneurship',
   }
 
+  // ✅ UPDATED: Expertise with eBay integration
   const expertise = [
     {
       icon: Languages,
       title: 'Multilingual AI & Machine Learning',
       description:
-        'Deep expertise in OpenAI Vision, multilingual voice recognition (99+ languages), and natural language processing across cultures.',
+        'Deep expertise in OpenAI Vision, multilingual voice recognition (99+ languages), natural language processing across cultures, and eBay Taxonomy API integration.',
       color: 'from-blue-400 to-indigo-500',
     },
     {
       icon: Rocket,
       title: 'Global Product Development',
       description:
-        'Full-stack development from concept to deployment, building scalable AI-powered platforms that serve entrepreneurs worldwide.',
+        'Full-stack development from concept to deployment, building scalable AI-powered platforms that serve entrepreneurs worldwide with Amazon, Shopify, and eBay integrations.',
       color: 'from-green-400 to-emerald-500',
     },
     {
       icon: Globe,
       title: 'Global Entrepreneur Mindset',
       description:
-        'Understanding real business challenges across cultures and building solutions that actually solve problems for international entrepreneurs.',
+        'Understanding real business challenges across cultures and building solutions that actually solve problems for international entrepreneurs selling on multiple platforms.',
       color: 'from-purple-400 to-pink-500',
     },
     {
       icon: Code,
-      title: 'Technical Leadership',
+      title: 'Technical Leadership & Marketplace Integration',
       description:
-        'Architecting robust systems that handle multilingual voice processing, image analysis, and bulk operations at global scale.',
+        "Architecting robust systems that handle multilingual voice processing, image analysis, bulk operations at global scale, and complex marketplace APIs including eBay's dual-token system.",
       color: 'from-orange-400 to-red-500',
     },
   ]
 
+  // ✅ UPDATED: Future roadmap with eBay enhancements
   const futureRoadmap = [
     {
       icon: Languages,
-      title: 'Advanced Language Features',
+      title: 'Advanced Language Features & eBay Global Expansion',
       description:
-        'Enhanced dialect support, cultural context optimization, and local market customization for even better global reach.',
+        'Enhanced dialect support, cultural context optimization, local market customization for even better global reach, plus eBay international marketplace support.',
       timeline: 'Coming Soon',
       color: 'from-blue-500 to-cyan-500',
     },
     {
       icon: TrendingUp,
-      title: 'Global AI Analytics Dashboard',
+      title: 'Global AI Analytics Dashboard with Multi-Platform Insights',
       description:
-        'Intelligent insights to optimize your content performance across different markets and languages, with cultural sensitivity analysis.',
+        'Intelligent insights to optimize your content performance across Amazon, Shopify, and eBay in different markets and languages, with cultural sensitivity analysis and eBay category performance tracking.',
       timeline: 'In Development',
       color: 'from-purple-500 to-pink-500',
     },
     {
       icon: Users,
-      title: 'Global Team Collaboration',
+      title: 'Global Team Collaboration & Advanced Platform Features',
       description:
-        'Advanced team features for international agencies and larger businesses to collaborate on multilingual content creation seamlessly.',
+        'Advanced team features for international agencies and larger businesses to collaborate on multilingual content creation seamlessly across all three platforms, with eBay bulk listing management.',
       timeline: 'Planned',
       color: 'from-green-500 to-emerald-500',
     },
@@ -368,17 +381,25 @@ export default function EnhancedAboutUsPage() {
               </div>
             </div>
 
-            {/* Free Tier Highlight */}
+            {/* ✅ UPDATED: Platform Highlight with eBay */}
             <div className="inline-flex items-center space-x-3 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl px-6 py-4 mb-8 shadow-lg">
-              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
-                <Zap className="h-4 w-4 text-white" />
+              <div className="flex -space-x-1">
+                <div className="w-6 h-6 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full flex items-center justify-center border-2 border-white">
+                  <span className="text-white text-xs">📦</span>
+                </div>
+                <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center border-2 border-white">
+                  <span className="text-white text-xs">🛍️</span>
+                </div>
+                <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-white">
+                  <span className="text-white text-xs">🏪</span>
+                </div>
               </div>
               <div className="text-left">
                 <div className="text-lg font-bold text-green-800">
-                  10 Free Multilingual Generations Monthly
+                  Amazon + Shopify + eBay Direct Publishing
                 </div>
                 <div className="text-sm text-green-700">
-                  No credit card required • Test in any language risk-free
+                  Revolutionary triple platform AI-powered integration
                 </div>
               </div>
             </div>
@@ -390,12 +411,14 @@ export default function EnhancedAboutUsPage() {
                 Global Content Creation
               </span>
             </h1>
-            {/* Enhanced Subtitle */}
+            {/* ✅ UPDATED: Enhanced Subtitle with eBay */}
             <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
               At Listora AI, we believe every entrepreneur worldwide deserves
               access to professional-grade content creation tools in their
               native language. We're on a mission to democratize global
-              marketing through multilingual artificial intelligence,
+              marketing through multilingual artificial intelligence and
+              revolutionary multi-platform publishing including
+              Amazon(Optimization), Shopify, and eBay,
               <span className="font-semibold text-gray-800">
                 {' '}
                 one voice at a time, in any language.
@@ -469,7 +492,7 @@ export default function EnhancedAboutUsPage() {
             </div>
           </div>
 
-          {/* Enhanced Stats Cards */}
+          {/* ✅ UPDATED: Enhanced Stats Cards with eBay */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {stats.map((stat, index) => {
               const Icon = stat.icon
@@ -497,7 +520,7 @@ export default function EnhancedAboutUsPage() {
         </div>
       </section>
 
-      {/* Enhanced Mission Section */}
+      {/* ✅ UPDATED: Enhanced Mission Section with eBay */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -536,11 +559,13 @@ export default function EnhancedAboutUsPage() {
                 </p>
                 <p>
                   Today, a solo entrepreneur from Spain can speak in Spanish and
-                  instantly get professional English content for Amazon US. An
-                  entrepreneur from India can speak in Hindi and get German
-                  content for European markets. They can compete with massive
-                  corporations without hiring expensive translation agencies or
-                  learning complex tools.
+                  instantly get professional English content for Amazon US,
+                  direct Shopify publishing, and eBay listings with AI-powered
+                  category detection. An entrepreneur from India can speak in
+                  Hindi and get German content for European markets across all
+                  three platforms. They can compete with massive corporations
+                  without hiring expensive translation agencies or learning
+                  complex tools.
                 </p>
               </div>
 
@@ -557,8 +582,9 @@ export default function EnhancedAboutUsPage() {
                       A world where every entrepreneur has access to the same
                       powerful multilingual content creation tools as the
                       biggest companies, democratizing global success through
-                      artificial intelligence and breaking down language
-                      barriers forever.
+                      artificial intelligence and revolutionary multi-platform
+                      publishing on Amazon(optimization), Shopify, and eBay,
+                      breaking down language barriers forever.
                     </p>
                   </div>
                 </div>
@@ -577,12 +603,12 @@ export default function EnhancedAboutUsPage() {
                     <Languages className="w-16 h-16 text-white animate-pulse" />
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                    From Global Idea to Impact
+                    From Global Idea to Triple Platform Impact
                   </h3>
                   <p className="text-gray-700 max-w-sm">
                     Transforming the way businesses worldwide create and share
                     their stories across cultures through multilingual AI
-                    innovation.
+                    innovation and revolutionary multi-platform publishing.
                   </p>
                 </div>
               </div>
@@ -591,7 +617,7 @@ export default function EnhancedAboutUsPage() {
         </div>
       </section>
 
-      {/* Timeline Section */}
+      {/* ✅ UPDATED: Timeline Section with eBay milestone */}
       <section className="py-24 bg-gradient-to-br from-gray-50 to-indigo-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
@@ -610,7 +636,7 @@ export default function EnhancedAboutUsPage() {
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               From a simple multilingual frustration to a revolutionary platform
               that's transforming how global entrepreneurs create content in any
-              language.
+              language and publish across Amazon, Shopify, and eBay.
             </p>
           </div>
 
@@ -714,8 +740,8 @@ export default function EnhancedAboutUsPage() {
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               These principles guide everything we do globally, from
-              multilingual product development to international customer
-              support.
+              multilingual product development to international customer support
+              across Amazon, Shopify, and eBay integrations.
             </p>
           </div>
 
@@ -781,7 +807,7 @@ export default function EnhancedAboutUsPage() {
         </div>
       </section>
 
-      {/* Enhanced Founder Section */}
+      {/* ✅ UPDATED: Enhanced Founder Section with eBay mentions */}
       <section className="py-24 bg-gradient-to-br from-gray-50 to-blue-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
@@ -855,8 +881,8 @@ export default function EnhancedAboutUsPage() {
                     <p className="text-gray-700 text-sm">
                       "Every entrepreneur worldwide deserves the same powerful
                       tools as big corporations. Multilingual Voice (99+
-                      languages) + AI + Direct Amazon & Shopify Publishing = The
-                      future of global content creation."
+                      languages) + AI + Direct Amazon, Shopify & eBay Publishing
+                      = The future of global content creation."
                     </p>
                   </div>
 
@@ -868,7 +894,8 @@ export default function EnhancedAboutUsPage() {
                     <p className="text-gray-700 text-sm">
                       "Start with 10 free multilingual content generations every
                       month. No credit card, no risk - just experience the power
-                      of AI-driven content creation in 99+ languages."
+                      of AI-driven content creation in 99+ languages with direct
+                      publishing to all three major platforms."
                     </p>
                   </div>
                 </div>
@@ -876,14 +903,15 @@ export default function EnhancedAboutUsPage() {
             </div>
           </div>
 
-          {/* Expertise Areas */}
+          {/* ✅ UPDATED: Expertise Areas with eBay integration */}
           <div className="text-center mb-12">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">
               Global Core Expertise & Skills
             </h3>
             <p className="text-gray-600 max-w-2xl mx-auto">
               The diverse international background and skills that went into
-              building Listora AI from the ground up for global entrepreneurs.
+              building Listora AI from the ground up for global entrepreneurs
+              across Amazon, Shopify, and eBay.
             </p>
           </div>
 
@@ -937,7 +965,7 @@ export default function EnhancedAboutUsPage() {
         </div>
       </section>
 
-      {/* Enhanced Future Vision Section */}
+      {/* ✅ UPDATED: Enhanced Future Vision Section with eBay */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
@@ -958,7 +986,7 @@ export default function EnhancedAboutUsPage() {
               We're just getting started globally. Here's what we're building
               next to make multilingual content creation even more powerful for
               entrepreneurs worldwide, breaking down more barriers and creating
-              more opportunities.
+              more opportunities across Amazon, Shopify, eBay, and beyond.
             </p>
           </div>
 
@@ -993,7 +1021,7 @@ export default function EnhancedAboutUsPage() {
         </div>
       </section>
 
-      {/* Enhanced CTA Section */}
+      {/* ✅ UPDATED: Enhanced CTA Section with eBay */}
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600" />
         <div className="absolute inset-0 bg-black/20" />
@@ -1006,7 +1034,7 @@ export default function EnhancedAboutUsPage() {
             Be part of the multilingual content creation revolution. Start
             building your global business with AI-powered tools today and join
             thousands of successful entrepreneurs worldwide, speaking in 99+
-            languages.
+            languages and selling on Amazon, Shopify, and eBay.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
@@ -1038,11 +1066,11 @@ export default function EnhancedAboutUsPage() {
             </div>
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-400" />
-              <span>No credit card required</span>
+              <span>Amazon + Shopify + eBay publishing</span>
             </div>
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-400" />
-              <span>14-day free trial</span>
+              <span>No credit card required</span>
             </div>
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-400" />
@@ -1052,7 +1080,7 @@ export default function EnhancedAboutUsPage() {
         </div>
       </section>
 
-      {/* Enhanced Footer */}
+      {/* ✅ UPDATED: Enhanced Footer with eBay */}
       <footer className="bg-gray-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
@@ -1066,8 +1094,9 @@ export default function EnhancedAboutUsPage() {
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 Empowering global entrepreneurs with multilingual AI-powered
                 content creation tools. From voice in 99+ languages to
-                professional content in seconds, with Amazon Optimization &
-                Direct Shopify publishing worldwide.
+                professional content in seconds, with Amazon optimization,
+                direct Shopify publishing, and revolutionary eBay direct listing
+                worldwide.
               </p>
             </div>
 
@@ -1086,6 +1115,9 @@ export default function EnhancedAboutUsPage() {
                   >
                     Global Pricing
                   </Link>
+                </li>
+                <li>
+                  <span className="text-gray-500">eBay Direct Listing</span>
                 </li>
               </ul>
             </div>
@@ -1130,7 +1162,8 @@ export default function EnhancedAboutUsPage() {
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
             <p>
               &copy; 2025 Listora AI. All rights reserved. Built with ❤️ for
-              global entrepreneurs worldwide. 🌍 Supporting 99+ languages.
+              global entrepreneurs worldwide. 🌍 Supporting 99+ languages with
+              Amazon, Shopify & eBay integration.
             </p>
           </div>
         </div>

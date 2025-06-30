@@ -67,6 +67,37 @@ export default function HomePage() {
     { flag: '🇯🇵', name: 'Japanese', text: 'プレミアムワイヤレスヘッドホン...' },
   ]
 
+  // ✅ UPDATED: Platform showcase with eBay
+  const platforms = [
+    {
+      name: 'Amazon',
+      color: 'from-orange-50 to-red-50 border-orange-200',
+      emoji: '📦',
+      text: 'Amazon Optimized!',
+      id: 'ASIN: B08XYZ123',
+      textColor: 'text-orange-700',
+      idColor: 'text-orange-600',
+    },
+    {
+      name: 'Shopify',
+      color: 'from-green-50 to-emerald-50 border-green-200',
+      emoji: '🛍️',
+      text: 'Live on Shopify!',
+      id: 'Product ID: 789456',
+      textColor: 'text-green-700',
+      idColor: 'text-green-600',
+    },
+    {
+      name: 'eBay',
+      color: 'from-blue-50 to-indigo-50 border-blue-200',
+      emoji: '🏪',
+      text: 'Live on eBay!',
+      id: 'Item ID: 306375092611',
+      textColor: 'text-blue-700',
+      idColor: 'text-blue-600',
+    },
+  ]
+
   useEffect(() => {
     if (activeFeature === 0 && typingIndex < sampleContent.length) {
       const timer = setTimeout(() => {
@@ -77,11 +108,11 @@ export default function HomePage() {
     }
   }, [activeFeature, typingIndex])
 
-  // Auto-rotate platform showcase
+  // ✅ UPDATED: Auto-rotate platform showcase (3 platforms now)
   useEffect(() => {
     const timer = setInterval(() => {
-      setActivePlatform((prev) => (prev + 1) % 2)
-    }, 4000)
+      setActivePlatform((prev) => (prev + 1) % 3) // Changed from % 2 to % 3
+    }, 3000) // Faster rotation for 3 platforms
     return () => clearInterval(timer)
   }, [])
 
@@ -160,7 +191,7 @@ export default function HomePage() {
       icon: Camera,
       title: 'AI Vision Analysis + Multi-Platform Images',
       description:
-        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions. Then automatically optimize for Amazon, Shopify, and other major platforms.',
+        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions. Then automatically optimize for Amazon, Shopify, eBay, and other major platforms.',
       benefit:
         'AI sees your product and writes descriptions based on actual visual details',
 
@@ -192,7 +223,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {[
               {
                 name: 'Amazon',
@@ -207,10 +238,10 @@ export default function HomePage() {
                 status: 'direct',
               },
               {
-                name: 'More Soon',
-                color: 'from-gray-400 to-gray-500',
-                emoji: '➕',
-                status: 'coming',
+                name: 'eBay',
+                color: 'from-blue-400 to-blue-500',
+                emoji: '🏪',
+                status: 'smart',
               },
             ].map((platform, i) => (
               <div
@@ -234,14 +265,15 @@ export default function HomePage() {
     },
     {
       icon: ShoppingCart,
-      title: 'Amazon Optimization + Shopify Publishing',
+      title:
+        'Triple Platform Power: Amazon Optimization + Shopify & eBay Direct Publishing',
       description:
-        'Get professional Amazon listing optimization with step-by-step guidance and optimized data, plus direct one-click publishing to Shopify with seamless seller account integration.',
+        'Get professional Amazon listing optimization with step-by-step guidance, direct one-click publishing to Shopify with seamless seller account integration, and revolutionary eBay direct listing with AI-powered category detection.',
       benefit:
-        'From voice input to Amazon-ready listings + live Shopify in under 2 minutes',
+        'From voice input to live on Amazon, Shopify AND eBay in under 2 minutes',
 
       demo: (
-        <div className="bg-gradient-to-br from-orange-50 to-green-100 rounded-xl p-6 border border-orange-200">
+        <div className="bg-gradient-to-br from-orange-50 to-blue-100 rounded-xl p-6 border border-orange-200">
           <div className="space-y-4">
             <div className="text-center">
               <div className="flex justify-center space-x-2 mb-4">
@@ -251,9 +283,12 @@ export default function HomePage() {
                 <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                   <span className="text-white text-lg">🛍️</span>
                 </div>
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                  <span className="text-white text-lg">🏪</span>
+                </div>
               </div>
               <p className="text-sm text-gray-700 font-medium">
-                Voice → AI Content → Amazon & Shopify Live
+                Voice → AI Content → Amazon + Shopify + eBay Live
               </p>
             </div>
 
@@ -275,7 +310,7 @@ export default function HomePage() {
                   icon: '🔗',
                 },
                 {
-                  step: '4. Optimizing + Publishing...',
+                  step: '4. Publishing to All 3 Platforms...',
                   status: 'processing',
                   icon: '🚀',
                 },
@@ -304,7 +339,7 @@ export default function HomePage() {
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
                 <div className="text-sm font-semibold text-orange-800">
                   📦 Amazon Optimized!
@@ -320,6 +355,103 @@ export default function HomePage() {
                 <div className="text-xs text-green-600 mt-1">
                   Product ID: 789456
                 </div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                <div className="text-sm font-semibold text-blue-800">
+                  🏪 eBay Live!
+                </div>
+                <div className="text-xs text-blue-600 mt-1">
+                  Item ID: 306375092611
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      icon: Award,
+      title: '🏪 eBay AI-Powered Direct Listing with Smart Category Detection',
+      description:
+        'Revolutionary eBay integration with dual-token authentication, real-time Taxonomy API category suggestions, and automatic item specifics generation. Our AI analyzes your content and suggests the perfect eBay category with all required fields.',
+      benefit:
+        'AI detects perfect eBay categories automatically - no manual research needed',
+
+      demo: (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 border border-blue-200">
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl mx-auto flex items-center justify-center mb-2">
+                <span className="text-white text-lg">🏪</span>
+              </div>
+              <p className="text-sm text-blue-700 font-medium">
+                AI-Powered eBay Category Detection + Live Publishing
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                {
+                  step: '1. AI Analyzes Your Content',
+                  status: 'complete',
+                  icon: '🤖',
+                },
+                {
+                  step: '2. eBay Taxonomy API Suggests Category',
+                  status: 'complete',
+                  icon: '🎯',
+                },
+                {
+                  step: '3. Auto-Generate Item Specifics',
+                  status: 'complete',
+                  icon: '📋',
+                },
+                {
+                  step: '4. Live eBay Listing Created!',
+                  status: 'complete',
+                  icon: '🏪',
+                },
+              ].map((item, i) => (
+                <div key={item.step} className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-blue-200">
+                    <span className="text-sm">{item.icon}</span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      {item.step}
+                    </span>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium ml-2">
+                      ✓
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-sm font-semibold text-blue-800 mb-2">
+                🏪 Live on eBay!
+              </div>
+              <div className="text-xs text-blue-600 space-y-1">
+                <div>Item ID: 306375092611</div>
+                <div>Category: 112529 (Headphones) - AI Detected!</div>
+                <div>Brand: Bose • Color: Beige • Type: Over-Ear</div>
+                <div>✅ All item specifics auto-generated</div>
+              </div>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2 mb-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-sm font-semibold text-green-800">
+                  🌟 eBay AI Integration Features
+                </span>
+              </div>
+              <div className="text-xs text-green-700 space-y-1">
+                <p>✓ Real eBay Taxonomy API integration</p>
+                <p>✓ Dual-token authentication system</p>
+                <p>✓ Auto category detection (27 aspects)</p>
+                <p>✓ Smart item specifics generation</p>
               </div>
             </div>
           </div>
@@ -402,7 +534,7 @@ export default function HomePage() {
       icon: Wand2,
       title: 'Advanced AI Engine',
       description:
-        'Powered by cutting-edge artificial intelligence that creates compelling product descriptions, catchy titles, and persuasive marketing copy optimized for both Amazon and Shopify.',
+        'Powered by cutting-edge artificial intelligence that creates compelling product descriptions, catchy titles, and persuasive marketing copy optimized for Amazon, Shopify, and eBay simultaneously.',
       benefit: 'AI-generated content that outperforms traditional copywriting',
 
       demo: (
@@ -431,7 +563,7 @@ export default function HomePage() {
                 task: 'Platform Optimization',
                 status: 'pending',
                 progress: 30,
-                detail: 'Amazon & Shopify formatting',
+                detail: 'Amazon, Shopify & eBay formatting',
               },
             ].map((item, i) => (
               <div key={item.task} className="space-y-2">
@@ -662,7 +794,7 @@ export default function HomePage() {
               <Languages className="h-4 w-4 text-indigo-600" />
               <span className="text-sm font-medium text-indigo-800">
                 🌍 Revolutionary AI platform: Voice (99+ Languages) + Vision +
-                Bulk Processing + Direct Publishing
+                Bulk Processing + Triple Platform Publishing
               </span>
               <Star className="h-4 w-4 text-yellow-500 fill-current" />
             </div>
@@ -678,7 +810,7 @@ export default function HomePage() {
               </span>
             </h1>
 
-            {/* Enhanced Subtitle */}
+            {/* ✅ UPDATED: Enhanced Subtitle with eBay */}
             <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
               The world's first AI that combines
               <span className="font-semibold text-blue-600">
@@ -688,12 +820,17 @@ export default function HomePage() {
               , OpenAI Vision analysis, bulk CSV processing, and
               <span className="font-semibold text-orange-600">
                 {' '}
-                Multi-platform optimization
-              </span>{' '}
-              and
+                Amazon optimization
+              </span>
+              ,
               <span className="font-semibold text-green-600">
                 {' '}
-                direct publishing
+                direct Shopify publishing
+              </span>
+              , and
+              <span className="font-semibold text-blue-600">
+                {' '}
+                revolutionary eBay direct listing
               </span>
               . Scale from 1 product to 500+ with background automation.
               <span className="font-semibold text-gray-800">
@@ -744,7 +881,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Platform Showcase */}
+            {/* ✅ UPDATED: Platform Showcase with eBay */}
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 max-w-6xl mx-auto mb-12 border border-white/50 shadow-2xl">
               <div className="grid md:grid-cols-3 gap-8 items-center">
                 {/* Voice Input */}
@@ -809,7 +946,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Platform Publishing */}
+                {/* ✅ UPDATED: Platform Publishing with eBay */}
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <div className="flex -space-x-2">
@@ -819,49 +956,36 @@ export default function HomePage() {
                       <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center border-2 border-white">
                         <span className="text-white text-xs">🛍️</span>
                       </div>
+                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-white">
+                        <span className="text-white text-xs">🏪</span>
+                      </div>
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">
                         Optimize & Publish
                       </h3>
                       <p className="text-sm text-gray-600">
-                        Amazon optimized + Shopify goes live
+                        Amazon + Shopify + eBay go live
                       </p>
                     </div>
                   </div>
                   <div
-                    className={`rounded-lg p-4 border transition-all duration-1000 ${
-                      activePlatform === 0
-                        ? 'bg-gradient-to-br from-orange-50 to-red-50 border-orange-200'
-                        : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'
-                    }`}
+                    className={`rounded-lg p-4 border transition-all duration-1000 ${platforms[activePlatform].color}`}
                   >
                     <div className="flex items-center space-x-2 mb-2">
                       <span className="text-lg">
-                        {activePlatform === 0 ? '📦' : '🛍️'}
+                        {platforms[activePlatform].emoji}
                       </span>
                       <span
-                        className={`text-sm font-medium ${
-                          activePlatform === 0
-                            ? 'text-orange-700'
-                            : 'text-green-700'
-                        }`}
+                        className={`text-sm font-medium ${platforms[activePlatform].textColor}`}
                       >
-                        {activePlatform === 0
-                          ? 'Amazon Optimized!'
-                          : 'Live on Shopify!'}
+                        {platforms[activePlatform].text}
                       </span>
                     </div>
                     <div
-                      className={`text-xs ${
-                        activePlatform === 0
-                          ? 'text-orange-600'
-                          : 'text-green-600'
-                      }`}
+                      className={`text-xs ${platforms[activePlatform].idColor}`}
                     >
-                      {activePlatform === 0
-                        ? 'ASIN: B08XYZ123'
-                        : 'Product ID: 789456'}{' '}
+                      {platforms[activePlatform].id}
                     </div>
                   </div>
                 </div>
@@ -914,7 +1038,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Enhanced Stats Cards */}
+          {/* ✅ UPDATED: Enhanced Stats Cards with eBay */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
               {
@@ -936,9 +1060,9 @@ export default function HomePage() {
                 color: 'from-purple-500 to-indigo-500',
               },
               {
-                number: 'Publishing Power',
-                label: 'Multi-Platform Optimization & Publishing',
-                icon: ShoppingCart,
+                number: 'Multi-Platforms',
+                label: 'Amazon Optimization + Shopify & eBay Direct Publishing',
+                icon: Store,
                 color: 'from-orange-500 to-red-500',
               },
             ].map((stat, index) => {
@@ -984,7 +1108,7 @@ export default function HomePage() {
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Our revolutionary AI platform combines multilingual voice
               recognition (99+ languages), OpenAI Vision analysis, bulk CSV
-              processing with background jobs, and direct Amazon & Shopify
+              processing with background jobs, and direct Amazon, Shopify & eBay
               integration to scale your business globally faster than ever.
             </p>
           </div>
@@ -1103,7 +1227,7 @@ export default function HomePage() {
               Start with our generous free plan (includes multilingual support)
               and scale as your business grows globally. All plans include
               enterprise-grade security, 99+ language support, and our complete
-              feature set with Amazon & Shopify integration.
+              feature set with Amazon, Shopify & eBay integration.
             </p>
           </div>
 
@@ -1122,7 +1246,7 @@ export default function HomePage() {
                   'Manual content generation (text input)',
                   'Voice-to-content generation (up to 1 minute)',
                   'AI Vision analysis (brands, colors, features)',
-                  'Amazon & Shopify optimized content format',
+                  'Amazon, Shopify & eBay optimized content format',
                   'Content library access',
                   'Email support',
                 ],
@@ -1153,7 +1277,7 @@ export default function HomePage() {
                   'Bulk CSV upload (up to 50 products)',
                   'Background job processing',
                   'Content library with organization',
-                  'Amazon optimization & Direct Shopify publishing integration',
+                  'Amazon optimization + Direct Shopify publishing + eBay direct listing integration',
                   'Priority email support',
                 ],
                 newCapabilities: [
@@ -1181,13 +1305,13 @@ export default function HomePage() {
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Business plan',
                   'Large bulk CSV upload (up to 200 products)',
-                  'Amazon optimization & Direct Shopify publishing integration',
+                  'Amazon optimization + Direct Shopify publishing + eBay direct listing (enhanced)',
                   'Enhanced voice processing (full 1-minute in any language)',
                   'Advanced AI Vision analysis',
                   'Bulk export options (CSV, Excel)',
                 ],
                 differentiators: [
-                  'Amazon optimization & Direct Shopify publishing integration',
+                  'Amazon optimization + Direct Shopify publishing + eBay direct listing (enhanced)',
                   'Higher bulk limits for global markets',
                   'Enhanced multilingual AI features',
                 ],
@@ -1214,7 +1338,7 @@ export default function HomePage() {
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Premium plan',
                   'Enterprise bulk processing (up to 1,000 products)',
-                  'Amazon optimization & Shopify publishing (unlimited)',
+                  'Amazon optimization + Shopify publishing + eBay publishing (unlimited)',
                   'Priority support (faster response)',
                   'Large-scale background processing',
                   'Global marketplace optimization',
@@ -1487,9 +1611,10 @@ export default function HomePage() {
           </h2>
           <p className="text-xl text-indigo-100 mb-12 max-w-3xl mx-auto">
             Experience the power of multilingual voice-driven content creation
-            with Amazon optimization & direct Shopify publishing. Speak in ANY
-            of 99+ languages and get professional content for global markets.
-            Start your free trial today and transform your business forever.
+            with Amazon optimization, direct Shopify publishing, and
+            revolutionary eBay direct listing. Speak in ANY of 99+ languages and
+            get professional content for global markets. Start your free trial
+            today and transform your business forever.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
@@ -1544,7 +1669,7 @@ export default function HomePage() {
                 Revolutionizing global product marketing with advanced
                 multilingual AI technology. Transform your voice in 99+
                 languages into professional content and optimize images for
-                various e-commerce platforms worldwide.
+                Amazon, Shopify, and eBay platforms worldwide.
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
@@ -1583,6 +1708,9 @@ export default function HomePage() {
                 </li>
                 <li>
                   <span className="text-gray-500">Platform Integrations</span>
+                </li>
+                <li>
+                  <span className="text-gray-500">eBay Direct Listing</span>
                 </li>
               </ul>
             </div>
@@ -1660,7 +1788,8 @@ export default function HomePage() {
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
             <p>
               &copy; 2025 Listora AI. All rights reserved. Built with ❤️ for
-              global entrepreneurs worldwide. 🌍 Supporting 99+ languages.
+              global entrepreneurs worldwide. 🌍 Supporting 99+ languages with
+              Amazon, Shopify & eBay integration.
             </p>
           </div>
         </div>
