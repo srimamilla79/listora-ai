@@ -1,5 +1,7 @@
 // src/app/api/ebay/publish/route.ts
 // eBay listing creation with DUAL TOKEN SYSTEM - User + Application Tokens
+// ✅ FIXED: Uses AI-generated content instead of user input
+// ✅ FIXED: AI-generated features in item specifics
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -54,6 +56,61 @@ interface CategoryResult {
   categoryId: string
   categoryName: string
   source: 'taxonomy_api' | 'verified_fallback' | 'bulletproof_fallback'
+}
+
+// ✅ NEW: EXTRACT TITLE FROM AI-GENERATED CONTENT
+function extractTitleFromContent(content: string): string | null {
+  // Extract from "PRODUCT TITLE/HEADLINE:" section
+  const titleMatch = content.match(
+    /###\s*1\.\s*PRODUCT TITLE\/HEADLINE:\s*\*\*(.*?)\*\*/i
+  )
+  if (titleMatch && titleMatch[1]) {
+    return titleMatch[1].trim()
+  }
+
+  // Fallback: look for any title with ** formatting near the start
+  const fallbackMatch = content.match(
+    /\*\*(.*?(?:Bluetooth|Wireless|Headphones|Premium|BOSE).*?)\*\*/i
+  )
+  if (fallbackMatch && fallbackMatch[1]) {
+    return fallbackMatch[1].trim()
+  }
+
+  return null
+}
+
+// ✅ NEW: EXTRACT FEATURES FROM AI-GENERATED CONTENT
+function extractFeaturesFromContent(content: string): string[] {
+  const features: string[] = []
+
+  // Extract from "KEY SELLING POINTS:" section
+  const keyPointsMatch = content.match(
+    /###\s*2\.\s*KEY SELLING POINTS:(.*?)(?=###|$)/is
+  )
+  if (keyPointsMatch) {
+    const bulletPoints = keyPointsMatch[1].match(/[-•]\s*\*\*(.*?)\*\*:/g)
+    if (bulletPoints) {
+      bulletPoints.forEach((point) => {
+        const feature = point.replace(/[-•]\s*\*\*(.*?)\*\*:/, '$1').trim()
+        if (feature) features.push(feature)
+      })
+    }
+  }
+
+  // Fallback: extract any bullet points with bold text
+  if (features.length === 0) {
+    const fallbackPoints = content.match(/[-•]\s*\*\*(.*?)\*\*/g)
+    if (fallbackPoints) {
+      fallbackPoints.slice(0, 5).forEach((point) => {
+        const feature = point.replace(/[-•]\s*\*\*(.*?)\*\*/, '$1').trim()
+        if (feature) features.push(feature)
+      })
+    }
+  }
+
+  return features.length > 0
+    ? features
+    : ['High Quality', 'Durable Design', 'Premium Materials']
 }
 
 export async function POST(request: NextRequest) {
@@ -118,9 +175,20 @@ export async function POST(request: NextRequest) {
 
     console.log('🏷️ Final category decision:', categoryResult)
 
+    // ✅ FIXED: Extract AI-generated title
+    const aiGeneratedTitle = extractTitleFromContent(
+      productContent.content || ''
+    )
+    const finalTitle = aiGeneratedTitle || productContent.product_name
+
+    console.log(
+      '🎯 Using title:',
+      finalTitle.substring(0, 50) + (finalTitle.length > 50 ? '...' : '')
+    )
+
     // Prepare eBay listing data
     const listingData: EbayListingData = {
-      Title: truncateTitle(productContent.product_name),
+      Title: truncateTitle(finalTitle), // ✅ FIXED: Use AI-generated title
       Description: formatEbayDescription(productContent),
       PrimaryCategory: { CategoryID: categoryResult.categoryId },
       StartPrice: publishingOptions.price.toString(),
@@ -620,7 +688,7 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('noise cancelling')
   ) {
     console.log('✅ Detected HEADPHONES category')
-    return '14969' // Headphones - CORRECT LEAF CATEGORY ✅
+    return '112529' // Headphones - CORRECT LEAF CATEGORY ✅
   }
 
   // KITCHEN & HOME - Check BEFORE generic electronics
@@ -826,17 +894,23 @@ function extractValueForAspect(
     if (aspect.includes('sleeve')) return extractSleeveLength(fullText)
     if (aspect.includes('fit')) return extractFit(fullText)
     if (aspect.includes('style')) return extractShirtStyle(fullText)
-  } else if (categoryId === '14969') {
+  } else if (categoryId === '112529') {
     // Headphones - NEW CATEGORY SUPPORT
     if (aspect.includes('type') || aspect.includes('style'))
       return extractHeadphoneType(fullText)
-    if (aspect.includes('features')) return extractHeadphoneFeatures(fullText)
+    if (aspect.includes('features')) {
+      const featuresList = extractHeadphoneFeatures(fullText)
+      return featuresList.length > 0 ? featuresList[0] : 'Standard'
+    }
     if (aspect.includes('connectivity')) return extractConnectivity(fullText)
   } else if (categoryId === '15052') {
     // Headphones - LEGACY CATEGORY SUPPORT
     if (aspect.includes('type') || aspect.includes('style'))
       return extractHeadphoneType(fullText)
-    if (aspect.includes('features')) return extractHeadphoneFeatures(fullText)
+    if (aspect.includes('features')) {
+      const featuresList = extractHeadphoneFeatures(fullText)
+      return featuresList.length > 0 ? featuresList[0] : 'Standard'
+    }
     if (aspect.includes('connectivity')) return extractConnectivity(fullText)
   }
 
@@ -904,12 +978,14 @@ function generateCategorySpecificAspects(
       Value: [extractSleeveLength(fullText)],
     })
     specifics.push({ Name: 'Fit', Value: [extractFit(fullText)] })
-  } else if (categoryId === '14969') {
+  } else if (categoryId === '112529') {
     // ✅ HEADPHONES Support (Correct Leaf Category)
     specifics.push({ Name: 'Type', Value: [extractHeadphoneType(fullText)] })
+    // ✅ FIXED: Use AI-generated features for headphones
+    const extractedFeatures = extractHeadphoneFeatures(fullText)
     specifics.push({
       Name: 'Features',
-      Value: [extractHeadphoneFeatures(fullText)],
+      Value: extractedFeatures,
     })
     specifics.push({
       Name: 'Connectivity',
@@ -919,9 +995,11 @@ function generateCategorySpecificAspects(
   } else if (categoryId === '15052') {
     // ✅ LEGACY: Headphones Support (Old Category - Keep for fallback)
     specifics.push({ Name: 'Type', Value: [extractHeadphoneType(fullText)] })
+    // ✅ FIXED: Use AI-generated features for headphones (legacy category)
+    const extractedFeatures = extractHeadphoneFeatures(fullText)
     specifics.push({
       Name: 'Features',
-      Value: [extractHeadphoneFeatures(fullText)],
+      Value: extractedFeatures,
     })
     specifics.push({
       Name: 'Connectivity',
@@ -994,52 +1072,64 @@ function extractBrand(fullText: string): string {
   return 'Unbranded'
 }
 
+// ✅ FIXED: ENHANCED COLOR DETECTION WITH BEIGE SUPPORT
 function extractColor(fullText: string): string {
-  const colors = [
-    'black',
-    'white',
-    'red',
-    'blue',
-    'green',
-    'yellow',
-    'orange',
-    'purple',
-    'pink',
-    'brown',
-    'gray',
-    'grey',
-    'silver',
-    'gold',
-    'navy',
-    'maroon',
-    'beige',
-    'tan',
-    'olive',
-    'turquoise',
-    'light gray',
-    'dark blue',
-    'light blue',
-  ]
-
   const text = fullText.toLowerCase()
 
-  // Check compound colors first
+  // Enhanced color detection with beige/cream colors
+  const colorMap = {
+    // Neutral colors (check first - most specific)
+    beige: [
+      'beige',
+      'tan',
+      'khaki',
+      'sand',
+      'nude',
+      'matte beige',
+      'soft beige',
+    ],
+    cream: ['cream', 'vanilla', 'eggshell', 'linen', 'ivory'],
+    white: ['white', 'off-white'],
+    black: ['black', 'ebony', 'charcoal'],
+    gray: ['gray', 'grey', 'silver', 'slate'],
+
+    // Compound colors (check before single colors)
+    'light gray': ['light gray', 'light grey'],
+    'dark blue': ['dark blue', 'navy blue'],
+    'light blue': ['light blue', 'sky blue'],
+
+    // Primary colors
+    red: ['red', 'crimson', 'scarlet'],
+    blue: ['blue', 'navy', 'cobalt', 'azure'],
+    green: ['green', 'emerald', 'forest'],
+    yellow: ['yellow', 'gold', 'golden'],
+    brown: ['brown', 'bronze', 'chocolate'],
+    pink: ['pink', 'rose', 'magenta'],
+    purple: ['purple', 'violet', 'lavender'],
+    orange: ['orange', 'amber', 'copper'],
+  }
+
+  // Check compound colors first (more specific)
   if (text.includes('light gray') || text.includes('light grey'))
     return 'Light Gray'
   if (text.includes('dark blue')) return 'Dark Blue'
   if (text.includes('light blue')) return 'Light Blue'
+  if (text.includes('soft beige') || text.includes('matte beige'))
+    return 'Beige'
 
-  // Check single colors
-  for (const color of colors) {
-    if (text.includes(color)) {
-      return color.charAt(0).toUpperCase() + color.slice(1)
+  // Check all color variants
+  for (const [colorName, variants] of Object.entries(colorMap)) {
+    for (const variant of variants) {
+      if (text.includes(variant)) {
+        return colorName.charAt(0).toUpperCase() + colorName.slice(1)
+      }
     }
   }
 
-  return 'Multi-Color'
+  return 'Multicolor'
 }
 
-// ✅ NEW: HEADPHONE EXTRACTORS
+// ✅ FIXED: HEADPHONE EXTRACTORS - NOW RETURNS ARRAY FOR FEATURES
 function extractHeadphoneType(fullText: string): string {
   const text = fullText.toLowerCase()
   if (text.includes('over-ear') || text.includes('over ear')) return 'Over-Ear'
@@ -1054,15 +1144,30 @@ function extractHeadphoneType(fullText: string): string {
   return 'Over-Ear'
 }
 
-function extractHeadphoneFeatures(fullText: string): string {
+// ✅ FIXED: NOW RETURNS ARRAY OF AI-GENERATED FEATURES
+function extractHeadphoneFeatures(fullText: string): string[] {
+  // ✅ FIXED: Return AI-generated features instead of single generic feature
+  const extractedFeatures = extractFeaturesFromContent(fullText)
+
+  // If we have AI-generated features, use them (max 3 for eBay)
+  if (extractedFeatures.length > 0) {
+    return extractedFeatures.slice(0, 3)
+  }
+
+  // Fallback to keyword detection if no AI features found
+  const features: string[] = []
   const text = fullText.toLowerCase()
+
   if (text.includes('noise cancelling') || text.includes('noise cancellation'))
-    return 'Noise Cancelling'
-  if (text.includes('wireless') || text.includes('bluetooth')) return 'Wireless'
+    features.push('Noise Cancelling')
+  if (text.includes('wireless') || text.includes('bluetooth'))
+    features.push('Wireless')
   if (text.includes('waterproof') || text.includes('water resistant'))
-    return 'Water Resistant'
-  if (text.includes('bass boost') || text.includes('bass')) return 'Bass Boost'
-  return 'Standard'
+    features.push('Water Resistant')
+  if (text.includes('bass boost') || text.includes('bass'))
+    features.push('Bass Boost')
+
+  return features.length > 0 ? features : ['Standard']
 }
 
 function extractConnectivity(fullText: string): string {
@@ -1495,6 +1600,7 @@ function truncateTitle(title: string): string {
   return title.length > 80 ? title.substring(0, 77) + '...' : title
 }
 
+// ✅ UPDATED: FORMAT DESCRIPTION WITH AI-GENERATED FEATURES
 function formatEbayDescription(productContent: any): string {
   let html = `<div style="font-family: Arial, sans-serif;">`
 
@@ -1502,12 +1608,13 @@ function formatEbayDescription(productContent: any): string {
     html += `<h3>Description</h3><p>${productContent.content.replace(/\n/g, '<br>')}</p>`
   }
 
-  if (productContent.features) {
-    html += `<h3>Features</h3><ul>`
-    const features = productContent.features
-      .split('\n')
-      .filter((f: string) => f.trim())
-    features.forEach((feature: string) => {
+  // ✅ Use extracted features from generated content instead of user input
+  const extractedFeatures = extractFeaturesFromContent(
+    productContent.content || ''
+  )
+  if (extractedFeatures.length > 0) {
+    html += `<h3>Key Features</h3><ul>`
+    extractedFeatures.forEach((feature: string) => {
       html += `<li>${feature.trim()}</li>`
     })
     html += `</ul>`
@@ -1526,7 +1633,7 @@ function mapConditionToEbay(
   const electronicsCategories = [
     '9355',
     '177',
-    '14969',
+    '112529',
     '15052',
     '171485',
     '20667',
