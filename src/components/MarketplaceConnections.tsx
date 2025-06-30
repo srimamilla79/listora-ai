@@ -94,101 +94,48 @@ export default function MarketplaceConnections({
     setLoading(true)
     setError(null)
 
-    const timeoutId = setTimeout(() => {
-      console.log('⏰ Database query timeout - using fallback')
-      setLoading(false)
-      setError('Database query timed out. Showing default state.')
-    }, 5000)
-
     try {
       const supabase = createClient()
 
-      // Query Amazon connections
-      console.log('🔍 MarketplaceConnections: Querying Amazon connections...')
-      const { data: amazonConnections, error: amazonError } = await supabase
-        .from('amazon_connections')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('status', 'active')
+      // Run all queries in parallel for speed - NO TIMEOUT
+      console.log('🔍 MarketplaceConnections: Running parallel queries...')
+      const [amazonResult, shopifyResult, ebayResult] = await Promise.all([
+        supabase
+          .from('amazon_connections')
+          .select('access_token, seller_id, marketplace_id, created_at')
+          .eq('user_id', currentUserId)
+          .eq('status', 'active')
+          .limit(1),
 
-      if (amazonError) {
-        console.error(
-          '❌ MarketplaceConnections: Amazon connection error:',
-          amazonError
-        )
-      } else {
-        console.log(
-          '✅ MarketplaceConnections: Amazon query successful, found:',
-          amazonConnections?.length || 0,
-          'connections'
-        )
-      }
+        supabase
+          .from('platform_connections')
+          .select('*') // Select all columns to see what exists
+          .eq('user_id', currentUserId)
+          .eq('platform', 'shopify')
+          .eq('status', 'connected')
+          .limit(1),
 
-      // Query Shopify connections
-      console.log('🔍 MarketplaceConnections: Querying Shopify connections...')
-      const { data: shopifyConnections, error: shopifyError } = await supabase
-        .from('platform_connections')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('platform', 'shopify')
-        .eq('status', 'connected')
+        supabase
+          .from('ebay_connections')
+          .select('access_token, seller_info, created_at')
+          .eq('user_id', currentUserId)
+          .eq('status', 'active')
+          .limit(1),
+      ])
 
-      if (shopifyError) {
-        console.error(
-          '❌ MarketplaceConnections: Shopify connection error:',
-          shopifyError
-        )
-      } else {
-        console.log(
-          '✅ MarketplaceConnections: Shopify query successful, found:',
-          shopifyConnections?.length || 0,
-          'connections'
-        )
-      }
+      console.log('✅ MarketplaceConnections: Parallel queries completed')
+      console.log('🔍 Amazon result:', !!amazonResult.data)
+      console.log('🔍 Shopify result:', !!shopifyResult.data)
+      console.log('🔍 eBay result:', !!ebayResult.data)
 
-      // ✅ NEW: Query eBay connections
-      console.log('🔍 MarketplaceConnections: Querying eBay connections...')
-      const { data: ebayConnections, error: ebayError } = await supabase
-        .from('ebay_connections')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('status', 'active')
-
-      if (ebayError) {
-        console.error(
-          '❌ MarketplaceConnections: eBay connection error:',
-          ebayError
-        )
-      } else {
-        console.log(
-          '✅ MarketplaceConnections: eBay query successful, found:',
-          ebayConnections?.length || 0,
-          'connections'
-        )
-      }
-
-      clearTimeout(timeoutId)
-
-      // Filter valid connections
-      const validAmazonConnection =
-        amazonConnections?.find(
-          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
-        ) || null
-
-      const validShopifyConnection =
-        shopifyConnections && shopifyConnections.length > 0
-          ? shopifyConnections[0]
-          : null
-
-      // ✅ NEW: Filter valid eBay connections
-      const validEbayConnection =
-        ebayConnections?.find(
-          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
-        ) || null
+      // Process results - handle arrays instead of single objects
+      const validAmazonConnection = amazonResult.data?.[0] || null
+      const validShopifyConnection = shopifyResult.data?.[0] || null
+      const validEbayConnection = ebayResult.data?.[0] || null
 
       console.log(
         '🔍 MarketplaceConnections: Valid Amazon connection:',
-        !!validAmazonConnection
+        !!validAmazonConnection?.access_token
       )
       console.log(
         '🔍 MarketplaceConnections: Valid Shopify connection:',
@@ -196,7 +143,7 @@ export default function MarketplaceConnections({
       )
       console.log(
         '🔍 MarketplaceConnections: Valid eBay connection:',
-        !!validEbayConnection
+        !!validEbayConnection?.access_token
       )
 
       const updatedConnections = [
@@ -213,12 +160,15 @@ export default function MarketplaceConnections({
           platform: 'shopify',
           connected: !!validShopifyConnection,
           storeInfo: {
-            shop_name: validShopifyConnection?.shop_name,
-            shop_domain: validShopifyConnection?.shop_domain,
+            shop_name:
+              validShopifyConnection?.platform_store_info?.shop_name ||
+              validShopifyConnection?.shop_name,
+            shop_domain:
+              validShopifyConnection?.platform_store_info?.shop_domain ||
+              validShopifyConnection?.shop_domain,
           },
           connectedAt: validShopifyConnection?.created_at,
         },
-        // ✅ NEW: Add eBay connection
         {
           platform: 'ebay',
           connected: !!validEbayConnection?.access_token,
@@ -240,22 +190,21 @@ export default function MarketplaceConnections({
       setConnections(updatedConnections)
       console.log('✅ Marketplace connections loaded:', updatedConnections)
 
-      // Notify parent components
+      // Notify parent components - EXACT SAME AS BEFORE
       if (onConnectionChange) {
         onConnectionChange('amazon', !!validAmazonConnection?.access_token)
         onConnectionChange('shopify', !!validShopifyConnection)
-        onConnectionChange('ebay', !!validEbayConnection?.access_token) // ✅ NEW
-        onConnectionChange('etsy', false) // Always false for coming soon
+        onConnectionChange('ebay', !!validEbayConnection?.access_token)
+        onConnectionChange('etsy', false)
       }
     } catch (error) {
-      clearTimeout(timeoutId)
       console.error('❌ Error loading connections:', error)
 
-      // Graceful fallback
+      // Graceful fallback - EXACT SAME AS BEFORE
       setConnections([
         { platform: 'amazon', connected: false },
         { platform: 'shopify', connected: false },
-        { platform: 'ebay', connected: false }, // ✅ NEW
+        { platform: 'ebay', connected: false },
         {
           platform: 'etsy',
           connected: false,
@@ -267,7 +216,7 @@ export default function MarketplaceConnections({
       if (onConnectionChange) {
         onConnectionChange('amazon', false)
         onConnectionChange('shopify', false)
-        onConnectionChange('ebay', false) // ✅ NEW
+        onConnectionChange('ebay', false)
         onConnectionChange('etsy', false)
       }
     } finally {
