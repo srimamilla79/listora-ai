@@ -1,5 +1,5 @@
 // src/app/api/ebay/oauth/route.ts
-// eBay OAuth with basic scopes first
+// eBay OAuth with environment-aware URLs
 
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -12,9 +12,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
 
-    // ✅ VERIFY: Ensure we're using sandbox URL
+    // ✅ ENVIRONMENT-AWARE: Uses production or sandbox based on EBAY_ENVIRONMENT
     const ebayAuthUrl = new URL(
-      'https://auth.sandbox.ebay.com/oauth2/authorize'
+      process.env.EBAY_ENVIRONMENT === 'sandbox'
+        ? 'https://auth.sandbox.ebay.com/oauth2/authorize'
+        : 'https://auth.ebay.com/oauth2/authorize'
     )
 
     const params = {
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
     })
 
     console.log(
-      '🔗 Redirecting to eBay OAuth with basic scope:',
+      `🔗 Redirecting to eBay OAuth (${process.env.EBAY_ENVIRONMENT}):`,
       ebayAuthUrl.toString()
     )
 

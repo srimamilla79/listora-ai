@@ -1,5 +1,5 @@
 // src/app/api/ebay/oauth/callback/route.ts
-// Fixed eBay OAuth callback with RuName
+// Fixed eBay OAuth callback with environment-aware URLs
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     console.log('✅ eBay OAuth callback received:', {
       code: code.substring(0, 10) + '...',
       userId: state,
+      environment: process.env.EBAY_ENVIRONMENT,
     })
 
     // Exchange code for access token
@@ -83,11 +84,20 @@ export async function GET(request: NextRequest) {
 
 // Helper function to exchange code for token
 async function exchangeCodeForToken(code: string) {
-  const tokenUrl = 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
+  // ✅ ENVIRONMENT-AWARE: Uses production or sandbox based on EBAY_ENVIRONMENT
+  const tokenUrl =
+    process.env.EBAY_ENVIRONMENT === 'sandbox'
+      ? 'https://api.sandbox.ebay.com/identity/v1/oauth2/token'
+      : 'https://api.ebay.com/identity/v1/oauth2/token'
 
   const credentials = Buffer.from(
     `${process.env.EBAY_APP_ID}:${process.env.EBAY_CERT_ID}`
   ).toString('base64')
+
+  console.log(
+    `🔄 Exchanging code for token (${process.env.EBAY_ENVIRONMENT}):`,
+    tokenUrl
+  )
 
   const response = await fetch(tokenUrl, {
     method: 'POST',
@@ -104,6 +114,7 @@ async function exchangeCodeForToken(code: string) {
 
   if (!response.ok) {
     const errorText = await response.text()
+    console.error('❌ eBay token exchange failed:', errorText)
     throw new Error(`eBay token exchange failed: ${errorText}`)
   }
 
@@ -113,19 +124,23 @@ async function exchangeCodeForToken(code: string) {
 // Helper function to get seller info
 async function getEbaySellerInfo(accessToken: string) {
   try {
-    const response = await fetch(
-      'https://api.sandbox.ebay.com/sell/account/v1/seller_account',
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    // ✅ ENVIRONMENT-AWARE: Uses production or sandbox based on EBAY_ENVIRONMENT
+    const apiUrl =
+      process.env.EBAY_ENVIRONMENT === 'sandbox'
+        ? 'https://api.sandbox.ebay.com/sell/account/v1/seller_account'
+        : 'https://api.ebay.com/sell/account/v1/seller_account'
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    })
 
     if (response.ok) {
       return await response.json()
     } else {
+      console.log('⚠️ Could not fetch seller info, using default')
       return { seller_id: 'unknown', status: 'connected' }
     }
   } catch (error) {
