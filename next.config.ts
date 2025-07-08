@@ -1,6 +1,15 @@
 import type { NextConfig } from 'next'
 
+const withMDX = require('@next/mdx')({
+  extension: /\.mdx?$/,
+  options: {
+    remarkPlugins: [],
+    rehypePlugins: [],
+  },
+})
+
 const nextConfig: NextConfig = {
+  pageExtensions: ['js', 'jsx', 'ts', 'tsx', 'md', 'mdx'],
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -45,4 +54,4 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+export default withMDX(nextConfig)

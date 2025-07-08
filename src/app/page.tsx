@@ -696,8 +696,8 @@ export default function HomePage() {
               <ListoraAILogo size="header" showText={true} />
             </Link>
 
-            {/* Desktop Navigation - Always visible */}
-            <nav className="hidden md:flex items-center space-x-8">
+            {/* Unified Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-6">
               <Link
                 href="/"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
@@ -723,39 +723,34 @@ export default function HomePage() {
                 About
               </Link>
               <Link
-                href="/contact"
+                href="/blog"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
-                Contact
+                Blog
               </Link>
-            </nav>
 
-            {/* Action Buttons - Always visible */}
-            <div className="flex items-center space-x-3">
-              {/* Login Button */}
+              {/* Separator */}
+              <div className="h-4 w-px bg-gray-300"></div>
+
               <Link
                 href="/login"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium px-4 py-2 rounded-lg hover:bg-gray-100"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
                 Login
               </Link>
-
-              {/* Book Demo Button */}
               <Link
                 href="/demo"
                 className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
               >
                 Book Demo
               </Link>
-
-              {/* Start Free Trial Button */}
               <Link
                 href="/signup"
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
               >
                 Start Free Trial
               </Link>
-            </div>
+            </nav>
 
             {/* Mobile Menu Button - Add this for mobile responsiveness */}
             <div className="md:hidden">
@@ -1727,7 +1722,12 @@ export default function HomePage() {
                   </button>
                 </li>
                 <li>
-                  <span className="text-gray-500">Blog</span>
+                  <Link
+                    href="/blog"
+                    className="hover:text-white transition-colors cursor-pointer"
+                  >
+                    Blog
+                  </Link>
                 </li>
                 <li>
                   <span className="text-gray-500">Careers</span>

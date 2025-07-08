@@ -276,26 +276,26 @@ export default function OptimizedSignupPage() {
               <ListoraAILogo size="header" showText={true} />
             </Link>
 
-            {/* Desktop Navigation - Always visible */}
-            <nav className="hidden md:flex items-center space-x-8">
+            {/* Unified Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-6">
               <Link
                 href="/"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
                 Home
               </Link>
-              <Link
-                href="/#features-section"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              <button
+                onClick={() => (window.location.href = '/#features-section')}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
               >
                 Features
-              </Link>
-              <Link
-                href="/#pricing-section"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              </button>
+              <button
+                onClick={() => (window.location.href = '/#pricing-section')}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
               >
                 Pricing
-              </Link>
+              </button>
               <Link
                 href="/about"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
@@ -303,39 +303,34 @@ export default function OptimizedSignupPage() {
                 About
               </Link>
               <Link
-                href="/contact"
+                href="/blog"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
-                Contact
+                Blog
               </Link>
-            </nav>
 
-            {/* Action Buttons - Always visible */}
-            <div className="flex items-center space-x-3">
-              {/* Login Button */}
+              {/* Separator */}
+              <div className="h-4 w-px bg-gray-300"></div>
+
               <Link
                 href="/login"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium px-4 py-2 rounded-lg hover:bg-gray-100"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
                 Login
               </Link>
-
-              {/* Book Demo Button */}
               <Link
                 href="/demo"
                 className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
               >
                 Book Demo
               </Link>
-
-              {/* Start Free Trial Button - Active State */}
               <Link
                 href="/signup"
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-lg font-medium shadow-lg"
               >
                 Start Free Trial
               </Link>
-            </div>
+            </nav>
 
             {/* Mobile Menu Button */}
             <div className="md:hidden">

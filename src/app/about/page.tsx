@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import ListoraAILogo from '@/components/ui/ListoraAILogo'
 import {
   Zap,
   Users,
@@ -262,39 +263,34 @@ export default function EnhancedAboutUsPage() {
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
+            {/* Logo - Updated to use ListoraAILogo component */}
             <Link
               href="/"
               className="flex items-center hover:opacity-80 transition-opacity"
             >
-              <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-white font-bold text-sm">L</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">
-                Listora AI
-              </span>
+              <ListoraAILogo size="header" showText={true} />
             </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-8">
+            {/* Unified Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-6">
               <Link
                 href="/"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
                 Home
               </Link>
-              <Link
-                href="/#features-section"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              <button
+                onClick={() => (window.location.href = '/#features-section')}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
               >
                 Features
-              </Link>
-              <Link
-                href="/#pricing-section"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+              </button>
+              <button
+                onClick={() => (window.location.href = '/#pricing-section')}
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
               >
                 Pricing
-              </Link>
+              </button>
               <Link
                 href="/about"
                 className="text-indigo-600 font-medium border-b-2 border-indigo-600"
@@ -302,18 +298,18 @@ export default function EnhancedAboutUsPage() {
                 About
               </Link>
               <Link
-                href="/contact"
+                href="/blog"
                 className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
-                Contact
+                Blog
               </Link>
-            </nav>
 
-            {/* Action Buttons */}
-            <div className="flex items-center space-x-3">
+              {/* Separator */}
+              <div className="h-4 w-px bg-gray-300"></div>
+
               <Link
                 href="/login"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium px-4 py-2 rounded-lg hover:bg-gray-100"
+                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
               >
                 Login
               </Link>
@@ -329,7 +325,7 @@ export default function EnhancedAboutUsPage() {
               >
                 Start Free Trial
               </Link>
-            </div>
+            </nav>
 
             {/* Mobile Menu Button */}
             <div className="md:hidden">
@@ -1086,9 +1082,7 @@ export default function EnhancedAboutUsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             <div>
               <div className="flex items-center space-x-3 mb-6">
-                <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">L</span>
-                </div>
+                <ListoraAILogo size="md" showText={false} />
                 <span className="text-xl font-bold">Listora AI</span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
