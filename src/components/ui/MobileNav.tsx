@@ -94,10 +94,10 @@ export default function MobileNav({ currentPage }: MobileNavProps) {
             onClick={closeMenu}
           />
 
-          {/* Menu Panel with ref for click detection */}
+          {/* Menu Panel - NOW SLIDES FROM LEFT */}
           <div
             ref={menuRef}
-            className="fixed top-0 right-0 h-full w-72 bg-white shadow-2xl z-[70] md:hidden transform translate-x-0"
+            className="fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-[70] md:hidden transform translate-x-0"
           >
             {/* Compact Header */}
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3">

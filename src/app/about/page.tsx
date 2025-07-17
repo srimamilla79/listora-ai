@@ -141,7 +141,8 @@ export default function EnhancedAboutUsPage() {
     },
     {
       phase: 'Integration',
-      title: 'Triple Platform Power: Amazon + Shopify + eBay Direct Publishing',
+      title:
+        'Triple Platform Power: Amazon Optimization + Shopify & eBay Direct Publishing',
       description:
         'Professional Amazon listing optimization with step-by-step guidance, direct one-click publishing to Shopify with seamless seller integration, and revolutionary eBay direct listing with AI-powered category detection and Taxonomy API.',
       icon: ShoppingCart,
@@ -264,13 +265,19 @@ export default function EnhancedAboutUsPage() {
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo - Updated to use ListoraAILogo component */}
-            <Link
-              href="/"
-              className="flex items-center hover:opacity-80 transition-opacity"
-            >
-              <ListoraAILogo size="header" showText={true} />
-            </Link>
+            {/* Left Side: Mobile Menu + Logo */}
+            <div className="flex items-center space-x-3">
+              {/* Mobile Navigation Component - NOW ON LEFT */}
+              <MobileNav currentPage="about" />
+
+              {/* Logo */}
+              <Link
+                href="/"
+                className="flex items-center hover:opacity-80 transition-opacity"
+              >
+                <ListoraAILogo size="header" showText={true} />
+              </Link>
+            </div>
 
             {/* Unified Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-6">
@@ -327,9 +334,6 @@ export default function EnhancedAboutUsPage() {
                 Start Free Trial
               </Link>
             </nav>
-
-            {/* Mobile Navigation Component */}
-            <MobileNav currentPage="about" />
           </div>
         </div>
       </header>
@@ -377,7 +381,7 @@ export default function EnhancedAboutUsPage() {
               </div>
               <div className="text-left">
                 <div className="text-lg font-bold text-green-800">
-                  Amazon + Shopify + eBay Direct Publishing
+                  Amazon Optimization + Shopify & eBay Direct Publishing
                 </div>
                 <div className="text-sm text-green-700">
                   Revolutionary triple platform AI-powered integration
@@ -862,8 +866,9 @@ export default function EnhancedAboutUsPage() {
                     <p className="text-gray-700 text-sm">
                       "Every entrepreneur worldwide deserves the same powerful
                       tools as big corporations. Multilingual Voice (99+
-                      languages) + AI + Direct Amazon, Shopify & eBay Publishing
-                      = The future of global content creation."
+                      languages) + AI + Amazon Optimization, Shopify & eBay
+                      Direct Publishing = The future of global content
+                      creation."
                     </p>
                   </div>
 
@@ -1047,7 +1052,9 @@ export default function EnhancedAboutUsPage() {
             </div>
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-400" />
-              <span>Amazon + Shopify + eBay publishing</span>
+              <span>
+                Amazon Optimization + Shopify & eBay Direct Publishing
+              </span>
             </div>
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-400" />

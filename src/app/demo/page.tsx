@@ -257,13 +257,19 @@ This is a demo request - please follow up soon to schedule a personalized demons
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo - Always clickable to home */}
-            <Link
-              href="/"
-              className="flex items-center hover:opacity-80 transition-opacity"
-            >
-              <ListoraAILogo size="header" showText={true} />
-            </Link>
+            {/* Left Side: Mobile Menu + Logo */}
+            <div className="flex items-center space-x-3">
+              {/* Mobile Navigation Component - NOW ON LEFT */}
+              <MobileNav currentPage="demo" />
+
+              {/* Logo */}
+              <Link
+                href="/"
+                className="flex items-center hover:opacity-80 transition-opacity"
+              >
+                <ListoraAILogo size="header" showText={true} />
+              </Link>
+            </div>
 
             {/* Unified Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-6">
@@ -320,9 +326,6 @@ This is a demo request - please follow up soon to schedule a personalized demons
                 Start Free Trial
               </Link>
             </nav>
-
-            {/* Mobile Navigation Component */}
-            <MobileNav currentPage="demo" />
           </div>
         </div>
       </header>
