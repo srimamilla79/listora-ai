@@ -39,6 +39,7 @@ import {
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 import Link from 'next/link'
+import MobileNav from '@/components/ui/MobileNav'
 
 export default function HomePage() {
   const [activeFeature, setActiveFeature] = useState(0)
@@ -684,7 +685,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Enhanced Header - REMOVED REVIEWS TAB */}
+      {/* Enhanced Header with MobileNav Component */}
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -700,7 +701,7 @@ export default function HomePage() {
             <nav className="hidden md:flex items-center space-x-6">
               <Link
                 href="/"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-indigo-600 font-medium border-b-2 border-indigo-600 px-4 py-2"
               >
                 Home
               </Link>
@@ -752,24 +753,8 @@ export default function HomePage() {
               </Link>
             </nav>
 
-            {/* Mobile Menu Button - Add this for mobile responsiveness */}
-            <div className="md:hidden">
-              <button className="text-gray-600 hover:text-indigo-600 p-2">
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
-            </div>
+            {/* Mobile Navigation Component */}
+            <MobileNav currentPage="home" />
           </div>
         </div>
       </header>

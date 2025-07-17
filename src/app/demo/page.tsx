@@ -29,6 +29,7 @@ import {
   Award,
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
+import MobileNav from '@/components/ui/MobileNav'
 
 export default function BookDemoPage() {
   const [formData, setFormData] = useState({
@@ -252,7 +253,7 @@ This is a demo request - please follow up soon to schedule a personalized demons
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Header */}
+      {/* Header with MobileNav Component */}
       <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -320,24 +321,8 @@ This is a demo request - please follow up soon to schedule a personalized demons
               </Link>
             </nav>
 
-            {/* Mobile Menu Button */}
-            <div className="md:hidden">
-              <button className="text-gray-600 hover:text-indigo-600 p-2">
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
-            </div>
+            {/* Mobile Navigation Component */}
+            <MobileNav currentPage="demo" />
           </div>
         </div>
       </header>
