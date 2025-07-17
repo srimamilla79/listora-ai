@@ -426,7 +426,19 @@ export default function EnhancedBulkCSVUploadPage() {
               return
             }
 
-            setCurrentJob(result.job)
+            // Ensure progress is always set on the job object
+            let jobWithProgress = { ...result.job }
+            if (typeof jobWithProgress.progress !== 'number') {
+              // Calculate progress from stats if not present
+              const stats = getJobStats(jobWithProgress)
+              if (stats.total > 0) {
+                jobWithProgress.progress =
+                  ((stats.completed + stats.failed) / stats.total) * 100
+              } else {
+                jobWithProgress.progress = 0
+              }
+            }
+            setCurrentJob(jobWithProgress)
 
             // Stop polling if job is completed or failed
             if (

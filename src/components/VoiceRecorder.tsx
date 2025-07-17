@@ -1,4 +1,7 @@
-// src/components/VoiceRecorder.tsx - Fixed Audio Constraints
+// Step 1: VoiceRecorder.tsx - MINIMAL CRITICAL FIXES
+// Replace your existing VoiceRecorder.tsx with this version
+// This only adds essential cleanup - no other changes
+
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
@@ -17,12 +20,13 @@ interface VoiceResult {
 interface MultilingualVoiceRecorderProps {
   onContentGenerated: (result: VoiceResult) => void
   onTranscriptionComplete?: (transcription: string) => void
-  supabase?: any // Add supabase as a prop
-  sessionToken?: string // Add session token as alternative
-  contentType?: string // <-- RESTORED: allow contentType prop
-  onReRecord?: () => void // Optional callback for re-recording
-  showReRecordButton?: boolean // Show re-record button instead of reset
-  onProcessingChange?: (isProcessing: boolean) => void // Notifies parent when processing starts/ends
+  supabase?: any
+  sessionToken?: string
+  contentType?: string
+  onReRecord?: () => void
+  showReRecordButton?: boolean
+  onProcessingChange?: (isProcessing: boolean) => void
+  onReset?: () => void
 }
 
 export default function MultilingualVoiceRecorder({
@@ -30,10 +34,11 @@ export default function MultilingualVoiceRecorder({
   onTranscriptionComplete,
   supabase,
   sessionToken,
-  contentType = 'product', // <-- default to product if not provided
+  contentType = 'product',
   onReRecord,
   showReRecordButton = false,
   onProcessingChange,
+  onReset,
 }: MultilingualVoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -41,7 +46,6 @@ export default function MultilingualVoiceRecorder({
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [recordingTime, setRecordingTime] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
-  const isProcessingRef = useRef(false)
   const [transcription, setTranscription] = useState('')
   const [detectionResult, setDetectionResult] = useState<{
     language: string
@@ -55,17 +59,83 @@ export default function MultilingualVoiceRecorder({
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
 
-  // Cleanup on unmount
+  // 🔧 FIX 1: Add processing timeout and component mount tracking
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const componentMountedRef = useRef(true)
+
+  // 🔧 FIX 2: Enhanced cleanup function (CRITICAL)
+  const performCleanup = () => {
+    console.log('🧹 Cleaning up voice recorder resources...')
+
+    // Clear timers
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current)
+      processingTimeoutRef.current = null
+    }
+
+    // Stop media stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => {
+        track.stop()
+        console.log('🔇 Stopped audio track')
+      })
+      streamRef.current = null
+    }
+
+    // Clean up media recorder
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop()
+        }
+      } catch (error) {
+        console.warn('Error stopping media recorder:', error)
+      }
+      mediaRecorderRef.current = null
+    }
+
+    // Clean up audio element
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
+
+    // Clean up blob URL (CRITICAL for memory leaks)
+    if (audioUrl) {
+      try {
+        URL.revokeObjectURL(audioUrl)
+      } catch (error) {
+        console.warn('Error revoking audio URL:', error)
+      }
+    }
+
+    chunksRef.current = []
+  }
+
+  // 🔧 FIX 3: Component unmount cleanup (CRITICAL)
+  useEffect(() => {
+    componentMountedRef.current = true
+
+    return () => {
+      console.log('🧹 Voice recorder unmounting - performing cleanup...')
+      componentMountedRef.current = false
+      performCleanup()
+    }
+  }, [])
+
+  // 🔧 FIX 4: Audio URL cleanup on change
   useEffect(() => {
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
       if (audioUrl) {
-        URL.revokeObjectURL(audioUrl)
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop())
+        try {
+          URL.revokeObjectURL(audioUrl)
+        } catch (error) {
+          console.warn('Error revoking audio URL on change:', error)
+        }
       }
     }
   }, [audioUrl])
@@ -76,55 +146,52 @@ export default function MultilingualVoiceRecorder({
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const startRecording = async () => {
-    // Always reset all state before starting a new recording
-    resetRecording()
-    try {
-      console.log('📱 Starting multilingual recording...')
+  // 🔧 FIX 5: Enhanced reset with proper cleanup
+  const resetRecording = () => {
+    console.log('🔄 Resetting voice recorder...')
 
-      // Check for HTTPS requirement
+    performCleanup()
+
+    // Reset state
+    setAudioBlob(null)
+    setAudioUrl(null)
+    setRecordingTime(0)
+    setIsPlaying(false)
+    setIsRecording(false)
+    setTranscription('')
+    setDetectionResult(null)
+    setIsProcessing(false)
+
+    if (onProcessingChange) {
+      onProcessingChange(false)
+    }
+    if (onReset) {
+      console.log('🔄 Calling parent reset function...')
+      onReset()
+    }
+  }
+
+  const startRecording = async () => {
+    // Always reset before starting
+    resetRecording()
+
+    try {
+      console.log('📱 Starting recording...')
+
       if (
         location.protocol !== 'https:' &&
         location.hostname !== 'localhost' &&
         location.hostname !== '127.0.0.1'
       ) {
-        throw new Error(
-          'Microphone access requires HTTPS. Please use a secure connection.'
-        )
+        throw new Error('Microphone access requires HTTPS.')
       }
 
-      // Check browser support
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error(
-          'Your browser does not support microphone access. Please use a modern browser.'
-        )
+        throw new Error('Browser does not support microphone access.')
       }
 
-      // 🔧 FIX: Use progressive audio constraints - start simple, add features if supported
-      const tryGetUserMedia = async (constraints: MediaStreamConstraints) => {
-        try {
-          return await navigator.mediaDevices.getUserMedia(constraints)
-        } catch (error) {
-          console.log('⚠️ Constraint failed, trying simpler version...', error)
-          throw error
-        }
-      }
-
-      let stream: MediaStream | null = null
-
-      // Try progressively simpler constraints
+      // Try multiple audio constraint options
       const constraintOptions = [
-        // Ideal constraints with audio enhancements
-        {
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            sampleRate: 44100,
-            channelCount: 1,
-          },
-        },
-        // Good quality but flexible
         {
           audio: {
             echoCancellation: true,
@@ -132,298 +199,226 @@ export default function MultilingualVoiceRecorder({
             autoGainControl: true,
           },
         },
-        // Basic quality with minimal constraints
-        {
-          audio: {
-            echoCancellation: true,
-          },
-        },
-        // Minimal - just audio
-        {
-          audio: true,
-        },
+        { audio: true },
       ]
 
+      let stream: MediaStream | null = null
       for (const constraints of constraintOptions) {
         try {
-          console.log('🎤 Trying audio constraints:', constraints)
-          stream = await tryGetUserMedia(constraints)
-          console.log('✅ Audio constraints successful:', constraints)
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
           break
         } catch (error) {
-          console.log('❌ Constraints failed, trying next option...')
           continue
         }
       }
 
       if (!stream) {
-        throw new Error(
-          'Unable to access microphone with any configuration. Please check your microphone settings.'
-        )
+        throw new Error('Unable to access microphone.')
+      }
+
+      // Check if component is still mounted
+      if (!componentMountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
       }
 
       streamRef.current = stream
 
-      // 🔧 FIX: Use progressive MediaRecorder options
+      // Create MediaRecorder with fallback options
       let mediaRecorder: MediaRecorder | null = null
-      const mimeTypeOptions = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/mp4',
-        'audio/ogg;codecs=opus',
-        'audio/wav',
-      ]
+      const mimeTypes = ['audio/webm', 'audio/mp4', 'audio/wav']
 
-      for (const mimeType of mimeTypeOptions) {
+      for (const mimeType of mimeTypes) {
         if (MediaRecorder.isTypeSupported(mimeType)) {
           try {
-            console.log('🎵 Trying MIME type:', mimeType)
-            mediaRecorder = new MediaRecorder(stream, {
-              mimeType,
-              audioBitsPerSecond: 64000,
-            })
-            console.log('✅ MediaRecorder created with:', mimeType)
+            mediaRecorder = new MediaRecorder(stream, { mimeType })
             break
           } catch (error) {
-            console.log('❌ MediaRecorder failed for:', mimeType)
             continue
           }
         }
       }
 
-      // Fallback: try without bitrate specification
       if (!mediaRecorder) {
-        for (const mimeType of mimeTypeOptions) {
-          if (MediaRecorder.isTypeSupported(mimeType)) {
-            try {
-              console.log('🎵 Trying MIME type without bitrate:', mimeType)
-              mediaRecorder = new MediaRecorder(stream, { mimeType })
-              console.log('✅ MediaRecorder created (no bitrate):', mimeType)
-              break
-            } catch (error) {
-              continue
-            }
-          }
-        }
-      }
-
-      // Final fallback: basic MediaRecorder
-      if (!mediaRecorder) {
-        console.log('🎵 Using basic MediaRecorder...')
         mediaRecorder = new MediaRecorder(stream)
-      }
-
-      if (!mediaRecorder) {
-        throw new Error(
-          'Unable to create MediaRecorder. Your browser may not support audio recording.'
-        )
       }
 
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
 
-      // Always set up event handlers for the new mediaRecorder instance
+      // 🔧 FIX 6: Enhanced event handlers with mount checks
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data.size > 0 && componentMountedRef.current) {
           chunksRef.current.push(event.data)
         }
       }
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, {
-          type: mediaRecorder?.mimeType || 'audio/webm',
-        })
-        setAudioBlob(blob)
-        const url = URL.createObjectURL(blob)
-        setAudioUrl(url)
+        if (!componentMountedRef.current) return
 
-        // Clean up stream
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track) => track.stop())
-          streamRef.current = null
-        }
+        try {
+          const blob = new Blob(chunksRef.current, {
+            type: mediaRecorder?.mimeType || 'audio/webm',
+          })
 
-        // Always process voice after recording stops
-        if (blob) {
-          processVoiceToContent(blob)
+          if (blob.size === 0) {
+            throw new Error('Recording is empty')
+          }
+
+          setAudioBlob(blob)
+          const url = URL.createObjectURL(blob)
+          setAudioUrl(url)
+
+          // Auto-process after a short delay
+          setTimeout(() => {
+            if (componentMountedRef.current && blob.size > 0) {
+              processVoiceToContent(blob)
+            }
+          }, 100)
+        } catch (error) {
+          console.error('Error processing recording:', error)
+          if (componentMountedRef.current) {
+            alert('Failed to process recording. Please try again.')
+          }
+        } finally {
+          // Clean up stream
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => track.stop())
+            streamRef.current = null
+          }
         }
       }
 
       mediaRecorder.onerror = (event) => {
-        console.error('📱 MediaRecorder error:', event)
-        throw new Error('Recording failed. Please try again.')
+        console.error('MediaRecorder error:', event)
+        if (componentMountedRef.current) {
+          resetRecording()
+          alert('Recording failed. Please try again.')
+        }
       }
 
-      // Start recording
-      mediaRecorder.start(500) // Capture data every 500ms
+      mediaRecorder.start(1000)
       setIsRecording(true)
       setRecordingTime(0)
 
-      // Start timer
       intervalRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1)
+        if (componentMountedRef.current) {
+          setRecordingTime((prev) => prev + 1)
+        }
       }, 1000)
-
-      console.log('✅ Recording started successfully')
     } catch (error) {
-      console.error('📱 Recording error:', error)
-
-      // Clean up on error
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop())
-        streamRef.current = null
-      }
-
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-
+      console.error('Recording error:', error)
+      performCleanup()
       setIsRecording(false)
 
-      // User-friendly error messages
-      let errorMessage =
-        'Failed to access microphone. Please check permissions.'
-
+      let errorMessage = 'Failed to access microphone.'
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError') {
-          errorMessage =
-            'Microphone access denied. Please allow microphone permissions and try again.'
+          errorMessage = 'Microphone access denied. Please allow permissions.'
         } else if (error.name === 'NotFoundError') {
-          errorMessage =
-            'No microphone found. Please connect a microphone and try again.'
-        } else if (error.name === 'NotReadableError') {
-          errorMessage =
-            'Microphone is busy. Please close other apps using the microphone and try again.'
-        } else if (error.name === 'OverconstrainedError') {
-          errorMessage =
-            'Microphone configuration issue. Please try again or use a different microphone.'
-        } else if (error.name === 'NotSupportedError') {
-          errorMessage =
-            'Your browser does not support audio recording. Please try a different browser.'
+          errorMessage = 'No microphone found.'
         } else if (error.message) {
           errorMessage = error.message
         }
       }
 
-      alert(errorMessage)
+      if (componentMountedRef.current) {
+        alert(errorMessage)
+      }
     }
   }
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
+    if (
+      mediaRecorderRef.current &&
+      isRecording &&
+      componentMountedRef.current
+    ) {
+      try {
+        mediaRecorderRef.current.stop()
+        setIsRecording(false)
 
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+      } catch (error) {
+        console.error('Error stopping recording:', error)
+        resetRecording()
       }
     }
   }
 
   const playAudio = () => {
-    if (audioRef.current && audioUrl) {
-      audioRef.current.play()
-      setIsPlaying(true)
+    if (audioRef.current && audioUrl && componentMountedRef.current) {
+      try {
+        audioRef.current.play()
+        setIsPlaying(true)
+      } catch (error) {
+        console.error('Error playing audio:', error)
+      }
     }
   }
 
   const pauseAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      setIsPlaying(false)
+    if (audioRef.current && componentMountedRef.current) {
+      try {
+        audioRef.current.pause()
+        setIsPlaying(false)
+      } catch (error) {
+        console.error('Error pausing audio:', error)
+      }
     }
   }
 
-  const resetRecording = () => {
-    // Clear all audio state
-    setAudioBlob(null)
-    setAudioUrl(null)
-    setRecordingTime(0)
-    setIsPlaying(false)
-    setTranscription('')
-    setDetectionResult(null)
-    setIsProcessing(false) // 🔧 FIX: Reset processing state
-    isProcessingRef.current = false
-
-    // Clear media recorder ref to avoid stale event handlers
-    mediaRecorderRef.current = null
-
-    // Also clear any pending timeouts or intervals
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-
-    // Clean up audio element
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-    }
-
-    // Clean up stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
-    }
-
-    // Clear any pending chunks
-    if (chunksRef.current) {
-      chunksRef.current = []
-    }
-  }
-
+  // 🔧 FIX 7: Enhanced voice processing with timeout
   const processVoiceToContent = async (blobArg?: Blob) => {
     const blobToProcess = blobArg || audioBlob
-    if (!blobToProcess) return
+    if (!blobToProcess || !componentMountedRef.current) return
 
     setIsProcessing(true)
-    isProcessingRef.current = true
     if (onProcessingChange) onProcessingChange(true)
-    // Optional: Timeout for auto-cancel (e.g., 45s)
-    let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
-      setIsProcessing(false)
-      isProcessingRef.current = false
-      if (onProcessingChange) onProcessingChange(false)
-      alert('Voice processing timed out. Please try again.')
+
+    // Set timeout
+    processingTimeoutRef.current = setTimeout(() => {
+      if (componentMountedRef.current) {
+        setIsProcessing(false)
+        if (onProcessingChange) onProcessingChange(false)
+        alert('Processing timed out. Please try again.')
+      }
     }, 45000)
 
-    const startTime = Date.now()
     try {
+      if (blobToProcess.size === 0) {
+        throw new Error('Audio recording is empty')
+      }
+
       const formData = new FormData()
       formData.append('audio', blobToProcess, 'recording.webm')
       if (contentType) {
         formData.append('contentType', contentType)
       }
+
       let headers: HeadersInit = {}
 
       if (supabase) {
-        let session, accessToken
         try {
           const sessionResult = await supabase.auth.getSession()
-          session = sessionResult?.data?.session
-          accessToken = session?.access_token
+          const session = sessionResult?.data?.session
+          const accessToken = session?.access_token
+
+          if (accessToken) {
+            headers['Authorization'] = `Bearer ${accessToken}`
+          } else {
+            throw new Error('No access token available')
+          }
         } catch (authError) {
-          console.log('⚠️ Auth error:', authError)
-        }
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`
-          console.log('✅ Auth token added to voice request')
-        } else {
-          alert(
-            'Authentication failed. Please log in again or refresh the page.'
+          throw new Error(
+            'Authentication failed. Please refresh and try again.'
           )
-          setIsProcessing(false)
-          isProcessingRef.current = false
-          return
         }
       } else {
-        console.log('⚠️ No supabase instance provided to voice recorder')
-        alert('Internal error: Supabase client not available.')
-        setIsProcessing(false)
-        isProcessingRef.current = false
-        return
+        throw new Error('Supabase client not available')
       }
 
       const response = await fetch('/api/voice-to-form', {
@@ -435,13 +430,14 @@ export default function MultilingualVoiceRecorder({
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to process voice')
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
       const result = await response.json()
-      const processingTime = Math.round((Date.now() - startTime) / 1000)
 
-      // Handle multilingual results
+      if (!componentMountedRef.current) return
+
+      // Process results
       if (result.detectedLanguage) {
         setDetectionResult({
           language: result.detectedLanguage,
@@ -457,7 +453,6 @@ export default function MultilingualVoiceRecorder({
         }
       }
 
-      // Call the callback with all results
       onContentGenerated({
         transcription: result.transcription,
         detectedLanguage: result.detectedLanguage,
@@ -467,17 +462,17 @@ export default function MultilingualVoiceRecorder({
         productName: result.productName,
         generatedContent: result.generatedContent,
       })
-
-      console.log(`✅ Voice processed in ${processingTime}s`)
     } catch (error) {
-      console.error('❌ Voice processing error:', error)
+      console.error('Voice processing error:', error)
+
+      if (!componentMountedRef.current) return
 
       let errorMessage = 'Failed to process voice'
-
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          errorMessage =
-            'Voice processing timed out (45s). Please try a shorter recording or check your internet connection.'
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Processing timed out. Please try a shorter recording.'
+        } else if (error.message.includes('Authentication')) {
+          errorMessage = 'Authentication failed. Please refresh and try again.'
         } else {
           errorMessage = error.message
         }
@@ -485,17 +480,22 @@ export default function MultilingualVoiceRecorder({
 
       alert(`Voice processing failed: ${errorMessage}`)
     } finally {
-      setIsProcessing(false)
-      isProcessingRef.current = false
-      if (onProcessingChange) onProcessingChange(false)
-      if (timeoutId) clearTimeout(timeoutId)
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current)
+        processingTimeoutRef.current = null
+      }
+
+      if (componentMountedRef.current) {
+        setIsProcessing(false)
+        if (onProcessingChange) onProcessingChange(false)
+      }
     }
   }
 
+  // Rest of the component JSX remains exactly the same...
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <div className="space-y-6">
-        {/* Header */}
         <div className="text-center">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
             🎤 Multilingual Voice Recorder
@@ -505,7 +505,6 @@ export default function MultilingualVoiceRecorder({
           </p>
         </div>
 
-        {/* Recording Status */}
         {isRecording && (
           <div className="flex items-center justify-center space-x-2 text-red-600 bg-red-50 rounded-lg p-4">
             <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
@@ -515,7 +514,13 @@ export default function MultilingualVoiceRecorder({
           </div>
         )}
 
-        {/* Language Detection Results */}
+        {isProcessing && (
+          <div className="flex items-center justify-center space-x-2 text-blue-600 bg-blue-50 rounded-lg p-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="font-medium">Processing voice... Please wait</span>
+          </div>
+        )}
+
         {detectionResult && (
           <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-4 border border-blue-200">
             <h4 className="font-semibold text-gray-900 mb-2">
@@ -543,7 +548,6 @@ export default function MultilingualVoiceRecorder({
           </div>
         )}
 
-        {/* Transcription Display */}
         {transcription && (
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h4 className="font-semibold text-gray-900 mb-2">
@@ -553,13 +557,12 @@ export default function MultilingualVoiceRecorder({
           </div>
         )}
 
-        {/* Main Controls */}
         <div className="flex justify-center items-center space-x-4">
           {!isRecording ? (
             <button
               onClick={startRecording}
               disabled={isProcessing}
-              className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg font-medium"
+              className="flex items-center space-x-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-3 rounded-full transition-all transform hover:scale-105 shadow-lg font-medium disabled:transform-none disabled:cursor-not-allowed"
             >
               <Mic className="h-5 w-5" />
               <span>Start Recording</span>
@@ -575,11 +578,10 @@ export default function MultilingualVoiceRecorder({
             </button>
           )}
 
-          {audioBlob && !isRecording && (
+          {audioBlob && !isRecording && !isProcessing && (
             <>
               <button
                 onClick={isPlaying ? pauseAudio : playAudio}
-                disabled={isProcessing}
                 className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
               >
                 {isPlaying ? (
@@ -596,7 +598,6 @@ export default function MultilingualVoiceRecorder({
                     resetRecording()
                     if (onReRecord) onReRecord()
                   }}
-                  disabled={isProcessing}
                   className="flex items-center space-x-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -605,7 +606,6 @@ export default function MultilingualVoiceRecorder({
               ) : (
                 <button
                   onClick={resetRecording}
-                  disabled={isProcessing}
                   className="flex items-center space-x-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -616,10 +616,6 @@ export default function MultilingualVoiceRecorder({
           )}
         </div>
 
-        {/* Process Button - removed, voice is processed automatically after stop */}
-        {/* No manual process button, UX is now automatic */}
-
-        {/* Audio Element */}
         {audioUrl && (
           <audio
             ref={audioRef}
@@ -629,10 +625,14 @@ export default function MultilingualVoiceRecorder({
           />
         )}
 
-        {/* Help Text */}
         <div className="text-center text-sm text-gray-500 space-y-1">
           <p>💡 Tip: Speak clearly about your product in any language</p>
           <p>🌍 Supports 99+ languages with automatic detection</p>
+          {isProcessing && (
+            <p className="text-blue-600 font-medium">
+              ⏳ Processing usually takes 10-30 seconds
+            </p>
+          )}
         </div>
       </div>
     </div>

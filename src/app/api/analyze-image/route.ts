@@ -137,9 +137,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    let completion
+    let completion: OpenAI.Chat.Completions.ChatCompletion
     try {
-      completion = await withTimeout(
+      completion = (await withTimeout(
         openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [
@@ -176,7 +176,7 @@ Keep response focused and under 250 words. This will be used to enhance product 
           temperature: 0.7,
         }),
         14000
-      )
+      )) as OpenAI.Chat.Completions.ChatCompletion
     } catch (openaiError) {
       console.error('4. OpenAI Vision API timed out or failed:', openaiError)
       // Fallback response if OpenAI is too slow or errors
