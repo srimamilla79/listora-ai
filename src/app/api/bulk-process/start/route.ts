@@ -27,7 +27,7 @@ function createServiceRoleClient() {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🚀 Emergency simple bulk process start')
+  console.log('🚀 Simple sequential bulk process start')
 
   try {
     const { products, userId, selectedSections } = await request.json()
@@ -91,23 +91,26 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     const cookies = request.headers.get('cookie')
 
-    // Start simple background processing
-    processProductsInBackground(
-      jobId,
-      productsWithIds,
-      userId,
-      selectedSections,
-      supabase,
-      authHeader,
-      cookies
-    ).catch((error) => {
-      console.error('❌ Background processing failed:', error)
-    })
+    // 🔥 PROCESS FIRST PRODUCT ONLY - Sequential chain
+    if (productsWithIds.length > 0) {
+      processProductSequentially(
+        jobId,
+        productsWithIds,
+        0, // Start with index 0
+        userId,
+        selectedSections,
+        supabase,
+        authHeader,
+        cookies
+      ).catch((error) => {
+        console.error('❌ Sequential processing failed:', error)
+      })
+    }
 
     return NextResponse.json({
       success: true,
       jobId: jobId,
-      message: `Background job started for ${products.length} products`,
+      message: `Sequential job started for ${products.length} products`,
       productsCount: products.length,
     })
   } catch (error) {
@@ -119,78 +122,213 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 🔥 SIMPLE: BASIC PROCESSING THAT ACTUALLY WORKS
-async function processProductsInBackground(
+// 🔥 SIMPLE SEQUENTIAL PROCESSING - One at a time
+async function processProductSequentially(
   jobId: string,
   products: BulkProduct[],
+  currentIndex: number,
   userId: string,
   selectedSections: any,
   supabase: any,
   authHeader?: string | null,
   cookies?: string | null
 ) {
-  console.log(`🚀 Starting SIMPLE processing for ${products.length} products`)
+  console.log(`🔄 Processing product ${currentIndex + 1}/${products.length}`)
+
+  // If we've processed all products, finish up
+  if (currentIndex >= products.length) {
+    console.log('🏁 All products processed, final verification...')
+    await performFinalVerification(jobId, supabase)
+    return
+  }
+
+  const product = products[currentIndex]
 
   try {
-    // 🔥 BATCH OF 2 - Conservative for production
-    const batchSize = 2
+    // Process this one product
+    await processSingleProduct(
+      jobId,
+      product,
+      userId,
+      selectedSections,
+      supabase,
+      authHeader,
+      cookies
+    )
 
-    for (let i = 0; i < products.length; i += batchSize) {
-      const batch = products.slice(i, i + batchSize)
-
-      console.log(`📦 Processing batch ${Math.floor(i / batchSize) + 1}`)
-
-      // Process batch in parallel
-      await Promise.all(
-        batch.map(async (product) => {
-          try {
-            await processProduct(
-              jobId,
-              product,
-              userId,
-              selectedSections,
-              supabase,
-              authHeader,
-              cookies
-            )
-            console.log(`✅ Completed: ${product.product_name}`)
-          } catch (error) {
-            console.error(`❌ Failed: ${product.product_name}`, error)
-          }
-        })
-      )
-
-      // Simple wait between batches
-      if (i + batchSize < products.length) {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-      }
-    }
-
-    console.log(`🏁 All products processed, final verification...`)
-
-    // Simple final verification
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    await performSimpleFinalVerification(jobId, supabase)
+    console.log(
+      `✅ Completed product ${currentIndex + 1}: ${product.product_name}`
+    )
   } catch (error) {
-    console.error(`❌ Critical error:`, error)
+    console.error(`❌ Failed to process product ${currentIndex + 1}:`, error)
 
+    // Mark as failed and continue
+    await updateProductStatus(
+      jobId,
+      product.id,
+      'failed',
+      {
+        error_message:
+          error instanceof Error ? error.message : 'Processing failed',
+      },
+      supabase
+    )
+  }
+
+  // Wait 2 seconds then process next product
+  setTimeout(async () => {
     try {
-      await supabase
-        .from('bulk_jobs')
-        .update({
-          status: 'failed',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', jobId)
-    } catch (updateError) {
-      console.error('❌ Failed to mark job as failed:', updateError)
+      await processProductSequentially(
+        jobId,
+        products,
+        currentIndex + 1,
+        userId,
+        selectedSections,
+        supabase,
+        authHeader,
+        cookies
+      )
+    } catch (error) {
+      console.error(`❌ Failed to continue sequential processing:`, error)
+    }
+  }, 2000) // 2 second delay between products
+}
+
+// 🔥 PROCESS SINGLE PRODUCT
+async function processSingleProduct(
+  jobId: string,
+  product: BulkProduct,
+  userId: string,
+  selectedSections: any,
+  supabase: any,
+  authHeader?: string | null,
+  cookies?: string | null
+) {
+  console.log(`🔄 Processing: ${product.product_name}`)
+
+  // Mark as processing
+  await updateProductStatus(jobId, product.id, 'processing', {}, supabase)
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  if (authHeader) {
+    headers['Authorization'] = authHeader
+  }
+
+  if (cookies) {
+    headers['Cookie'] = cookies
+  }
+
+  // 2-minute timeout per product (very generous)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => {
+    console.log(`⏰ Timeout for ${product.product_name}`)
+    controller.abort()
+  }, 120000) // 2 minutes
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/generate`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          productName: product.product_name,
+          features: product.features,
+          platform: product.platform,
+          isBackgroundJob: true,
+          userId: userId,
+          selectedSections: selectedSections,
+        }),
+        signal: controller.signal,
+      }
+    )
+
+    clearTimeout(timeoutId)
+
+    if (response.ok) {
+      console.log(`✅ API success: ${product.product_name}`)
+      await updateProductStatus(jobId, product.id, 'completed', {}, supabase)
+    } else {
+      console.log(`❌ API failed: ${product.product_name} - ${response.status}`)
+      await updateProductStatus(
+        jobId,
+        product.id,
+        'failed',
+        { error_message: `API error: ${response.status}` },
+        supabase
+      )
+    }
+  } catch (fetchError) {
+    clearTimeout(timeoutId)
+
+    if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+      console.log(`⏰ Request timeout: ${product.product_name}`)
+      await updateProductStatus(
+        jobId,
+        product.id,
+        'failed',
+        { error_message: 'Request timeout after 2 minutes' },
+        supabase
+      )
+    } else {
+      throw fetchError
     }
   }
 }
 
-// 🔥 SIMPLE FINAL VERIFICATION
-async function performSimpleFinalVerification(jobId: string, supabase: any) {
-  console.log('🔍 Simple final verification...')
+// 🔥 SIMPLE STATUS UPDATE
+async function updateProductStatus(
+  jobId: string,
+  productId: string,
+  newStatus: BulkProduct['status'],
+  additionalData: Partial<BulkProduct>,
+  supabase: any
+) {
+  try {
+    const { data: currentJob } = await supabase
+      .from('bulk_jobs')
+      .select('products')
+      .eq('id', jobId)
+      .single()
+
+    if (!currentJob?.products) return
+
+    const updatedProducts = (currentJob.products as BulkProduct[]).map(
+      (p: BulkProduct) =>
+        p.id === productId ? { ...p, status: newStatus, ...additionalData } : p
+    )
+
+    const completedCount = updatedProducts.filter(
+      (p) => p.status === 'completed'
+    ).length
+    const failedCount = updatedProducts.filter(
+      (p) => p.status === 'failed'
+    ).length
+
+    await supabase
+      .from('bulk_jobs')
+      .update({
+        products: updatedProducts,
+        completed_products: completedCount,
+        failed_products: failedCount,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', jobId)
+
+    console.log(
+      `📊 Updated ${productId} to ${newStatus} (${completedCount} completed, ${failedCount} failed)`
+    )
+  } catch (error) {
+    console.log(`⚠️ Status update failed for ${productId}`)
+  }
+}
+
+// 🔥 FINAL VERIFICATION
+async function performFinalVerification(jobId: string, supabase: any) {
+  console.log('🔍 Final verification...')
 
   try {
     const { data: finalJob } = await supabase
@@ -209,10 +347,10 @@ async function performSimpleFinalVerification(jobId: string, supabase: any) {
 
     const products = finalJob.products as BulkProduct[]
 
-    // Count final statuses and fix incomplete ones
     let completedCount = 0
     let failedCount = 0
 
+    // Handle any products still in non-final states
     const finalProducts = products.map((product) => {
       if (product.status === 'processing' || product.status === 'pending') {
         failedCount++
@@ -229,9 +367,6 @@ async function performSimpleFinalVerification(jobId: string, supabase: any) {
       return product
     })
 
-    console.log(`📊 Final: ${completedCount} completed, ${failedCount} failed`)
-
-    // Single final update
     await supabase
       .from('bulk_jobs')
       .update({
@@ -253,120 +388,5 @@ async function performSimpleFinalVerification(jobId: string, supabase: any) {
       .from('bulk_jobs')
       .update({ status: 'completed', updated_at: new Date().toISOString() })
       .eq('id', jobId)
-  }
-}
-
-// 🔥 SIMPLE PRODUCT PROCESSING
-async function processProduct(
-  jobId: string,
-  product: BulkProduct,
-  userId: string,
-  selectedSections: any,
-  supabase: any,
-  authHeader?: string | null,
-  cookies?: string | null
-) {
-  try {
-    console.log(`🔄 Processing: ${product.product_name}`)
-
-    // Mark as processing
-    await updateProductStatus(jobId, product.id, 'processing', supabase)
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    }
-
-    if (authHeader) {
-      headers['Authorization'] = authHeader
-    }
-
-    if (cookies) {
-      headers['Cookie'] = cookies
-    }
-
-    // 90-second timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => {
-      controller.abort()
-    }, 90000)
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/generate`,
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            productName: product.product_name,
-            features: product.features,
-            platform: product.platform,
-            isBackgroundJob: true,
-            userId: userId,
-            selectedSections: selectedSections,
-          }),
-          signal: controller.signal,
-        }
-      )
-
-      clearTimeout(timeoutId)
-
-      if (response.ok) {
-        console.log(`✅ API success: ${product.product_name}`)
-        await updateProductStatus(jobId, product.id, 'completed', supabase)
-      } else {
-        console.log(`❌ API failed: ${product.product_name}`)
-        await updateProductStatus(jobId, product.id, 'failed', supabase)
-      }
-    } catch (fetchError) {
-      clearTimeout(timeoutId)
-      console.log(`❌ Request error: ${product.product_name}`)
-      await updateProductStatus(jobId, product.id, 'failed', supabase)
-    }
-  } catch (error) {
-    console.error(`❌ Error processing ${product.product_name}:`, error)
-    await updateProductStatus(jobId, product.id, 'failed', supabase)
-  }
-}
-
-// 🔥 SIMPLE STATUS UPDATE - NO RETRIES
-async function updateProductStatus(
-  jobId: string,
-  productId: string,
-  newStatus: BulkProduct['status'],
-  supabase: any
-) {
-  try {
-    const { data: currentJob } = await supabase
-      .from('bulk_jobs')
-      .select('products')
-      .eq('id', jobId)
-      .single()
-
-    if (!currentJob?.products) return
-
-    const updatedProducts = (currentJob.products as BulkProduct[]).map(
-      (p: BulkProduct) => (p.id === productId ? { ...p, status: newStatus } : p)
-    )
-
-    const completedCount = updatedProducts.filter(
-      (p) => p.status === 'completed'
-    ).length
-    const failedCount = updatedProducts.filter(
-      (p) => p.status === 'failed'
-    ).length
-
-    await supabase
-      .from('bulk_jobs')
-      .update({
-        products: updatedProducts,
-        completed_products: completedCount,
-        failed_products: failedCount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', jobId)
-
-    console.log(`📊 Updated ${productId} to ${newStatus}`)
-  } catch (error) {
-    console.log(`⚠️ Status update failed, continuing...`)
   }
 }
