@@ -247,7 +247,7 @@ async function processProductsInBackground(
 
     // 🔥 INSTANT FINAL VERIFICATION
     await new Promise((resolve) => setTimeout(resolve, 1000)) // Just 1 second
-    await performFinalVerificationWithTimeoutRecovery(jobId, supabase)
+    await performFinalVerificationWithContentLibraryCheck(jobId, supabase)
   } catch (error) {
     console.error(`❌ Critical error in processing for job ${jobId}:`, error)
 
@@ -372,12 +372,14 @@ async function quickJobStatusUpdate(jobId: string, supabase: any) {
   }
 }
 
-// 🔧 STREAMLINED FINAL VERIFICATION
-async function performFinalVerificationWithTimeoutRecovery(
+// 🔧 ENHANCED FINAL VERIFICATION WITH CONTENT LIBRARY CHECK
+async function performFinalVerificationWithContentLibraryCheck(
   jobId: string,
   supabase: any
 ) {
-  console.log('🔍 Lightning final verification...')
+  console.log(
+    '🔍 Enhanced final verification with content library cross-check...'
+  )
 
   try {
     const { data: finalJob, error: finalJobError } = await supabase
@@ -398,6 +400,58 @@ async function performFinalVerificationWithTimeoutRecovery(
     const products = finalJob.products as BulkProduct[]
     const now = new Date()
     const timeoutThreshold = 5 * 60 * 1000 // 5 minutes
+
+    // 🔍 CROSS-CHECK WITH CONTENT LIBRARY
+    // 🔍 CROSS-CHECK WITH CONTENT LIBRARY
+    console.log('🔍 Cross-checking with content library...')
+
+    try {
+      const { data: contentLibraryItems } = await supabase
+        .from('product_contents')
+        .select('product_name')
+        .eq('user_id', finalJob.user_id)
+        .gte('created_at', finalJob.created_at) // Only content created after job started
+
+      const contentLibraryCount = contentLibraryItems?.length || 0
+      console.log(
+        `📚 Content library shows ${contentLibraryCount} items generated`
+      )
+
+      // If content library has more items than completed status, we have a mismatch
+      const currentCompletedCount = products.filter(
+        (p) => p.status === 'completed'
+      ).length
+      console.log(`📊 Current completed count: ${currentCompletedCount}`)
+
+      if (contentLibraryCount > currentCompletedCount) {
+        console.log(
+          `🔧 Mismatch detected! Content library: ${contentLibraryCount}, Status: ${currentCompletedCount}`
+        )
+
+        // Find products that should be marked as completed
+        const productNames =
+          contentLibraryItems?.map(
+            (item: { product_name: string }) => item.product_name
+          ) || []
+
+        for (const product of products) {
+          if (
+            product.status !== 'completed' &&
+            productNames.includes(product.product_name)
+          ) {
+            console.log(
+              `🔧 Fixing ${product.product_name}: ${product.status} → completed`
+            )
+            product.status = 'completed'
+            delete product.error_message
+          }
+        }
+      }
+    } catch (contentCheckError) {
+      console.log(
+        '⚠️ Content library check failed, continuing with normal verification'
+      )
+    }
 
     // 🔥 FAST TIMEOUT DETECTION AND COUNT
     let completedCount = 0
@@ -464,7 +518,7 @@ async function performFinalVerificationWithTimeoutRecovery(
   }
 }
 
-// 🔥 STREAMLINED PRODUCT PROCESSING
+// 🔥 ENHANCED PRODUCT PROCESSING WITH IMMEDIATE VERIFICATION
 async function processProduct(
   jobId: string,
   product: BulkProduct,
@@ -526,38 +580,42 @@ async function processProduct(
         // 🔥 INSTANT SUCCESS UPDATE
         await quickProductStatusUpdate(jobId, product.id, 'completed', supabase)
 
-        // 🔍 DOUBLE-CHECK SUCCESS UPDATE (ensures accuracy)
-        setTimeout(async () => {
-          try {
-            const { data: currentJob } = await supabase
-              .from('bulk_jobs')
-              .select('products')
-              .eq('id', jobId)
-              .single()
+        // 🔍 IMMEDIATE VERIFICATION (no setTimeout that might get lost)
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 1000)) // Just 1 second wait
 
-            if (currentJob?.products) {
-              const products = currentJob.products as BulkProduct[]
-              const targetProduct = products.find((p) => p.id === product.id)
+          const { data: currentJob } = await supabase
+            .from('bulk_jobs')
+            .select('products')
+            .eq('id', jobId)
+            .single()
 
-              if (targetProduct && targetProduct.status !== 'completed') {
-                console.log(
-                  `🔧 Fixing status for ${product.product_name}: ${targetProduct.status} → completed`
-                )
-                await quickProductStatusUpdate(
-                  jobId,
-                  product.id,
-                  'completed',
-                  supabase
-                )
-              }
+          if (currentJob?.products) {
+            const products = currentJob.products as BulkProduct[]
+            const targetProduct = products.find((p) => p.id === product.id)
+
+            if (targetProduct && targetProduct.status !== 'completed') {
+              console.log(
+                `🔧 Immediate fix for ${product.product_name}: ${targetProduct.status} → completed`
+              )
+              await quickProductStatusUpdate(
+                jobId,
+                product.id,
+                'completed',
+                supabase
+              )
+            } else {
+              console.log(
+                `✅ Status verified correct for ${product.product_name}`
+              )
             }
-          } catch (verifyError) {
-            console.log(
-              `⚠️ Status verification failed for ${product.product_name}`,
-              verifyError
-            )
           }
-        }, 3000) // Check after 3 seconds to ensure status is correct
+        } catch (verifyError) {
+          console.log(
+            `⚠️ Status verification failed for ${product.product_name}`,
+            verifyError
+          )
+        }
       } else {
         const errorText = await response.text()
         console.log(
