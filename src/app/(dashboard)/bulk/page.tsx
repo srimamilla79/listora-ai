@@ -253,7 +253,12 @@ export default function EnhancedBulkCSVUploadPage() {
 
   const [currentJob, setCurrentJob] = useState<BulkJob | null>(null)
   const [isSubmittingJob, setIsSubmittingJob] = useState(false)
-  const jobPollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // 🚀 BULLETPROOF POLLING STATE
+  const [isPolling, setIsPolling] = useState(false)
+  const [pollCount, setPollCount] = useState(0)
+  const activeIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
   const [useBackgroundProcessing, setUseBackgroundProcessing] = useState(true)
   const [showRecoveryModal, setShowRecoveryModal] = useState(false)
   const [recoverySession, setRecoverySession] = useState<BulkJobSession | null>(
@@ -337,8 +342,48 @@ export default function EnhancedBulkCSVUploadPage() {
       const result = await response.json()
       console.log('🚀 Background job started:', result.jobId)
 
-      startJobPolling(result.jobId)
       setCurrentStep('processing')
+
+      // 🚀 IMMEDIATE STATUS CHECK + POLLING START
+      setTimeout(async () => {
+        console.log('🔍 Checking job status immediately after start...')
+
+        try {
+          const statusResponse = await fetch(
+            `/api/bulk-process/status/${result.jobId}?t=${Date.now()}`,
+            {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                Pragma: 'no-cache',
+                Expires: '0',
+              },
+            }
+          )
+
+          if (statusResponse.ok) {
+            const statusResult = await statusResponse.json()
+            console.log(`🔍 Initial job status: ${statusResult.job?.status}`)
+
+            if (statusResult.job) {
+              setCurrentJob(statusResult.job)
+
+              // If still processing, start polling
+              if (statusResult.job.status === 'processing') {
+                console.log('📡 Job is processing, starting polling...')
+                startJobPolling(result.jobId)
+              } else if (statusResult.job.status === 'completed') {
+                console.log('✅ Job already completed!')
+                setCurrentStep('results')
+              }
+            }
+          }
+        } catch (error) {
+          console.error('❌ Initial status check failed:', error)
+          // Fall back to polling anyway
+          startJobPolling(result.jobId)
+        }
+      }, 1000) // Check after 1 second
     } catch (error) {
       console.error('❌ Failed to start background job:', error)
       alert('Failed to start processing. Please try again.')
@@ -347,239 +392,188 @@ export default function EnhancedBulkCSVUploadPage() {
     }
   }
 
+  // 🚀 BULLETPROOF POLLING IMPLEMENTATION
   const startJobPolling = useCallback(
     (jobId: string) => {
-      if (!supabase) return
+      console.log('🚀 startJobPolling called with jobId:', jobId)
 
-      console.log('🔄 Starting job polling for:', jobId)
-
-      if (jobPollingIntervalRef.current) {
-        clearInterval(jobPollingIntervalRef.current)
-        jobPollingIntervalRef.current = null
-        console.log('🛑 Cleared existing polling interval')
+      if (!supabase) {
+        console.log('❌ No supabase client available')
+        return
       }
 
-      let pollCount = 0
-      const maxPolls = 1000
+      console.log('🔄 Starting bulletproof polling for:', jobId)
+
+      // FORCE CLEAR any existing polling - multiple methods
+      if (activeIntervalRef.current) {
+        clearInterval(activeIntervalRef.current)
+        activeIntervalRef.current = null
+        console.log('🛑 Cleared existing interval')
+      }
+
+      // Clear by window if ref fails
+      if (
+        typeof window !== 'undefined' &&
+        (window as any).activePollingInterval
+      ) {
+        clearInterval((window as any).activePollingInterval)
+        delete (window as any).activePollingInterval
+        console.log('🛑 Cleared window interval')
+      }
+
+      setIsPolling(true)
+      setPollCount(0)
+      console.log('✅ Set isPolling to true')
+
+      let pollAttempt = 0
+      const maxPolls = 100
+      const pollInterval = 3000
+      let isPollingActive = true // 🔧 LOCAL FLAG instead of React state
 
       const pollJob = async () => {
-        pollCount++
+        pollAttempt++
+        setPollCount(pollAttempt)
+        console.log(`📊 Starting poll attempt ${pollAttempt}`)
 
-        if (pollCount > maxPolls) {
-          console.log('🛑 Stopping polling - reached maximum attempts')
-          if (jobPollingIntervalRef.current) {
-            clearInterval(jobPollingIntervalRef.current)
-            jobPollingIntervalRef.current = null
-          }
+        // SAFETY: Stop polling if we've tried too many times
+        if (pollAttempt > maxPolls) {
+          console.log('🛑 SAFETY: Stopping polling after 100 attempts')
+          stopPolling()
           return
         }
+
+        // 🔧 REMOVED THE PROBLEMATIC isPolling CHECK
+        // The React state was causing immediate stops due to timing issues
 
         try {
           const {
             data: { session },
           } = await supabase.auth.getSession()
+
           if (!session?.access_token) {
             console.log('❌ No session, stopping polling')
-            if (jobPollingIntervalRef.current) {
-              clearInterval(jobPollingIntervalRef.current)
-              jobPollingIntervalRef.current = null
-            }
+            stopPolling()
             return
           }
 
-          const response = await fetch(`/api/bulk-process/status/${jobId}`, {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          })
-
-          if (response.ok) {
-            const result = await response.json()
-
-            if (!result.job || !result.job.status) {
-              console.log('🛑 Job not found or no status, stopping polling')
-              if (jobPollingIntervalRef.current) {
-                clearInterval(jobPollingIntervalRef.current)
-                jobPollingIntervalRef.current = null
-              }
-              return
+          console.log(`📡 Making status API call for poll ${pollAttempt}`)
+          const response = await fetch(
+            `/api/bulk-process/status/${jobId}?t=${Date.now()}`,
+            {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                Pragma: 'no-cache',
+                Expires: '0',
+              },
             }
+          )
 
-            let jobWithProgress = { ...result.job }
-            if (typeof jobWithProgress.progress !== 'number') {
-              const stats = getJobStats(jobWithProgress)
-              if (stats.total > 0) {
-                jobWithProgress.progress =
-                  ((stats.completed + stats.failed) / stats.total) * 100
-              } else {
-                jobWithProgress.progress = 0
-              }
-            }
-            setCurrentJob(jobWithProgress)
-
-            if (
-              result.job.status === 'completed' ||
-              result.job.status === 'failed'
-            ) {
-              console.log(
-                '🛑 Job finished:',
-                result.job.status,
-                '- Starting final count verification'
-              )
-
-              const verifyFinalCounts = async (
-                attempt = 1,
-                maxAttempts = 8
-              ) => {
-                try {
-                  console.log(
-                    `🔄 Final count verification attempt ${attempt}/${maxAttempts}`
-                  )
-
-                  // Wait longer between attempts for better reliability
-                  if (attempt > 1) {
-                    await new Promise((resolve) => setTimeout(resolve, 2000))
-                  }
-
-                  const finalResponse = await fetch(
-                    `/api/bulk-process/status/${jobId}`,
-                    {
-                      headers: {
-                        Authorization: `Bearer ${session.access_token}`,
-                      },
-                    }
-                  )
-
-                  if (finalResponse.ok) {
-                    const finalResult = await finalResponse.json()
-
-                    const finalStats = getJobStats(finalResult.job)
-                    const expectedTotal = finalStats.total
-                    const actualProcessed =
-                      finalStats.completed + finalStats.failed
-                    const stillProcessing = finalStats.processing
-                    const stillPending = finalStats.pending
-
-                    console.log(`📊 Detailed count check:`)
-                    console.log(`   Expected Total: ${expectedTotal}`)
-                    console.log(`   Completed: ${finalStats.completed}`)
-                    console.log(`   Failed: ${finalStats.failed}`)
-                    console.log(`   Still Processing: ${stillProcessing}`)
-                    console.log(`   Still Pending: ${stillPending}`)
-                    console.log(`   Total Processed: ${actualProcessed}`)
-
-                    // Check if we have all products accounted for AND none are still in progress
-                    const allAccountedFor = actualProcessed >= expectedTotal
-                    const noneInProgress =
-                      stillProcessing === 0 && stillPending === 0
-                    const shouldStop =
-                      allAccountedFor ||
-                      attempt >= maxAttempts ||
-                      noneInProgress
-
-                    if (shouldStop) {
-                      let finalJobWithProgress = { ...finalResult.job }
-                      if (typeof finalJobWithProgress.progress !== 'number') {
-                        if (finalStats.total > 0) {
-                          finalJobWithProgress.progress =
-                            ((finalStats.completed + finalStats.failed) /
-                              finalStats.total) *
-                            100
-                        } else {
-                          finalJobWithProgress.progress = 0
-                        }
-                      }
-
-                      setCurrentJob(finalJobWithProgress)
-                      console.log(
-                        `🎉 Final verified count: ${finalStats.completed}/${finalStats.total}`
-                      )
-                      console.log(
-                        `🎯 Reason for stopping: ${allAccountedFor ? 'All products processed' : attempt >= maxAttempts ? 'Max attempts reached' : 'No products in progress'}`
-                      )
-
-                      if (jobPollingIntervalRef.current) {
-                        clearInterval(jobPollingIntervalRef.current)
-                        jobPollingIntervalRef.current = null
-                      }
-
-                      if (result.job.status === 'completed') {
-                        setCurrentStep('results')
-                      }
-
-                      return
-                    } else {
-                      const missing = expectedTotal - actualProcessed
-                      const inProgress = stillProcessing + stillPending
-                      console.log(
-                        `⏳ Waiting for remaining products (${missing} missing, ${inProgress} still in progress)`
-                      )
-                      // Continue verification without setTimeout - let the next attempt handle the delay
-                      verifyFinalCounts(attempt + 1, maxAttempts)
-                    }
-                  } else {
-                    console.error('❌ Final verification API failed, stopping')
-                    if (jobPollingIntervalRef.current) {
-                      clearInterval(jobPollingIntervalRef.current)
-                      jobPollingIntervalRef.current = null
-                    }
-                    if (result.job.status === 'completed') {
-                      setCurrentStep('results')
-                    }
-                  }
-                } catch (error) {
-                  console.error('❌ Final verification error:', error)
-                  if (attempt >= maxAttempts) {
-                    console.log(
-                      '🛑 Max attempts reached, stopping verification'
-                    )
-                    if (jobPollingIntervalRef.current) {
-                      clearInterval(jobPollingIntervalRef.current)
-                      jobPollingIntervalRef.current = null
-                    }
-                    if (result.job.status === 'completed') {
-                      setCurrentStep('results')
-                    }
-                  } else {
-                    // Retry on error
-                    setTimeout(
-                      () => verifyFinalCounts(attempt + 1, maxAttempts),
-                      2000
-                    )
-                  }
-                }
-              }
-
-              verifyFinalCounts()
-              return
-            }
-
-            console.log(
-              `📊 Poll ${pollCount}: Job status = ${result.job.status}`
-            )
-          } else {
+          if (!response.ok) {
             console.log('❌ Polling API failed, stopping')
-            if (jobPollingIntervalRef.current) {
-              clearInterval(jobPollingIntervalRef.current)
-              jobPollingIntervalRef.current = null
+            stopPolling()
+            return
+          }
+
+          const result = await response.json()
+          console.log(`📊 Poll ${pollAttempt} result:`, result)
+
+          if (!result.job || !result.job.status) {
+            console.log('🛑 Job not found, stopping polling')
+            stopPolling()
+            return
+          }
+
+          // Update job data
+          let jobWithProgress = { ...result.job }
+          if (typeof jobWithProgress.progress !== 'number') {
+            const stats = getJobStats(jobWithProgress)
+            if (stats.total > 0) {
+              jobWithProgress.progress =
+                ((stats.completed + stats.failed) / stats.total) * 100
+            } else {
+              jobWithProgress.progress = 0
             }
+          }
+          setCurrentJob(jobWithProgress)
+
+          console.log(
+            `📊 Poll ${pollAttempt}: Job status = ${result.job.status}`
+          )
+
+          // CHECK FOR COMPLETION
+          if (
+            result.job.status === 'completed' ||
+            result.job.status === 'failed'
+          ) {
+            console.log('🏁 JOB FINISHED! Status:', result.job.status)
+
+            // IMMEDIATE STOP - no delays, no verification, just stop
+            stopPolling()
+
+            // Set the step to results
+            if (result.job.status === 'completed') {
+              setCurrentStep('results')
+              console.log('✅ Job completed successfully!')
+            }
+
+            return // Exit immediately
           }
         } catch (error) {
           console.error('❌ Polling error:', error)
-          if (jobPollingIntervalRef.current) {
-            clearInterval(jobPollingIntervalRef.current)
-            jobPollingIntervalRef.current = null
-          }
+          // Don't stop on error, just continue polling
         }
       }
 
-      pollJob()
-      const interval = setInterval(pollJob, 3000)
-      jobPollingIntervalRef.current = interval
+      // Helper function to completely stop polling
+      const stopPolling = () => {
+        console.log('🛑 STOPPING ALL POLLING')
+        isPollingActive = false // 🔧 Set local flag
 
-      console.log('🔄 Polling interval started with ID:', interval)
+        // Method 1: Clear via ref
+        if (activeIntervalRef.current) {
+          clearInterval(activeIntervalRef.current)
+          activeIntervalRef.current = null
+          console.log('✅ Cleared interval via ref')
+        }
+
+        // Method 2: Clear via window backup
+        if (
+          typeof window !== 'undefined' &&
+          (window as any).activePollingInterval
+        ) {
+          clearInterval((window as any).activePollingInterval)
+          delete (window as any).activePollingInterval
+          console.log('✅ Cleared interval via window backup')
+        }
+
+        // Method 3: Set state
+        setIsPolling(false)
+        console.log('✅ Set isPolling to false')
+      }
+
+      // Start polling immediately
+      console.log('🚀 Starting immediate poll...')
+      pollJob()
+
+      // Set interval with DOUBLE backup storage
+      const interval = setInterval(() => {
+        if (isPollingActive) {
+          // 🔧 Check local flag instead of React state
+          pollJob()
+        }
+      }, pollInterval)
+
+      activeIntervalRef.current = interval
+
+      // BACKUP: Also store in window for cleanup
+      if (typeof window !== 'undefined') {
+        ;(window as any).activePollingInterval = interval
+      }
+
+      console.log('🔄 Polling interval created with ID:', interval)
     },
-    [supabase]
+    [supabase] // 🔧 REMOVED isPolling from dependencies
   )
 
   const checkForActiveJobs = useCallback(async () => {
@@ -604,20 +598,31 @@ export default function EnhancedBulkCSVUploadPage() {
           const activeJob = result.activeJobs[0]
           console.log('🔍 Found active job:', activeJob.id)
 
-          startJobPolling(activeJob.id)
-          setCurrentStep('processing')
+          // Only start polling if not already polling
+          if (!isPolling) {
+            startJobPolling(activeJob.id)
+            setCurrentStep('processing')
+          } else {
+            console.log('⚠️ Already polling, skipping new polling start')
+          }
         } else {
           console.log('🔍 No active jobs found')
-          if (jobPollingIntervalRef.current) {
-            clearInterval(jobPollingIntervalRef.current)
-            jobPollingIntervalRef.current = null
+
+          // Stop any existing polling if no active jobs
+          if (isPolling) {
+            if (activeIntervalRef.current) {
+              clearInterval(activeIntervalRef.current)
+              activeIntervalRef.current = null
+            }
+            setIsPolling(false)
+            console.log('🛑 Stopped polling - no active jobs')
           }
         }
       }
     } catch (error) {
       console.error('❌ Error checking active jobs:', error)
     }
-  }, [user, supabase, startJobPolling, useBackgroundProcessing])
+  }, [user, supabase, startJobPolling, useBackgroundProcessing, isPolling])
 
   const updateUsageTracking = async (
     userId: string,
@@ -854,29 +859,28 @@ export default function EnhancedBulkCSVUploadPage() {
     useBackgroundProcessing,
   ])
 
+  // 🚀 BULLETPROOF CLEANUP ON UNMOUNT
   useEffect(() => {
-    if (
-      currentJob &&
-      (currentJob.status === 'completed' || currentJob.status === 'failed')
-    ) {
-      console.log(
-        '🛑 Force stopping polling - job status changed to:',
-        currentJob.status
-      )
-      if (jobPollingIntervalRef.current) {
-        clearInterval(jobPollingIntervalRef.current)
-        jobPollingIntervalRef.current = null
-        console.log('🛑 Polling interval cleared via useEffect')
-      }
-    }
-  }, [currentJob?.status])
-
-  useEffect(() => {
+    // Cleanup on unmount or when polling should stop
     return () => {
-      if (jobPollingIntervalRef.current) {
-        clearInterval(jobPollingIntervalRef.current)
-        console.log('🛑 Cleanup: Stopped polling on component unmount')
+      console.log('🧹 Component cleanup: Stopping all polling')
+
+      // Stop via ref
+      if (activeIntervalRef.current) {
+        clearInterval(activeIntervalRef.current)
+        activeIntervalRef.current = null
       }
+
+      // Stop via window backup
+      if (
+        typeof window !== 'undefined' &&
+        (window as any).activePollingInterval
+      ) {
+        clearInterval((window as any).activePollingInterval)
+        delete (window as any).activePollingInterval
+      }
+
+      setIsPolling(false)
     }
   }, [])
 
@@ -1482,11 +1486,25 @@ export default function EnhancedBulkCSVUploadPage() {
   }
 
   const resetWorkflow = () => {
-    if (jobPollingIntervalRef.current) {
-      clearInterval(jobPollingIntervalRef.current)
-      jobPollingIntervalRef.current = null
-      console.log('🛑 Stopped job polling')
+    // 🚀 BULLETPROOF CLEANUP
+    console.log('🔄 Resetting bulk workflow')
+
+    // STOP POLLING FIRST
+    if (activeIntervalRef.current) {
+      clearInterval(activeIntervalRef.current)
+      activeIntervalRef.current = null
     }
+
+    if (
+      typeof window !== 'undefined' &&
+      (window as any).activePollingInterval
+    ) {
+      clearInterval((window as any).activePollingInterval)
+      delete (window as any).activePollingInterval
+    }
+
+    setIsPolling(false)
+    setPollCount(0)
 
     clearSession()
     setCurrentJob(null)
@@ -1519,6 +1537,8 @@ export default function EnhancedBulkCSVUploadPage() {
       callToAction: true,
     })
     setShowContentSections(false)
+
+    console.log('✅ Workflow reset complete')
   }
 
   const handleUpgrade = () => {
@@ -1708,53 +1728,62 @@ export default function EnhancedBulkCSVUploadPage() {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {process.env.NODE_ENV === 'development' && (
-          <div className="mb-8 bg-white/80 backdrop-blur-xl rounded-xl p-4 shadow-lg border border-white/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Settings className="h-5 w-5 text-gray-600" />
-                  <span className="font-semibold text-gray-900">
-                    Processing Mode:
-                  </span>
+          <>
+            <div className="mb-8 bg-white/80 backdrop-blur-xl rounded-xl p-4 shadow-lg border border-white/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Settings className="h-5 w-5 text-gray-600" />
+                    <span className="font-semibold text-gray-900">
+                      Processing Mode:
+                    </span>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setUseBackgroundProcessing(!useBackgroundProcessing)
+                    }
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all cursor-pointer flex items-center space-x-2 ${
+                      useBackgroundProcessing
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white'
+                        : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                    }`}
+                  >
+                    {useBackgroundProcessing ? (
+                      <Database className="h-4 w-4" />
+                    ) : (
+                      <Cpu className="h-4 w-4" />
+                    )}
+                    <span>
+                      {useBackgroundProcessing ? 'Background' : 'Frontend'}
+                    </span>
+                    <span className="text-xs opacity-75">
+                      (Click to toggle)
+                    </span>
+                  </button>
                 </div>
-                <button
-                  onClick={() =>
-                    setUseBackgroundProcessing(!useBackgroundProcessing)
-                  }
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all cursor-pointer flex items-center space-x-2 ${
-                    useBackgroundProcessing
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white'
-                      : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-                  }`}
-                >
-                  {useBackgroundProcessing ? (
-                    <Database className="h-4 w-4" />
-                  ) : (
-                    <Cpu className="h-4 w-4" />
-                  )}
-                  <span>
-                    {useBackgroundProcessing ? 'Background' : 'Frontend'}
-                  </span>
-                  <span className="text-xs opacity-75">(Click to toggle)</span>
-                </button>
-              </div>
-              <div className="text-right text-sm text-gray-600">
-                <div>
-                  <strong>Step:</strong> {currentStep} |{' '}
-                  <strong>Processing:</strong> {isProcessing ? 'Yes' : 'No'}
-                </div>
-                <div>
-                  <strong>Jobs:</strong> {processingJobs.length} |
-                  {useBackgroundProcessing && (
-                    <>
-                      <strong>Active Job:</strong>{' '}
-                      {currentJob ? currentJob.id.slice(-8) : 'None'}
-                    </>
-                  )}
+                <div className="text-right text-sm text-gray-600">
+                  <div>
+                    <strong>Step:</strong> {currentStep} |{' '}
+                    <strong>Processing:</strong> {isProcessing ? 'Yes' : 'No'}
+                  </div>
+                  <div>
+                    <strong>Jobs:</strong> {processingJobs.length} |
+                    {useBackgroundProcessing && (
+                      <>
+                        <strong>Active Job:</strong>{' '}
+                        {currentJob ? currentJob.id.slice(-8) : 'None'}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+
+            {/* 🚀 BULLETPROOF POLLING DEBUG */}
+            <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-2 rounded text-xs z-50">
+              Polling: {isPolling ? 'ON' : 'OFF'} | Count: {pollCount}
+            </div>
+          </>
         )}
 
         <div className="text-center mb-12">
@@ -2533,31 +2562,13 @@ export default function EnhancedBulkCSVUploadPage() {
                 {currentJob && currentJob.status === 'completed' && (
                   <div className="mt-10 flex justify-center space-x-6">
                     <button
-                      onClick={() => {
-                        if (jobPollingIntervalRef.current) {
-                          clearInterval(jobPollingIntervalRef.current)
-                          jobPollingIntervalRef.current = null
-                          console.log(
-                            '🛑 Manually stopped polling from completed job'
-                          )
-                        }
-                        resetWorkflow()
-                      }}
+                      onClick={resetWorkflow}
                       className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
                     >
                       Start New Job
                     </button>
                     <button
-                      onClick={() => {
-                        if (jobPollingIntervalRef.current) {
-                          clearInterval(jobPollingIntervalRef.current)
-                          jobPollingIntervalRef.current = null
-                          console.log(
-                            '🛑 Stopped polling before viewing results'
-                          )
-                        }
-                        setCurrentStep('results')
-                      }}
+                      onClick={() => setCurrentStep('results')}
                       className="bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
                     >
                       <Download className="h-5 w-5" />
