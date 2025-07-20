@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 🔧 PRODUCTION-OPTIMIZED SEQUENTIAL PROCESSING
+// 🚀 FIXED: SUPER FAST PROCESSING WITH PROPER BATCHING
 async function processProductsInBackground(
   jobId: string,
   products: BulkProduct[],
@@ -130,64 +130,73 @@ async function processProductsInBackground(
   authHeader?: string | null,
   cookies?: string | null
 ) {
-  console.log(
-    `🎬 Starting SEQUENTIAL processing for ${products.length} products (one at a time for production stability)`
-  )
+  console.log(`🚀 Starting FAST processing for ${products.length} products`)
 
   try {
-    // 🔄 Process ONE product at a time - completely eliminates race conditions
-    for (let i = 0; i < products.length; i++) {
-      const product = products[i]
+    // 🔥 BATCH OF 3 - Fast parallel processing
+    const batchSize = 3
+
+    for (let i = 0; i < products.length; i += batchSize) {
+      const batch = products.slice(i, i + batchSize)
+      const batchEnd = Math.min(i + batchSize, products.length)
+
       console.log(
-        `🚀 [${i + 1}/${products.length}] Processing: ${product.product_name}`
+        `📦 Processing batch ${Math.floor(i / batchSize) + 1}: products ${i + 1}-${batchEnd}`
+      )
+      console.log(
+        `📋 Batch contains ${batch.length} products:`,
+        batch.map((p) => p.product_name)
       )
 
-      try {
-        await processProduct(
-          jobId,
-          product,
-          userId,
-          selectedSections,
-          supabase,
-          authHeader,
-          cookies
-        )
-        console.log(
-          `✅ [${i + 1}/${products.length}] Completed: ${product.product_name}`
-        )
-      } catch (error) {
-        console.error(
-          `❌ [${i + 1}/${products.length}] Failed: ${product.product_name}`,
-          error
-        )
-      }
+      // Process batch in parallel
+      await Promise.all(
+        batch.map(async (product, batchIndex) => {
+          const globalIndex = i + batchIndex
+          console.log(
+            `🚀 [${globalIndex + 1}/${products.length}] Processing: ${product.product_name}`
+          )
 
-      // 🔒 PRODUCTION SAFETY: Wait between each product for database consistency
-      if (i < products.length - 1) {
-        // Don't wait after the last product
-        console.log(
-          `⏳ Waiting 3 seconds for database sync before next product...`
-        )
-        await new Promise((resolve) => setTimeout(resolve, 3000))
+          try {
+            await processProduct(
+              jobId,
+              product,
+              userId,
+              selectedSections,
+              supabase,
+              authHeader,
+              cookies
+            )
+            console.log(
+              `✅ [${globalIndex + 1}/${products.length}] Completed: ${product.product_name}`
+            )
+          } catch (error) {
+            console.error(
+              `❌ [${globalIndex + 1}/${products.length}] Failed: ${product.product_name}`,
+              error
+            )
+          }
+        })
+      )
+
+      // 🔥 MINIMAL WAIT - Just 1 second for database sync
+      if (i + batchSize < products.length) {
+        console.log(`⏳ Quick sync pause...`)
+        await new Promise((resolve) => setTimeout(resolve, 1000))
       }
     }
 
     console.log(
-      `🏁 All products processed sequentially, starting final verification...`
+      `🏁 All ${products.length} products processed, starting verification...`
     )
 
-    // 🔒 PRODUCTION SAFETY: Wait for all database writes to settle
-    await new Promise((resolve) => setTimeout(resolve, 5000))
+    // 🔥 REDUCED FINAL WAIT - Just 2 seconds
+    await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    // 🔧 BULLETPROOF FINAL VERIFICATION
+    // Quick final verification
     await performFinalVerification(jobId, supabase)
   } catch (error) {
-    console.error(
-      `❌ Critical error in sequential processing for job ${jobId}:`,
-      error
-    )
+    console.error(`❌ Critical error in processing for job ${jobId}:`, error)
 
-    // Fallback: Mark job as failed
     try {
       await supabase
         .from('bulk_jobs')
@@ -202,178 +211,129 @@ async function processProductsInBackground(
   }
 }
 
-// 🔧 BULLETPROOF FINAL VERIFICATION WITH PRODUCTION SAFEGUARDS
+// 🔥 FAST FINAL VERIFICATION
 async function performFinalVerification(jobId: string, supabase: any) {
-  const maxRetries = 5
-  let retryCount = 0
+  console.log('🔍 Quick final verification...')
 
-  console.log('🔍 Starting bulletproof final verification...')
+  try {
+    // 🔥 SINGLE ATTEMPT - No retries for speed
+    const { data: finalJob, error: finalJobError } = await supabase
+      .from('bulk_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single()
 
-  while (retryCount < maxRetries) {
-    try {
+    if (finalJobError) {
+      console.error('❌ Error fetching final job:', finalJobError)
+      return // Just return, don't retry
+    }
+
+    if (!finalJob?.products) {
+      console.error('❌ Final job or products not found')
+      return
+    }
+
+    // Count products by status
+    const products = finalJob.products as BulkProduct[]
+    let completedCount = 0
+    let failedCount = 0
+    let processingCount = 0
+    let pendingCount = 0
+
+    for (const product of products) {
+      switch (product.status) {
+        case 'completed':
+          completedCount++
+          break
+        case 'failed':
+          failedCount++
+          break
+        case 'processing':
+          processingCount++
+          break
+        case 'pending':
+          pendingCount++
+          break
+      }
+    }
+
+    console.log('📊 Final counts:')
+    console.log(`   Completed: ${completedCount}, Failed: ${failedCount}`)
+    console.log(
+      `   Still Processing: ${processingCount}, Pending: ${pendingCount}`
+    )
+
+    // Fix any products not in final state
+    let updatedProducts = products
+    let needsUpdate = false
+
+    if (processingCount > 0 || pendingCount > 0) {
       console.log(
-        `🔄 Final verification attempt ${retryCount + 1}/${maxRetries}`
+        `⚠️ Fixing ${processingCount + pendingCount} incomplete products...`
       )
 
-      // 🔒 PRODUCTION SAFETY: Extra delay to ensure database consistency
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      const { data: finalJob, error: finalJobError } = await supabase
-        .from('bulk_jobs')
-        .select('*')
-        .eq('id', jobId)
-        .single()
-
-      if (finalJobError) {
-        console.error('❌ Error fetching final job:', finalJobError)
-        throw new Error(
-          typeof finalJobError === 'string'
-            ? finalJobError
-            : JSON.stringify(finalJobError)
-        )
-      }
-
-      if (!finalJob?.products) {
-        console.error('❌ Final job or products not found')
-        throw new Error('Job data not found')
-      }
-
-      // Count products by status with detailed logging
-      const products = finalJob.products as BulkProduct[]
-      let completedCount = 0
-      let failedCount = 0
-      let processingCount = 0
-      let pendingCount = 0
-
-      console.log('📊 Analyzing product statuses:')
-
-      for (const product of products) {
-        console.log(`   ${product.product_name}: ${product.status}`)
-        switch (product.status) {
-          case 'completed':
-            completedCount++
-            break
-          case 'failed':
-            failedCount++
-            break
-          case 'processing':
-            processingCount++
-            break
-          case 'pending':
-            pendingCount++
-            break
-        }
-      }
-
-      console.log('📊 Final verification counts:')
-      console.log(`   Total: ${products.length}`)
-      console.log(`   Completed: ${completedCount}`)
-      console.log(`   Failed: ${failedCount}`)
-      console.log(`   Still Processing: ${processingCount}`)
-      console.log(`   Still Pending: ${pendingCount}`)
-
-      // 🔧 FIX: Handle any products not in final state
-      let updatedProducts = products
-      let needsUpdate = false
-
-      if (processingCount > 0 || pendingCount > 0) {
-        console.log(
-          `⚠️ Found ${processingCount + pendingCount} products not in final state, fixing...`
-        )
-
-        updatedProducts = products.map((product) => {
-          if (product.status === 'processing' || product.status === 'pending') {
-            console.log(
-              `🔧 Marking ${product.product_name} as failed (was ${product.status})`
-            )
-            needsUpdate = true
-            return {
-              ...product,
-              status: 'failed' as const,
-              error_message: `Marked as failed in final verification - was ${product.status}`,
-            }
+      updatedProducts = products.map((product) => {
+        if (product.status === 'processing' || product.status === 'pending') {
+          needsUpdate = true
+          return {
+            ...product,
+            status: 'failed' as const,
+            error_message: `Marked as failed in verification - was ${product.status}`,
           }
-          return product
-        })
-
-        // Recalculate counts
-        failedCount = updatedProducts.filter(
-          (p) => p.status === 'failed'
-        ).length
-        completedCount = updatedProducts.filter(
-          (p) => p.status === 'completed'
-        ).length
-        processingCount = 0
-        pendingCount = 0
-      }
-
-      // 🔒 ATOMIC FINAL UPDATE
-      const updateData: any = {
-        status: 'completed',
-        completed_products: completedCount,
-        failed_products: failedCount,
-        updated_at: new Date().toISOString(),
-      }
-
-      if (needsUpdate) {
-        updateData.products = updatedProducts
-      }
-
-      const { error: finalUpdateError } = await supabase
-        .from('bulk_jobs')
-        .update(updateData)
-        .eq('id', jobId)
-
-      if (finalUpdateError) {
-        console.error('❌ Error in final job update:', finalUpdateError)
-        throw new Error(
-          typeof finalUpdateError === 'string'
-            ? finalUpdateError
-            : JSON.stringify(finalUpdateError)
-        )
-      }
-
-      console.log(
-        `✅ Job completed successfully: ${completedCount} completed, ${failedCount} failed`
-      )
-      console.log('🎉 Final verification completed successfully!')
-      return // Success, exit retry loop
-    } catch (error) {
-      console.error(
-        `❌ Final verification error (attempt ${retryCount + 1}):`,
-        error
-      )
-      retryCount++
-
-      if (retryCount >= maxRetries) {
-        console.error(
-          `❌ Final verification failed after ${maxRetries} attempts`
-        )
-
-        // 🔧 FALLBACK: Mark job as completed anyway to prevent infinite processing
-        try {
-          await supabase
-            .from('bulk_jobs')
-            .update({
-              status: 'completed',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', jobId)
-          console.log('✅ Fallback: Marked job as completed')
-        } catch (fallbackError) {
-          console.error('❌ Fallback update also failed:', fallbackError)
         }
-        return
-      }
+        return product
+      })
 
-      // Wait longer between retries in production
-      console.log(`⏳ Waiting 5 seconds before retry ${retryCount + 1}...`)
-      await new Promise((resolve) => setTimeout(resolve, 5000))
+      failedCount = updatedProducts.filter((p) => p.status === 'failed').length
+      completedCount = updatedProducts.filter(
+        (p) => p.status === 'completed'
+      ).length
+    }
+
+    // Final update
+    const updateData: any = {
+      status: 'completed',
+      completed_products: completedCount,
+      failed_products: failedCount,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (needsUpdate) {
+      updateData.products = updatedProducts
+    }
+
+    const { error: finalUpdateError } = await supabase
+      .from('bulk_jobs')
+      .update(updateData)
+      .eq('id', jobId)
+
+    if (finalUpdateError) {
+      console.error('❌ Final update error:', finalUpdateError)
+    } else {
+      console.log(
+        `✅ Job completed: ${completedCount} completed, ${failedCount} failed`
+      )
+    }
+  } catch (error) {
+    console.error('❌ Verification error:', error)
+
+    // Fallback: Just mark as completed
+    try {
+      await supabase
+        .from('bulk_jobs')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', jobId)
+      console.log('✅ Fallback: Marked as completed')
+    } catch (fallbackError) {
+      console.error('❌ Fallback failed:', fallbackError)
     }
   }
 }
 
-// 🔧 PRODUCTION-SAFE PRODUCT PROCESSING
+// 🔥 FAST PRODUCT PROCESSING
 async function processProduct(
   jobId: string,
   product: BulkProduct,
@@ -405,12 +365,12 @@ async function processProduct(
       console.log(`🍪 Using cookies for ${product.product_name}`)
     }
 
-    // 🔧 PRODUCTION TIMEOUT: Longer timeout for serverless environments
+    // 🔥 FAST TIMEOUT: 2 minutes instead of 3
     const controller = new AbortController()
     const timeoutId = setTimeout(() => {
       console.log(`⏰ Timeout reached for ${product.product_name}`)
       controller.abort()
-    }, 180000) // 3 minutes timeout for production
+    }, 120000) // 2 minutes timeout
 
     try {
       console.log(`📡 Making API call for ${product.product_name}...`)
@@ -475,7 +435,7 @@ async function processProduct(
           product.id,
           'failed',
           {
-            error_message: 'Request timeout after 3 minutes',
+            error_message: 'Request timeout after 2 minutes',
           },
           supabase
         )
@@ -504,7 +464,7 @@ async function processProduct(
   }
 }
 
-// 🔧 PRODUCTION-SAFE STATUS UPDATE WITH RETRY
+// 🔥 FAST STATUS UPDATES - Reduced retries
 async function updateProductStatusSafe(
   jobId: string,
   productId: string,
@@ -512,12 +472,11 @@ async function updateProductStatusSafe(
   additionalData: Partial<BulkProduct>,
   supabase: any
 ) {
-  const maxRetries = 3
+  const maxRetries = 2 // 🔥 REDUCED from 3 to 2
   let retryCount = 0
 
   while (retryCount < maxRetries) {
     try {
-      // Get current job state
       const { data: currentJob, error: fetchError } = await supabase
         .from('bulk_jobs')
         .select('products, completed_products, failed_products')
@@ -525,23 +484,13 @@ async function updateProductStatusSafe(
         .single()
 
       if (fetchError) {
-        console.error(
-          `❌ Error fetching job for status update (attempt ${retryCount + 1}):`,
-          fetchError
-        )
-        throw new Error(
-          typeof fetchError === 'string'
-            ? fetchError
-            : JSON.stringify(fetchError)
-        )
+        throw new Error('Database fetch failed')
       }
 
       if (!currentJob?.products) {
-        console.error('❌ No products found in job')
         throw new Error('No products found')
       }
 
-      // Update the specific product
       const updatedProducts = (currentJob.products as BulkProduct[]).map(
         (p: BulkProduct) =>
           p.id === productId
@@ -549,7 +498,6 @@ async function updateProductStatusSafe(
             : p
       )
 
-      // Calculate accurate counts
       const completedCount = updatedProducts.filter(
         (p) => p.status === 'completed'
       ).length
@@ -557,7 +505,6 @@ async function updateProductStatusSafe(
         (p) => p.status === 'failed'
       ).length
 
-      // Single atomic update
       const { error: updateError } = await supabase
         .from('bulk_jobs')
         .update({
@@ -569,35 +516,23 @@ async function updateProductStatusSafe(
         .eq('id', jobId)
 
       if (updateError) {
-        console.error(
-          `❌ Error updating product status (attempt ${retryCount + 1}):`,
-          updateError
-        )
-        throw new Error(
-          typeof updateError === 'string'
-            ? updateError
-            : JSON.stringify(updateError)
-        )
+        throw new Error('Database update failed')
       }
 
-      console.log(
-        `📊 Updated ${productId} to ${newStatus} (Completed: ${completedCount}, Failed: ${failedCount})`
-      )
-      return // Success, exit retry loop
+      console.log(`📊 Updated ${productId} to ${newStatus}`)
+      return // Success
     } catch (error) {
       retryCount++
 
       if (retryCount >= maxRetries) {
         console.error(
-          `❌ Failed to update ${productId} status after ${maxRetries} attempts:`,
-          error
+          `❌ Failed to update ${productId} after ${maxRetries} attempts`
         )
-        return // Give up after max retries
+        return
       }
 
-      // Wait before retry with exponential backoff
-      const waitTime = 1000 * Math.pow(2, retryCount - 1) // 1s, 2s, 4s
-      console.log(`⏳ Retrying status update in ${waitTime}ms...`)
+      // 🔥 FASTER RETRY - Reduced wait time
+      const waitTime = 500 * retryCount // 500ms, 1s instead of 1s, 2s, 4s
       await new Promise((resolve) => setTimeout(resolve, waitTime))
     }
   }
