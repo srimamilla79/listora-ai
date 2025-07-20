@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
@@ -100,7 +100,6 @@ interface BulkJob {
   avgProcessingTime?: number
 }
 
-// 🚀 NEW: Content sections interface
 interface ContentSections {
   title: boolean
   sellingPoints: boolean
@@ -141,17 +140,14 @@ interface BulkJobSession {
   selectedSections?: ContentSections
 }
 
-// 🚀 HELPER FUNCTION: Get job stats from any data structure
 const getJobStats = (job: any) => {
   if (!job)
     return { total: 0, completed: 0, failed: 0, processing: 0, pending: 0 }
 
-  // Handle different data structures
   if (job.stats) {
     return job.stats
   }
 
-  // Calculate from job properties
   const total = job.total_products || 0
   const completed = job.completed_products || 0
   const failed = job.failed_products || 0
@@ -161,7 +157,6 @@ const getJobStats = (job: any) => {
   return { total, completed, failed, processing, pending }
 }
 
-// Plan limits configuration
 const PLAN_LIMITS = {
   starter: {
     name: 'Starter',
@@ -214,10 +209,8 @@ const PLAN_LIMITS = {
 }
 
 export default function EnhancedBulkCSVUploadPage() {
-  // Add Supabase state for SSR fix
   const [supabase, setSupabase] = useState<any>(null)
   const [mounted, setMounted] = useState(false)
-
   const [user, setUser] = useState<any>(null)
   const [userPlan, setUserPlan] = useState<keyof typeof PLAN_LIMITS>('starter')
   const [loading, setLoading] = useState(true)
@@ -236,7 +229,6 @@ export default function EnhancedBulkCSVUploadPage() {
   const [monthlyUsage, setMonthlyUsage] = useState(0)
   const [monthlyLimit, setMonthlyLimit] = useState(10)
 
-  // 🚀 NEW: Content section selection state
   const [selectedSections, setSelectedSections] = useState<ContentSections>({
     title: true,
     sellingPoints: true,
@@ -247,7 +239,6 @@ export default function EnhancedBulkCSVUploadPage() {
   })
   const [showContentSections, setShowContentSections] = useState(false)
 
-  // Enhanced progress tracking states
   const [currentProcessingStats, setCurrentProcessingStats] = useState({
     total: 0,
     pending: 0,
@@ -260,12 +251,10 @@ export default function EnhancedBulkCSVUploadPage() {
   const [processingStartTime, setProcessingStartTime] = useState<number>(0)
   const [currentJobId, setCurrentJobId] = useState<string>('')
 
-  // Background job states
   const [currentJob, setCurrentJob] = useState<BulkJob | null>(null)
   const [isSubmittingJob, setIsSubmittingJob] = useState(false)
-  const [jobPollingInterval, setJobPollingInterval] =
-    useState<NodeJS.Timeout | null>(null)
-  const [useBackgroundProcessing, setUseBackgroundProcessing] = useState(true) // Toggle between modes
+  const jobPollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [useBackgroundProcessing, setUseBackgroundProcessing] = useState(true)
   const [showRecoveryModal, setShowRecoveryModal] = useState(false)
   const [recoverySession, setRecoverySession] = useState<BulkJobSession | null>(
     null
@@ -273,11 +262,9 @@ export default function EnhancedBulkCSVUploadPage() {
 
   const router = useRouter()
 
-  // Session management for frontend mode
   const SESSION_KEY = 'listora_bulk_session'
   const PROCESSING_KEY = 'listora_processing_lock'
 
-  // 🚀 NEW: Content section handlers
   const toggleSection = (section: keyof ContentSections) => {
     setSelectedSections((prev) => ({
       ...prev,
@@ -307,14 +294,12 @@ export default function EnhancedBulkCSVUploadPage() {
     return Object.values(selectedSections).filter(Boolean).length
   }
 
-  // Initialize Supabase client after component mounts
   useEffect(() => {
     setMounted(true)
     const supabaseClient = createClient()
     setSupabase(supabaseClient)
   }, [])
 
-  // 🚀 BACKGROUND JOB: Start processing on server
   const startBackgroundJob = async (products: any[]) => {
     if (!user || !supabase) {
       alert('Please log in to process bulk content')
@@ -340,7 +325,6 @@ export default function EnhancedBulkCSVUploadPage() {
         body: JSON.stringify({
           products,
           userId: user.id,
-          // 🚀 NEW: Pass selected content sections
           selectedSections: selectedSections,
         }),
       })
@@ -353,7 +337,6 @@ export default function EnhancedBulkCSVUploadPage() {
       const result = await response.json()
       console.log('🚀 Background job started:', result.jobId)
 
-      // Start polling for job status
       startJobPolling(result.jobId)
       setCurrentStep('processing')
     } catch (error) {
@@ -364,32 +347,29 @@ export default function EnhancedBulkCSVUploadPage() {
     }
   }
 
-  // 🔄 POLLING: Check job status every 3 seconds
   const startJobPolling = useCallback(
     (jobId: string) => {
       if (!supabase) return
 
       console.log('🔄 Starting job polling for:', jobId)
 
-      // Clear any existing polling first
-      if (jobPollingInterval) {
-        clearInterval(jobPollingInterval)
-        setJobPollingInterval(null)
+      if (jobPollingIntervalRef.current) {
+        clearInterval(jobPollingIntervalRef.current)
+        jobPollingIntervalRef.current = null
         console.log('🛑 Cleared existing polling interval')
       }
 
       let pollCount = 0
-      const maxPolls = 1000 // Safety limit: stop after ~50 minutes (1000 * 3 seconds)
+      const maxPolls = 1000
 
       const pollJob = async () => {
         pollCount++
 
-        // Safety check: stop polling after max attempts
         if (pollCount > maxPolls) {
           console.log('🛑 Stopping polling - reached maximum attempts')
-          if (jobPollingInterval) {
-            clearInterval(jobPollingInterval)
-            setJobPollingInterval(null)
+          if (jobPollingIntervalRef.current) {
+            clearInterval(jobPollingIntervalRef.current)
+            jobPollingIntervalRef.current = null
           }
           return
         }
@@ -400,9 +380,9 @@ export default function EnhancedBulkCSVUploadPage() {
           } = await supabase.auth.getSession()
           if (!session?.access_token) {
             console.log('❌ No session, stopping polling')
-            if (jobPollingInterval) {
-              clearInterval(jobPollingInterval)
-              setJobPollingInterval(null)
+            if (jobPollingIntervalRef.current) {
+              clearInterval(jobPollingIntervalRef.current)
+              jobPollingIntervalRef.current = null
             }
             return
           }
@@ -416,20 +396,17 @@ export default function EnhancedBulkCSVUploadPage() {
           if (response.ok) {
             const result = await response.json()
 
-            // Check if job exists and has a status
             if (!result.job || !result.job.status) {
               console.log('🛑 Job not found or no status, stopping polling')
-              if (jobPollingInterval) {
-                clearInterval(jobPollingInterval)
-                setJobPollingInterval(null)
+              if (jobPollingIntervalRef.current) {
+                clearInterval(jobPollingIntervalRef.current)
+                jobPollingIntervalRef.current = null
               }
               return
             }
 
-            // Ensure progress is always set on the job object
             let jobWithProgress = { ...result.job }
             if (typeof jobWithProgress.progress !== 'number') {
-              // Calculate progress from stats if not present
               const stats = getJobStats(jobWithProgress)
               if (stats.total > 0) {
                 jobWithProgress.progress =
@@ -440,7 +417,6 @@ export default function EnhancedBulkCSVUploadPage() {
             }
             setCurrentJob(jobWithProgress)
 
-            // Stop polling if job is completed or failed
             if (
               result.job.status === 'completed' ||
               result.job.status === 'failed'
@@ -448,21 +424,133 @@ export default function EnhancedBulkCSVUploadPage() {
               console.log(
                 '🛑 Job finished:',
                 result.job.status,
-                '- Stopping polling'
+                '- Starting final count verification'
               )
 
-              // Clear the interval immediately
-              if (jobPollingInterval) {
-                clearInterval(jobPollingInterval)
-                setJobPollingInterval(null)
+              const verifyFinalCounts = async (
+                attempt = 1,
+                maxAttempts = 8
+              ) => {
+                try {
+                  console.log(
+                    `🔄 Final count verification attempt ${attempt}/${maxAttempts}`
+                  )
+
+                  // Wait longer between attempts for better reliability
+                  if (attempt > 1) {
+                    await new Promise((resolve) => setTimeout(resolve, 2000))
+                  }
+
+                  const finalResponse = await fetch(
+                    `/api/bulk-process/status/${jobId}`,
+                    {
+                      headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                      },
+                    }
+                  )
+
+                  if (finalResponse.ok) {
+                    const finalResult = await finalResponse.json()
+
+                    const finalStats = getJobStats(finalResult.job)
+                    const expectedTotal = finalStats.total
+                    const actualProcessed =
+                      finalStats.completed + finalStats.failed
+                    const stillProcessing = finalStats.processing
+                    const stillPending = finalStats.pending
+
+                    console.log(`📊 Detailed count check:`)
+                    console.log(`   Expected Total: ${expectedTotal}`)
+                    console.log(`   Completed: ${finalStats.completed}`)
+                    console.log(`   Failed: ${finalStats.failed}`)
+                    console.log(`   Still Processing: ${stillProcessing}`)
+                    console.log(`   Still Pending: ${stillPending}`)
+                    console.log(`   Total Processed: ${actualProcessed}`)
+
+                    // Check if we have all products accounted for AND none are still in progress
+                    const allAccountedFor = actualProcessed >= expectedTotal
+                    const noneInProgress =
+                      stillProcessing === 0 && stillPending === 0
+                    const shouldStop =
+                      allAccountedFor ||
+                      attempt >= maxAttempts ||
+                      noneInProgress
+
+                    if (shouldStop) {
+                      let finalJobWithProgress = { ...finalResult.job }
+                      if (typeof finalJobWithProgress.progress !== 'number') {
+                        if (finalStats.total > 0) {
+                          finalJobWithProgress.progress =
+                            ((finalStats.completed + finalStats.failed) /
+                              finalStats.total) *
+                            100
+                        } else {
+                          finalJobWithProgress.progress = 0
+                        }
+                      }
+
+                      setCurrentJob(finalJobWithProgress)
+                      console.log(
+                        `🎉 Final verified count: ${finalStats.completed}/${finalStats.total}`
+                      )
+                      console.log(
+                        `🎯 Reason for stopping: ${allAccountedFor ? 'All products processed' : attempt >= maxAttempts ? 'Max attempts reached' : 'No products in progress'}`
+                      )
+
+                      if (jobPollingIntervalRef.current) {
+                        clearInterval(jobPollingIntervalRef.current)
+                        jobPollingIntervalRef.current = null
+                      }
+
+                      if (result.job.status === 'completed') {
+                        setCurrentStep('results')
+                      }
+
+                      return
+                    } else {
+                      const missing = expectedTotal - actualProcessed
+                      const inProgress = stillProcessing + stillPending
+                      console.log(
+                        `⏳ Waiting for remaining products (${missing} missing, ${inProgress} still in progress)`
+                      )
+                      // Continue verification without setTimeout - let the next attempt handle the delay
+                      verifyFinalCounts(attempt + 1, maxAttempts)
+                    }
+                  } else {
+                    console.error('❌ Final verification API failed, stopping')
+                    if (jobPollingIntervalRef.current) {
+                      clearInterval(jobPollingIntervalRef.current)
+                      jobPollingIntervalRef.current = null
+                    }
+                    if (result.job.status === 'completed') {
+                      setCurrentStep('results')
+                    }
+                  }
+                } catch (error) {
+                  console.error('❌ Final verification error:', error)
+                  if (attempt >= maxAttempts) {
+                    console.log(
+                      '🛑 Max attempts reached, stopping verification'
+                    )
+                    if (jobPollingIntervalRef.current) {
+                      clearInterval(jobPollingIntervalRef.current)
+                      jobPollingIntervalRef.current = null
+                    }
+                    if (result.job.status === 'completed') {
+                      setCurrentStep('results')
+                    }
+                  } else {
+                    // Retry on error
+                    setTimeout(
+                      () => verifyFinalCounts(attempt + 1, maxAttempts),
+                      2000
+                    )
+                  }
+                }
               }
 
-              // Set the step to results if completed
-              if (result.job.status === 'completed') {
-                setCurrentStep('results')
-              }
-
-              // Exit the function to prevent any further polling
+              verifyFinalCounts()
               return
             }
 
@@ -471,31 +559,29 @@ export default function EnhancedBulkCSVUploadPage() {
             )
           } else {
             console.log('❌ Polling API failed, stopping')
-            if (jobPollingInterval) {
-              clearInterval(jobPollingInterval)
-              setJobPollingInterval(null)
+            if (jobPollingIntervalRef.current) {
+              clearInterval(jobPollingIntervalRef.current)
+              jobPollingIntervalRef.current = null
             }
           }
         } catch (error) {
           console.error('❌ Polling error:', error)
-          if (jobPollingInterval) {
-            clearInterval(jobPollingInterval)
-            setJobPollingInterval(null)
+          if (jobPollingIntervalRef.current) {
+            clearInterval(jobPollingIntervalRef.current)
+            jobPollingIntervalRef.current = null
           }
         }
       }
 
-      // Start polling immediately, then every 3 seconds
       pollJob()
       const interval = setInterval(pollJob, 3000)
-      setJobPollingInterval(interval)
+      jobPollingIntervalRef.current = interval
 
       console.log('🔄 Polling interval started with ID:', interval)
     },
-    [supabase, jobPollingInterval]
+    [supabase]
   )
 
-  // 🔍 CHECK: Look for active jobs when user loads
   const checkForActiveJobs = useCallback(async () => {
     if (!user || !useBackgroundProcessing || !supabase) return
 
@@ -518,30 +604,21 @@ export default function EnhancedBulkCSVUploadPage() {
           const activeJob = result.activeJobs[0]
           console.log('🔍 Found active job:', activeJob.id)
 
-          // Start polling the active job
           startJobPolling(activeJob.id)
           setCurrentStep('processing')
         } else {
           console.log('🔍 No active jobs found')
-          // Clear any existing polling if no active jobs
-          if (jobPollingInterval) {
-            clearInterval(jobPollingInterval)
-            setJobPollingInterval(null)
+          if (jobPollingIntervalRef.current) {
+            clearInterval(jobPollingIntervalRef.current)
+            jobPollingIntervalRef.current = null
           }
         }
       }
     } catch (error) {
       console.error('❌ Error checking active jobs:', error)
     }
-  }, [
-    user,
-    supabase,
-    startJobPolling,
-    useBackgroundProcessing,
-    jobPollingInterval,
-  ])
+  }, [user, supabase, startJobPolling, useBackgroundProcessing])
 
-  // Frontend processing functions (existing logic)
   const updateUsageTracking = async (
     userId: string,
     incrementBy: number = 1
@@ -571,7 +648,6 @@ export default function EnhancedBulkCSVUploadPage() {
     }
   }
 
-  // Frontend session management (simplified)
   const saveSessionImmediate = useCallback(() => {
     if (!user || useBackgroundProcessing) return
 
@@ -590,7 +666,7 @@ export default function EnhancedBulkCSVUploadPage() {
       monthlyLimit,
       userPlan,
       lastUpdated: Date.now(),
-      selectedSections, // 🚀 NEW: Save content sections
+      selectedSections,
     }
 
     try {
@@ -617,7 +693,7 @@ export default function EnhancedBulkCSVUploadPage() {
     monthlyLimit,
     userPlan,
     useBackgroundProcessing,
-    selectedSections, // 🚀 NEW: Include in dependencies
+    selectedSections,
   ])
 
   const loadAndRestoreSession = useCallback(() => {
@@ -640,7 +716,6 @@ export default function EnhancedBulkCSVUploadPage() {
         return false
       }
 
-      // Restore state including content sections
       setCSVData(session.csvData || [])
       setColumnMappings(session.columnMappings || [])
       setProcessingJobs(session.processingJobs || [])
@@ -663,7 +738,6 @@ export default function EnhancedBulkCSVUploadPage() {
       setMonthlyLimit(session.monthlyLimit || 10)
       setUserPlan(session.userPlan || 'starter')
 
-      // 🚀 NEW: Restore content sections
       if (session.selectedSections) {
         setSelectedSections(session.selectedSections)
       }
@@ -695,7 +769,6 @@ export default function EnhancedBulkCSVUploadPage() {
     console.log('🗑️ Frontend session cleared')
   }
 
-  // Auth and plan loading
   useEffect(() => {
     if (!mounted || !supabase) return
 
@@ -747,7 +820,6 @@ export default function EnhancedBulkCSVUploadPage() {
     }
   }, [router, supabase, mounted])
 
-  // Check for active jobs or sessions when user loads
   useEffect(() => {
     if (user && planLoaded) {
       if (useBackgroundProcessing) {
@@ -764,7 +836,6 @@ export default function EnhancedBulkCSVUploadPage() {
     loadAndRestoreSession,
   ])
 
-  // Auto-save session for frontend mode
   useEffect(() => {
     if (
       user &&
@@ -783,7 +854,6 @@ export default function EnhancedBulkCSVUploadPage() {
     useBackgroundProcessing,
   ])
 
-  // Force stop polling when currentJob becomes completed or failed
   useEffect(() => {
     if (
       currentJob &&
@@ -793,25 +863,23 @@ export default function EnhancedBulkCSVUploadPage() {
         '🛑 Force stopping polling - job status changed to:',
         currentJob.status
       )
-      if (jobPollingInterval) {
-        clearInterval(jobPollingInterval)
-        setJobPollingInterval(null)
+      if (jobPollingIntervalRef.current) {
+        clearInterval(jobPollingIntervalRef.current)
+        jobPollingIntervalRef.current = null
         console.log('🛑 Polling interval cleared via useEffect')
       }
     }
-  }, [currentJob?.status, jobPollingInterval])
+  }, [currentJob?.status])
 
-  // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      if (jobPollingInterval) {
-        clearInterval(jobPollingInterval)
+      if (jobPollingIntervalRef.current) {
+        clearInterval(jobPollingIntervalRef.current)
         console.log('🛑 Cleanup: Stopped polling on component unmount')
       }
     }
-  }, [jobPollingInterval])
+  }, [])
 
-  // Update processing stats whenever jobs change (frontend mode)
   useEffect(() => {
     if (useBackgroundProcessing) return
 
@@ -1149,7 +1217,6 @@ export default function EnhancedBulkCSVUploadPage() {
     )
   }
 
-  // Frontend processing function (existing logic)
   const startFrontendProcessing = async (products: any[]) => {
     if (isProcessing || !supabase) {
       alert('⚠️ Processing is already in progress.')
@@ -1205,7 +1272,6 @@ export default function EnhancedBulkCSVUploadPage() {
                   productName: job.productName,
                   features: job.features,
                   platform: job.platform,
-                  // 🚀 NEW: Pass selected content sections
                   selectedSections: selectedSections,
                 }),
               })
@@ -1290,7 +1356,6 @@ export default function EnhancedBulkCSVUploadPage() {
       return
     }
 
-    // 🚀 NEW: Validate content sections
     if (getSelectedSectionCount() === 0) {
       alert('Please select at least one content section to generate')
       return
@@ -1307,7 +1372,6 @@ export default function EnhancedBulkCSVUploadPage() {
       return
     }
 
-    // Prepare products
     const products = csvData
       .filter((row) => row[productNameCol.csvColumn]?.trim())
       .map((row, index) => {
@@ -1338,7 +1402,6 @@ export default function EnhancedBulkCSVUploadPage() {
       return
     }
 
-    // Choose processing mode
     if (useBackgroundProcessing) {
       console.log(
         `🚀 Starting background job with ${products.length} products and ${getSelectedSectionCount()} content sections`
@@ -1419,10 +1482,9 @@ export default function EnhancedBulkCSVUploadPage() {
   }
 
   const resetWorkflow = () => {
-    // Stop polling first
-    if (jobPollingInterval) {
-      clearInterval(jobPollingInterval)
-      setJobPollingInterval(null)
+    if (jobPollingIntervalRef.current) {
+      clearInterval(jobPollingIntervalRef.current)
+      jobPollingIntervalRef.current = null
       console.log('🛑 Stopped job polling')
     }
 
@@ -1448,7 +1510,6 @@ export default function EnhancedBulkCSVUploadPage() {
     setShowRecoveryModal(false)
     setRecoverySession(null)
     setCurrentJobId('')
-    // 🚀 NEW: Reset content sections to default
     setSelectedSections({
       title: true,
       sellingPoints: true,
@@ -1474,7 +1535,6 @@ export default function EnhancedBulkCSVUploadPage() {
   const currentPlanLimits = PLAN_LIMITS[userPlan]
   const PlanIcon = currentPlanLimits.icon
 
-  // Recovery Modal Component (for frontend mode)
   const RecoveryModal = () => {
     if (!showRecoveryModal || !recoverySession || useBackgroundProcessing)
       return null
@@ -1541,7 +1601,6 @@ export default function EnhancedBulkCSVUploadPage() {
                   setProcessingJobs(recoverySession.processingJobs || [])
                   setCurrentStep(recoverySession.currentStep || 'processing')
                   setCurrentJobId(recoverySession.id)
-                  // 🚀 NEW: Restore content sections from session
                   if (recoverySession.selectedSections) {
                     setSelectedSections(recoverySession.selectedSections)
                   }
@@ -1568,7 +1627,6 @@ export default function EnhancedBulkCSVUploadPage() {
     )
   }
 
-  // Wait for both mounted and supabase to be ready
   if (loading || !planLoaded || !mounted || !supabase) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
@@ -1607,14 +1665,12 @@ export default function EnhancedBulkCSVUploadPage() {
 
   return (
     <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
-      {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
         <div className="absolute top-0 right-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
         <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
       </div>
 
-      {/* Enhanced Plan Status Banner */}
       <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-4 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
@@ -1650,9 +1706,7 @@ export default function EnhancedBulkCSVUploadPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Debug/Mode Toggle - Only show in development */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mb-8 bg-white/80 backdrop-blur-xl rounded-xl p-4 shadow-lg border border-white/50">
             <div className="flex items-center justify-between">
@@ -1703,7 +1757,6 @@ export default function EnhancedBulkCSVUploadPage() {
           </div>
         )}
 
-        {/* Enhanced Page Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-6 py-3 mb-8">
             <Upload className="h-5 w-5 text-indigo-600" />
@@ -1747,7 +1800,6 @@ export default function EnhancedBulkCSVUploadPage() {
           )}
         </div>
 
-        {/* Enhanced Progress Steps */}
         <div className="mb-12">
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 shadow-xl border border-white/50">
             <div className="flex items-center justify-between">
@@ -1843,7 +1895,6 @@ export default function EnhancedBulkCSVUploadPage() {
           </div>
         </div>
 
-        {/* Step 1: Enhanced Upload CSV */}
         {currentStep === 'upload' && (
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
             <div className="text-center">
@@ -1944,7 +1995,6 @@ export default function EnhancedBulkCSVUploadPage() {
           </div>
         )}
 
-        {/* Step 2: Enhanced Column Mapping */}
         {currentStep === 'mapping' && (
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
             <div className="flex items-center justify-between mb-8">
@@ -2030,7 +2080,6 @@ export default function EnhancedBulkCSVUploadPage() {
               ))}
             </div>
 
-            {/* 🚀 NEW: Content Section Selection in Mapping Step */}
             <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
@@ -2056,7 +2105,6 @@ export default function EnhancedBulkCSVUploadPage() {
                 </button>
               </div>
 
-              {/* Quick Summary */}
               <div className="mb-4 p-4 bg-white rounded-xl border border-indigo-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -2087,7 +2135,6 @@ export default function EnhancedBulkCSVUploadPage() {
                 </div>
               </div>
 
-              {/* Expandable Content Sections */}
               {showContentSections && (
                 <div className="space-y-3 bg-white rounded-xl border border-gray-200 p-4">
                   <h5 className="font-semibold text-gray-900 mb-3 text-sm">
@@ -2183,7 +2230,6 @@ export default function EnhancedBulkCSVUploadPage() {
                     </div>
                   )}
 
-                  {/* Efficiency Info */}
                   <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center space-x-2 mb-2">
                       <Zap className="h-4 w-4 text-blue-600" />
@@ -2257,11 +2303,9 @@ export default function EnhancedBulkCSVUploadPage() {
           </div>
         )}
 
-        {/* Step 3: Enhanced Processing */}
         {currentStep === 'processing' && (
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
             {useBackgroundProcessing && currentJob ? (
-              // Background processing display
               <>
                 <div className="text-center mb-10">
                   <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
@@ -2288,7 +2332,6 @@ export default function EnhancedBulkCSVUploadPage() {
                   </div>
                 </div>
 
-                {/* Enhanced Background Processing Stats */}
                 <div className="mb-10 grid grid-cols-2 md:grid-cols-5 gap-6">
                   {[
                     {
@@ -2346,7 +2389,6 @@ export default function EnhancedBulkCSVUploadPage() {
                   })}
                 </div>
 
-                {/* Enhanced Background Progress Bar */}
                 <div className="mb-10">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">
@@ -2395,7 +2437,6 @@ export default function EnhancedBulkCSVUploadPage() {
                     )}
                 </div>
 
-                {/* Background Product Status */}
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                   {(currentJob.products || []).map((product, index) => (
                     <div
@@ -2493,10 +2534,9 @@ export default function EnhancedBulkCSVUploadPage() {
                   <div className="mt-10 flex justify-center space-x-6">
                     <button
                       onClick={() => {
-                        // Stop polling first
-                        if (jobPollingInterval) {
-                          clearInterval(jobPollingInterval)
-                          setJobPollingInterval(null)
+                        if (jobPollingIntervalRef.current) {
+                          clearInterval(jobPollingIntervalRef.current)
+                          jobPollingIntervalRef.current = null
                           console.log(
                             '🛑 Manually stopped polling from completed job'
                           )
@@ -2509,10 +2549,9 @@ export default function EnhancedBulkCSVUploadPage() {
                     </button>
                     <button
                       onClick={() => {
-                        // Stop polling before going to results
-                        if (jobPollingInterval) {
-                          clearInterval(jobPollingInterval)
-                          setJobPollingInterval(null)
+                        if (jobPollingIntervalRef.current) {
+                          clearInterval(jobPollingIntervalRef.current)
+                          jobPollingIntervalRef.current = null
                           console.log(
                             '🛑 Stopped polling before viewing results'
                           )
@@ -2532,7 +2571,6 @@ export default function EnhancedBulkCSVUploadPage() {
                 )}
               </>
             ) : (
-              // Frontend processing display - Enhanced
               <>
                 <div className="text-center mb-10">
                   <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
@@ -2550,7 +2588,6 @@ export default function EnhancedBulkCSVUploadPage() {
                   </p>
                 </div>
 
-                {/* Enhanced Frontend Processing Stats */}
                 <div className="mb-10 grid grid-cols-2 md:grid-cols-5 gap-6">
                   {[
                     {
@@ -2608,7 +2645,6 @@ export default function EnhancedBulkCSVUploadPage() {
                   })}
                 </div>
 
-                {/* Enhanced Frontend Progress Bar */}
                 <div className="mb-10">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">
@@ -2656,7 +2692,6 @@ export default function EnhancedBulkCSVUploadPage() {
                     )}
                 </div>
 
-                {/* Enhanced Frontend Product Status */}
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                   {processingJobs.map((job, index) => (
                     <div
@@ -2783,7 +2818,6 @@ export default function EnhancedBulkCSVUploadPage() {
           </div>
         )}
 
-        {/* Step 4: Enhanced Results */}
         {currentStep === 'results' && (
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
             <div className="text-center mb-10">
@@ -2869,10 +2903,8 @@ export default function EnhancedBulkCSVUploadPage() {
         )}
       </div>
 
-      {/* Recovery Modal */}
       <RecoveryModal />
 
-      {/* Enhanced Upgrade Modal */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl max-w-lg w-full p-8 shadow-2xl border border-white/20">
