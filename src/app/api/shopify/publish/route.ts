@@ -317,7 +317,7 @@ function createOptimizedShopifyProduct(
       product_type: detectProductType(mergedProductContent.generated_content),
 
       // ✅ Start as published (if user wants immediate visibility)
-      status: 'active', // Changed from 'draft' to 'active'
+      status: 'draft', // Changed from 'draft' to 'active'
 
       // ✅ Enhanced variant with better attributes
       variants: [

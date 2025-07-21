@@ -1,16 +1,8 @@
 // src/app/api/ebay/publish/route.ts
 // eBay listing creation with DUAL TOKEN SYSTEM - User + Application Tokens
-// ✅ FIXED: Uses AI-generated content instead of user input
-// ✅ FIXED: AI-generated features in item specifics
-
+// ✅ TRUE eBay BEST PRACTICES 2024 (Mobile-First, 800 Character Limit)
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { detectEbayCategory } from '@/lib/ebay-category-detector'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createServerSideClient } from '@/lib/supabase'
 
 interface EbayListingData {
   Title: string
@@ -21,33 +13,20 @@ interface EbayListingData {
   ListingType: string
   ListingDuration: string
   ConditionID: string
+  SKU: string
+  ShippingDetails: any
+  ReturnPolicy: any
+  PaymentMethods: any[]
+  DispatchTimeMax: number
   PictureDetails?: { PictureURL: string[] }
   ItemSpecifics?: Array<{ Name: string; Value: string[] }>
-  ShippingDetails: {
-    ShippingType: string
-    ShippingServiceOptions: Array<{
-      ShippingServicePriority: number
-      ShippingService: string
-      ShippingServiceCost: string
-    }>
-  }
-  ReturnPolicy: {
-    ReturnsAcceptedOption: string
-    RefundOption: string
-    ReturnsWithinOption: string
-    ShippingCostPaidByOption: string
-  }
-  PaymentMethods: string[]
-  PayPalEmailAddress?: string
-  DispatchTimeMax: number
-  SKU: string
 }
 
 interface EbayApiResult {
   ItemID: string
-  Fees: string[]
-  Errors: string[]
-  Warnings: string[]
+  Fees: any[]
+  Errors: any[]
+  Warnings: any[]
   Ack: string
   RawResponse: string
 }
@@ -55,62 +34,7 @@ interface EbayApiResult {
 interface CategoryResult {
   categoryId: string
   categoryName: string
-  source: 'taxonomy_api' | 'verified_fallback' | 'bulletproof_fallback'
-}
-
-// ✅ NEW: EXTRACT TITLE FROM AI-GENERATED CONTENT
-function extractTitleFromContent(content: string): string | null {
-  // Extract from "PRODUCT TITLE/HEADLINE:" section
-  const titleMatch = content.match(
-    /###\s*1\.\s*PRODUCT TITLE\/HEADLINE:\s*\*\*(.*?)\*\*/i
-  )
-  if (titleMatch && titleMatch[1]) {
-    return titleMatch[1].trim()
-  }
-
-  // Fallback: look for any title with ** formatting near the start
-  const fallbackMatch = content.match(
-    /\*\*(.*?(?:Bluetooth|Wireless|Headphones|Premium|BOSE).*?)\*\*/i
-  )
-  if (fallbackMatch && fallbackMatch[1]) {
-    return fallbackMatch[1].trim()
-  }
-
-  return null
-}
-
-// ✅ NEW: EXTRACT FEATURES FROM AI-GENERATED CONTENT
-function extractFeaturesFromContent(content: string): string[] {
-  const features: string[] = []
-
-  // Extract from "KEY SELLING POINTS:" section
-  const keyPointsMatch = content.match(
-    /###\s*2\.\s*KEY SELLING POINTS:(.*?)(?=###|$)/is
-  )
-  if (keyPointsMatch) {
-    const bulletPoints = keyPointsMatch[1].match(/[-•]\s*\*\*(.*?)\*\*:/g)
-    if (bulletPoints) {
-      bulletPoints.forEach((point) => {
-        const feature = point.replace(/[-•]\s*\*\*(.*?)\*\*:/, '$1').trim()
-        if (feature) features.push(feature)
-      })
-    }
-  }
-
-  // Fallback: extract any bullet points with bold text
-  if (features.length === 0) {
-    const fallbackPoints = content.match(/[-•]\s*\*\*(.*?)\*\*/g)
-    if (fallbackPoints) {
-      fallbackPoints.slice(0, 5).forEach((point) => {
-        const feature = point.replace(/[-•]\s*\*\*(.*?)\*\*/, '$1').trim()
-        if (feature) features.push(feature)
-      })
-    }
-  }
-
-  return features.length > 0
-    ? features
-    : ['High Quality', 'Durable Design', 'Premium Materials']
+  source: string
 }
 
 export async function POST(request: NextRequest) {
@@ -119,10 +43,29 @@ export async function POST(request: NextRequest) {
 
     const { productContent, images, publishingOptions, userId } =
       await request.json()
+    const supabase = await createServerSideClient()
+
+    // Always fetch the latest product content from the backend using the content ID
+    const { data: latestContent, error: fetchError } = await supabase
+      .from('product_contents')
+      .select('*')
+      .eq('id', productContent.id)
+      .eq('user_id', userId)
+      .single()
+
+    if (fetchError || !latestContent) {
+      return NextResponse.json(
+        { error: 'Could not fetch latest product content' },
+        { status: 500 }
+      )
+    }
+
+    // Use the latest content for publishing
+    const mergedProductContent = { ...productContent, ...latestContent }
 
     console.log('📋 Request data:', {
       userId,
-      productName: productContent?.product_name,
+      productName: mergedProductContent?.product_name,
       price: publishingOptions?.price,
       imageCount: images?.length || 0,
     })
@@ -152,7 +95,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ eBay connection found:', connection.id)
 
     // Get User Access Token (for listings)
-    const userAccessToken = await refreshTokenIfNeeded(connection)
+    const userAccessToken = await refreshTokenIfNeeded(connection, supabase)
     console.log(
       '🔐 Using user access token:',
       userAccessToken.substring(0, 20) + '...'
@@ -161,11 +104,11 @@ export async function POST(request: NextRequest) {
     // Generate SKU
     const sku = publishingOptions.sku || `LISTORA-${Date.now()}`
 
-    // ✅ FIXED: Generate comprehensive content for processing
-    const productName = productContent.product_name.toLowerCase()
-    const content = (productContent.content || '').toLowerCase()
-    const features = (productContent.features || '').toLowerCase()
-    const description = (productContent.description || '').toLowerCase()
+    // ✅ Generate comprehensive content for processing
+    const productName = mergedProductContent.product_name.toLowerCase()
+    const content = (mergedProductContent.generated_content || '').toLowerCase()
+    const features = (mergedProductContent.features || '').toLowerCase()
+    const description = (mergedProductContent.description || '').toLowerCase()
     const fullText = `${productName} ${content} ${features} ${description}`
 
     console.log('🔍 Processing full content length:', fullText.length)
@@ -175,11 +118,11 @@ export async function POST(request: NextRequest) {
 
     console.log('🏷️ Final category decision:', categoryResult)
 
-    // ✅ FIXED: Extract AI-generated title
+    // ✅ Extract AI-generated title
     const aiGeneratedTitle = extractTitleFromContent(
-      productContent.content || ''
+      mergedProductContent.generated_content || ''
     )
-    const finalTitle = aiGeneratedTitle || productContent.product_name
+    const finalTitle = aiGeneratedTitle || mergedProductContent.product_name
 
     console.log(
       '🎯 Using title:',
@@ -188,8 +131,8 @@ export async function POST(request: NextRequest) {
 
     // Prepare eBay listing data
     const listingData: EbayListingData = {
-      Title: truncateTitle(finalTitle), // ✅ FIXED: Use AI-generated title
-      Description: formatEbayDescription(productContent),
+      Title: truncateTitle(finalTitle),
+      Description: formatEbayBestPracticesDescription(mergedProductContent), // ✅ NEW: TRUE eBay best practices
       PrimaryCategory: { CategoryID: categoryResult.categoryId },
       StartPrice: publishingOptions.price.toString(),
       Quantity: publishingOptions.quantity,
@@ -236,7 +179,7 @@ export async function POST(request: NextRequest) {
     // ✅ SMART ITEM SPECIFICS GENERATION
     listingData.ItemSpecifics = await generateSmartItemSpecifics(
       categoryResult,
-      fullText // ← FIXED: Using fullText instead of content
+      fullText
     )
 
     console.log('📋 Generated item specifics:', listingData.ItemSpecifics)
@@ -265,11 +208,11 @@ export async function POST(request: NextRequest) {
       .from('ebay_listings')
       .insert({
         user_id: userId,
-        content_id: productContent.id,
+        content_id: mergedProductContent.id,
         ebay_item_id: ebayResult.ItemID,
         sku: sku,
         title: listingData.Title,
-        description: productContent.content,
+        description: mergedProductContent.generated_content,
         price: parseFloat(publishingOptions.price),
         quantity: publishingOptions.quantity,
         category_id: categoryResult.categoryId,
@@ -288,7 +231,7 @@ export async function POST(request: NextRequest) {
       console.log('✅ Saved to database:', listing.id)
     }
 
-    // ✅ ALSO save to unified published_products table
+    // ✅ Save to unified published_products table
     const listingUrl =
       process.env.EBAY_ENVIRONMENT === 'sandbox'
         ? `https://sandbox.ebay.com/itm/${ebayResult.ItemID}`
@@ -303,7 +246,7 @@ export async function POST(request: NextRequest) {
         platform_product_id: ebayResult.ItemID,
         platform_url: listingUrl,
         title: listingData.Title,
-        description: productContent.content,
+        description: mergedProductContent.generated_content,
         price: parseFloat(publishingOptions.price),
         quantity: publishingOptions.quantity,
         sku: sku,
@@ -339,6 +282,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       platform: 'ebay',
+      productId: ebayResult.ItemID, // ✅ Return productId for UnifiedPublisher
+      listingId: ebayResult.ItemID,
+      id: ebayResult.ItemID,
       data: {
         itemId: ebayResult.ItemID,
         sku: sku,
@@ -362,6 +308,239 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// ✅ TRUE eBay BEST PRACTICES DESCRIPTION FORMATTER
+// Mobile-First, 800 Character Mobile Limit, Simple HTML Only
+function formatEbayBestPracticesDescription(productContent: any): string {
+  // Parse the generated content
+  const sections = parseGeneratedContent(productContent.generated_content || '')
+
+  // ✅ eBay Mobile-Optimized Description Format
+  let html = `<div vocab="https://schema.org/" typeof="Product">`
+
+  // ✅ MOBILE DESCRIPTION (800 character limit including HTML tags)
+  html += `<span property="description">`
+
+  let mobileContent = ''
+  let charCount = 0
+
+  // Add key selling points (max 5 for mobile)
+  if (sections.bulletPoints && sections.bulletPoints.length > 0) {
+    mobileContent += '<ul>'
+    charCount += 4 // <ul> = 4 characters
+
+    let pointsAdded = 0
+    for (const point of sections.bulletPoints.slice(0, 5)) {
+      const [title] = point.split(':')
+      const cleanTitle = title.trim()
+      const liContent = `<li>${cleanTitle}</li>`
+
+      // Check if adding this point would exceed 800 chars
+      if (charCount + liContent.length < 750) {
+        // Leave buffer for closing tags
+        mobileContent += liContent
+        charCount += liContent.length
+        pointsAdded++
+      } else {
+        break
+      }
+    }
+
+    mobileContent += '</ul>'
+    charCount += 5 // </ul> = 5 characters
+  }
+
+  // Add brief description if space allows
+  if (sections.shortDescription && charCount < 600) {
+    const remainingChars = 750 - charCount
+    const briefDesc = sections.shortDescription.substring(
+      0,
+      remainingChars - 20
+    )
+    mobileContent += `<br>${briefDesc}`
+  }
+
+  html += mobileContent
+  html += `</span>` // End mobile description
+
+  // ✅ DESKTOP DESCRIPTION (can be longer, but keep simple)
+  // Add product details for desktop viewers
+  if (sections.fullDescription) {
+    html += `<br><br><strong>Product Details:</strong><br>`
+
+    const paragraphs = sections.fullDescription.split('\n\n')
+    for (let i = 0; i < Math.min(paragraphs.length, 3); i++) {
+      // Limit to 3 paragraphs
+      const paragraph = paragraphs[i].trim()
+      if (paragraph && paragraph.length > 20) {
+        // Keep paragraphs under 300 characters each
+        const shortParagraph =
+          paragraph.length > 300
+            ? paragraph.substring(0, 300) + '...'
+            : paragraph
+        html += `${shortParagraph}<br><br>`
+      }
+    }
+  }
+
+  // ✅ SIMPLE ITEM INFORMATION (No fancy tables)
+  html += `<strong>Condition:</strong> New<br>`
+  html += `<strong>Brand:</strong> ${extractBrand(productContent.generated_content || productContent.product_name)}<br>`
+  html += `<strong>Shipping:</strong> Fast shipping available<br>`
+  html += `<strong>Returns:</strong> 30-day return policy<br><br>`
+
+  // ✅ SIMPLE CONTACT INFO
+  html += `Questions? Please message us for more details.<br>`
+  html += `Thanks for shopping with us!`
+
+  html += `</div>`
+
+  console.log(`📱 Mobile description character count: ${mobileContent.length}`)
+
+  return html
+}
+
+// ✅ PARSE AI-GENERATED CONTENT SECTIONS
+function parseGeneratedContent(content: string) {
+  const sections = {
+    title: '',
+    shortDescription: '',
+    fullDescription: '',
+    bulletPoints: [] as string[],
+    instagramCaption: '',
+    blogIntro: '',
+  }
+
+  try {
+    const lines = content.split('\n').filter((line) => line.trim())
+
+    let currentSection = ''
+    let description: string[] = []
+    let bulletPoints: string[] = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim()
+
+      // Extract title (removes markdown)
+      if (trimmed.match(/^#{1,3}\s*1\.\s*PRODUCT TITLE/i)) {
+        currentSection = 'title'
+        for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+          const nextLine = lines[j].trim()
+          if (
+            nextLine &&
+            nextLine.startsWith('**') &&
+            nextLine.endsWith('**')
+          ) {
+            sections.title = nextLine.replace(/\*\*/g, '').trim()
+            break
+          }
+        }
+        continue
+      }
+
+      if (trimmed.match(/^#{1,3}\s*2\.\s*KEY SELLING/i)) {
+        currentSection = 'bullets'
+        continue
+      }
+
+      if (trimmed.match(/^#{1,3}\s*3\.\s*DETAILED? PRODUCT DESCRIPTION/i)) {
+        currentSection = 'description'
+        continue
+      }
+
+      // Skip social media sections for professional listing
+      if (trimmed.match(/^#{1,3}\s*[4-6]\./i)) {
+        currentSection = 'skip'
+        continue
+      }
+
+      // Process content based on current section
+      if (currentSection === 'bullets') {
+        if (trimmed.startsWith('-') && trimmed.includes('**')) {
+          const bulletMatch = trimmed.match(/^-\s*\*\*(.*?)\*\*:\s*(.*)/)
+          if (bulletMatch) {
+            bulletPoints.push(`${bulletMatch[1]}: ${bulletMatch[2]}`)
+          }
+        }
+      } else if (currentSection === 'description') {
+        if (
+          trimmed.length > 10 &&
+          !trimmed.match(/^#{1,3}/) &&
+          !trimmed.match(/^\*?\*?[A-Z\s]+:?\*?\*?$/) &&
+          !trimmed.includes('**')
+        ) {
+          description.push(trimmed)
+        }
+      }
+    }
+
+    sections.bulletPoints = bulletPoints
+    sections.fullDescription = description.join('\n\n')
+    sections.shortDescription = description[0] || ''
+  } catch (error) {
+    console.error('❌ Error parsing content:', error)
+    const cleanContent = content.replace(/\*\*/g, '').replace(/#{1,6}\s*/g, '')
+    const paragraphs = cleanContent
+      .split('\n\n')
+      .filter((p) => p.trim().length > 50)
+    sections.fullDescription = paragraphs[0] || cleanContent.substring(0, 300)
+  }
+
+  return sections
+}
+
+// ✅ EXTRACT AI-GENERATED TITLE FROM CONTENT
+function extractTitleFromContent(content: string): string | null {
+  // Extract from "PRODUCT TITLE/HEADLINE:" section
+  const titleMatch = content.match(
+    /###\s*1\.\s*PRODUCT TITLE\/HEADLINE:\s*\*\*(.*?)\*\*/i
+  )
+  if (titleMatch && titleMatch[1]) {
+    return titleMatch[1].trim()
+  }
+  // Fallback: look for any title with ** formatting
+  const fallbackMatch = content.match(
+    /\*\*(.*?(?:Premium|Professional|Luxury|Quality).*?)\*\*/i
+  )
+  return fallbackMatch ? fallbackMatch[1].trim() : null
+}
+
+// ✅ EXTRACT FEATURES FROM AI-GENERATED CONTENT
+function extractFeaturesFromContent(content: string): string[] {
+  const features: string[] = []
+  // Extract from "KEY SELLING POINTS:" section
+  const keyPointsMatch = content.match(
+    /###\s*2\.\s*KEY SELLING POINTS:(.*?)(?=###|$)/is
+  )
+  if (keyPointsMatch) {
+    const bulletPoints = keyPointsMatch[1].match(/[-•]\s*\*\*(.*?)\*\*:/g)
+    if (bulletPoints) {
+      bulletPoints.forEach((point) => {
+        const feature = point.replace(/[-•]\s*\*\*(.*?)\*\*:/, '$1').trim()
+        if (feature) features.push(feature)
+      })
+    }
+  }
+  // Fallback: extract any bullet points with bold text
+  if (features.length === 0) {
+    const fallbackPoints = content.match(/[-•]\s*\*\*(.*?)\*\*/g)
+    if (fallbackPoints) {
+      fallbackPoints.slice(0, 5).forEach((point) => {
+        const feature = point.replace(/[-•]\s*\*\*(.*?)\*\*/, '$1').trim()
+        if (feature) features.push(feature)
+      })
+    }
+  }
+  return features.length > 0
+    ? features
+    : [
+        'High Quality',
+        'Durable Design',
+        'Premium Materials',
+        'Excellent Performance',
+        'Great Value',
+      ]
 }
 
 // ✅ DUAL TOKEN SYSTEM: APPLICATION TOKEN FOR TAXONOMY API
@@ -493,7 +672,6 @@ async function detectCategoryWithDualTokens(
 }
 
 // ✅ TAXONOMY API FUNCTIONS WITH APPLICATION TOKEN
-
 async function testTaxonomyAPIWithAppToken(appToken: string): Promise<boolean> {
   try {
     const taxonomyUrl =
@@ -665,7 +843,7 @@ async function getRequiredAspectsWithAppToken(
   }
 }
 
-// ✅ VERIFIED CATEGORY DETECTION (FALLBACK) - FIXED PRIORITY ORDER
+// ✅ VERIFIED CATEGORY DETECTION (FALLBACK)
 function detectVerifiedCategory(fullText: string): string {
   const text = fullText.toLowerCase()
 
@@ -688,7 +866,7 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('noise cancelling')
   ) {
     console.log('✅ Detected HEADPHONES category')
-    return '112529' // Headphones - CORRECT LEAF CATEGORY ✅
+    return '14969' // Headphones
   }
 
   // KITCHEN & HOME - Check BEFORE generic electronics
@@ -699,7 +877,7 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('cooker')
   ) {
     console.log('✅ Detected KITCHEN APPLIANCES category')
-    return '20667' // Small Kitchen Appliances ✅
+    return '20667' // Small Kitchen Appliances
   }
 
   if (
@@ -708,7 +886,7 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('coffee mug')
   ) {
     console.log('✅ Detected DINNERWARE category')
-    return '20642' // Dinnerware & Serveware ✅
+    return '20642' // Dinnerware & Serveware
   }
 
   // FASHION - Check BEFORE generic terms
@@ -720,7 +898,7 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('adidas')
   ) {
     console.log('✅ Detected SHOES category')
-    return '15709' // Athletic Shoes ✅
+    return '15709' // Athletic Shoes
   }
 
   if (
@@ -730,12 +908,12 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('casual shirt')
   ) {
     console.log('✅ Detected SHIRTS category')
-    return '1059' // Casual Shirts ✅
+    return '1059' // Casual Shirts
   }
 
   if (text.includes('jeans') || text.includes('denim pants')) {
     console.log('✅ Detected JEANS category')
-    return '11554' // Jeans ✅
+    return '11554' // Jeans
   }
 
   if (
@@ -745,7 +923,7 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('wristwatch')
   ) {
     console.log('✅ Detected WATCH category')
-    return '31387' // Wristwatches ✅
+    return '31387' // Wristwatches
   }
 
   // ELECTRONICS - Check LAST (most generic)
@@ -756,7 +934,7 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('notebook')
   ) {
     console.log('✅ Detected LAPTOP category')
-    return '177' // PC Laptops & Netbooks ✅
+    return '177' // PC Laptops & Netbooks
   }
 
   // PHONES - Check LAST (very generic terms)
@@ -768,13 +946,13 @@ function detectVerifiedCategory(fullText: string): string {
     text.includes('pixel')
   ) {
     console.log('✅ Detected PHONE category')
-    return '9355' // Cell Phones & Smartphones ✅
+    return '9355' // Cell Phones & Smartphones
   }
 
   // Only match "phone" if no other category detected
   if (text.includes('phone') && !text.includes('headphone')) {
     console.log('✅ Detected generic PHONE category')
-    return '9355' // Cell Phones & Smartphones ✅
+    return '9355' // Cell Phones & Smartphones
   }
 
   // GENERIC FALLBACK - Only if nothing else matched
@@ -789,7 +967,7 @@ async function generateSmartItemSpecifics(
 ): Promise<Array<{ Name: string; Value: string[] }>> {
   const specifics: Array<{ Name: string; Value: string[] }> = []
 
-  // Always add universal basics - NOW USING FULLTEXT
+  // Always add universal basics
   specifics.push({ Name: 'Brand', Value: [extractBrand(fullText)] })
   specifics.push({ Name: 'Color', Value: [extractColor(fullText)] })
 
@@ -854,7 +1032,7 @@ function extractValueForAspect(
   const text = fullText.toLowerCase()
   const aspect = aspectName.toLowerCase()
 
-  // Universal aspect handling - NOW USING FULLTEXT
+  // Universal aspect handling
   if (aspect.includes('brand')) return extractBrand(fullText)
   if (aspect.includes('color') || aspect.includes('colour'))
     return extractColor(fullText)
@@ -862,7 +1040,7 @@ function extractValueForAspect(
   if (aspect.includes('size')) return extractGenericSize(fullText)
   if (aspect.includes('material')) return extractGenericMaterial(fullText)
 
-  // Category-specific aspect handling - NOW USING FULLTEXT
+  // Category-specific aspect handling
   if (categoryId === '9355') {
     // Cell Phones
     if (aspect.includes('storage')) return extractStorageCapacity(fullText)
@@ -877,41 +1055,12 @@ function extractValueForAspect(
       return extractRAM(fullText)
     if (aspect.includes('storage type')) return extractStorageType(fullText)
     if (aspect.includes('operating system')) return extractLaptopOS(fullText)
-  } else if (categoryId === '20667') {
-    // Kitchen Appliances
-    if (aspect.includes('capacity')) return extractCapacity(fullText)
-    if (aspect.includes('type')) return extractApplianceType(fullText)
-    if (aspect.includes('power')) return extractPower(fullText)
-  } else if (categoryId === '15709') {
-    // Shoes
-    if (aspect.includes('department')) return extractShoeDepartment(fullText)
-    if (aspect.includes('shoe size') || aspect.includes('size'))
-      return extractShoeSize(fullText)
-    if (aspect.includes('style')) return extractShoeStyle(fullText)
-    if (aspect.includes('width')) return extractShoeWidth(fullText)
-  } else if (categoryId === '1059') {
-    // Shirts
-    if (aspect.includes('sleeve')) return extractSleeveLength(fullText)
-    if (aspect.includes('fit')) return extractFit(fullText)
-    if (aspect.includes('style')) return extractShirtStyle(fullText)
-  } else if (categoryId === '112529') {
-    // Headphones - NEW CATEGORY SUPPORT
+  } else if (categoryId === '31387') {
+    // Watches
     if (aspect.includes('type') || aspect.includes('style'))
-      return extractHeadphoneType(fullText)
-    if (aspect.includes('features')) {
-      const featuresList = extractHeadphoneFeatures(fullText)
-      return featuresList.length > 0 ? featuresList[0] : 'Standard'
-    }
-    if (aspect.includes('connectivity')) return extractConnectivity(fullText)
-  } else if (categoryId === '15052') {
-    // Headphones - LEGACY CATEGORY SUPPORT
-    if (aspect.includes('type') || aspect.includes('style'))
-      return extractHeadphoneType(fullText)
-    if (aspect.includes('features')) {
-      const featuresList = extractHeadphoneFeatures(fullText)
-      return featuresList.length > 0 ? featuresList[0] : 'Standard'
-    }
-    if (aspect.includes('connectivity')) return extractConnectivity(fullText)
+      return extractWatchType(fullText)
+    if (aspect.includes('movement')) return extractMovement(fullText)
+    if (aspect.includes('band material')) return extractBandMaterial(fullText)
   }
 
   return 'Standard'
@@ -925,7 +1074,7 @@ function generateCategorySpecificAspects(
   const specifics: Array<{ Name: string; Value: string[] }> = []
 
   if (categoryId === '9355') {
-    // Cell Phones - NOW USING FULLTEXT
+    // Cell Phones
     specifics.push({ Name: 'Model', Value: [extractPhoneModel(fullText)] })
     specifics.push({
       Name: 'Storage Capacity',
@@ -934,7 +1083,7 @@ function generateCategorySpecificAspects(
     specifics.push({ Name: 'Network', Value: [extractNetwork(fullText)] })
     specifics.push({ Name: 'Operating System', Value: [extractOS(fullText)] })
   } else if (categoryId === '177') {
-    // Laptops - NOW USING FULLTEXT
+    // Laptops
     specifics.push({
       Name: 'Screen Size',
       Value: [extractScreenSize(fullText)],
@@ -949,65 +1098,20 @@ function generateCategorySpecificAspects(
       Name: 'Operating System',
       Value: [extractLaptopOS(fullText)],
     })
-  } else if (categoryId === '20667') {
-    // Kitchen Appliances - NOW USING FULLTEXT
-    specifics.push({ Name: 'Type', Value: [extractApplianceType(fullText)] })
-    specifics.push({ Name: 'Capacity', Value: [extractCapacity(fullText)] })
-    specifics.push({ Name: 'Power Source', Value: [extractPower(fullText)] })
-    specifics.push({ Name: 'Model', Value: [extractGenericModel(fullText)] })
-  } else if (categoryId === '15709') {
-    // Athletic Shoes - NOW USING FULLTEXT
+  } else if (categoryId === '31387') {
+    // Watches
+    specifics.push({ Name: 'Watch Type', Value: [extractWatchType(fullText)] })
+    specifics.push({ Name: 'Movement', Value: [extractMovement(fullText)] })
     specifics.push({
-      Name: 'Department',
-      Value: [extractShoeDepartment(fullText)],
-    })
-    specifics.push({ Name: 'US Shoe Size', Value: [extractShoeSize(fullText)] })
-    specifics.push({ Name: 'Style', Value: [extractShoeStyle(fullText)] })
-    specifics.push({ Name: 'Material', Value: [extractShoeMaterial(fullText)] })
-    specifics.push({ Name: 'Width', Value: [extractShoeWidth(fullText)] })
-  } else if (categoryId === '1059') {
-    // Casual Shirts - NOW USING FULLTEXT
-    specifics.push({ Name: 'Size', Value: [extractClothingSize(fullText)] })
-    specifics.push({
-      Name: 'Material',
-      Value: [extractFabricMaterial(fullText)],
-    })
-    specifics.push({ Name: 'Style', Value: [extractShirtStyle(fullText)] })
-    specifics.push({
-      Name: 'Sleeve Length',
-      Value: [extractSleeveLength(fullText)],
-    })
-    specifics.push({ Name: 'Fit', Value: [extractFit(fullText)] })
-  } else if (categoryId === '112529') {
-    // ✅ HEADPHONES Support (Correct Leaf Category)
-    specifics.push({ Name: 'Type', Value: [extractHeadphoneType(fullText)] })
-    // ✅ FIXED: Use AI-generated features for headphones
-    const extractedFeatures = extractHeadphoneFeatures(fullText)
-    specifics.push({
-      Name: 'Features',
-      Value: extractedFeatures,
+      Name: 'Band Material',
+      Value: [extractBandMaterial(fullText)],
     })
     specifics.push({
-      Name: 'Connectivity',
-      Value: [extractConnectivity(fullText)],
+      Name: 'Case Material',
+      Value: [extractCaseMaterial(fullText)],
     })
-    specifics.push({ Name: 'Model', Value: [extractGenericModel(fullText)] })
-  } else if (categoryId === '15052') {
-    // ✅ LEGACY: Headphones Support (Old Category - Keep for fallback)
-    specifics.push({ Name: 'Type', Value: [extractHeadphoneType(fullText)] })
-    // ✅ FIXED: Use AI-generated features for headphones (legacy category)
-    const extractedFeatures = extractHeadphoneFeatures(fullText)
-    specifics.push({
-      Name: 'Features',
-      Value: extractedFeatures,
-    })
-    specifics.push({
-      Name: 'Connectivity',
-      Value: [extractConnectivity(fullText)],
-    })
-    specifics.push({ Name: 'Model', Value: [extractGenericModel(fullText)] })
   } else {
-    // Universal fallback - NOW USING FULLTEXT
+    // Universal fallback
     specifics.push({ Name: 'Model', Value: [extractGenericModel(fullText)] })
     specifics.push({ Name: 'Type', Value: ['Standard'] })
   }
@@ -1015,7 +1119,7 @@ function generateCategorySpecificAspects(
   return specifics
 }
 
-// ✅ ALL EXTRACTION FUNCTIONS - NOW PROPERLY USING FULLTEXT
+// ✅ EXTRACTION FUNCTIONS
 
 function extractBrand(fullText: string): string {
   const text = fullText.toLowerCase()
@@ -1031,37 +1135,8 @@ function extractBrand(fullText: string): string {
   if (text.includes('hp')) return 'HP'
   if (text.includes('lenovo')) return 'Lenovo'
 
-  // Audio brands (for headphones)
-  if (text.includes('bose')) return 'Bose'
-  if (text.includes('beats')) return 'Beats'
-  if (text.includes('sennheiser')) return 'Sennheiser'
-  if (text.includes('skullcandy')) return 'Skullcandy'
-  if (text.includes('jbl')) return 'JBL'
-  if (text.includes('audio-technica')) return 'Audio-Technica'
-
-  // Kitchen brands
-  if (text.includes('chefman')) return 'Chefman'
-  if (text.includes('ninja')) return 'Ninja'
-  if (text.includes('cuisinart')) return 'Cuisinart'
-  if (text.includes('breville')) return 'Breville'
-  if (text.includes('kitchenaid')) return 'KitchenAid'
-
-  // Fashion brands
-  if (text.includes('nike')) return 'Nike'
-  if (text.includes('adidas')) return 'adidas'
-  if (text.includes('jordan')) return 'Jordan'
-  if (text.includes('puma')) return 'PUMA'
-  if (text.includes('under armour')) return 'Under Armour'
-  if (text.includes('nautica')) return 'Nautica'
-  if (text.includes('carhartt')) return 'Carhartt'
-  if (text.includes('polo')) return 'Polo Ralph Lauren'
-  if (text.includes('calvin klein')) return 'Calvin Klein'
-  if (text.includes('tommy hilfiger')) return 'Tommy Hilfiger'
-  if (text.includes('levi')) return "Levi's"
-  if (text.includes('hanes')) return 'Hanes'
-  if (text.includes('gildan')) return 'Gildan'
-
   // Watch brands
+  if (text.includes('cheetah')) return 'Cheetah'
   if (text.includes('rolex')) return 'Rolex'
   if (text.includes('omega')) return 'Omega'
   if (text.includes('seiko')) return 'Seiko'
@@ -1069,38 +1144,27 @@ function extractBrand(fullText: string): string {
   if (text.includes('fossil')) return 'Fossil'
   if (text.includes('timex')) return 'Timex'
 
+  // Fashion brands
+  if (text.includes('nike')) return 'Nike'
+  if (text.includes('adidas')) return 'adidas'
+  if (text.includes('jordan')) return 'Jordan'
+  if (text.includes('puma')) return 'PUMA'
+
   return 'Unbranded'
 }
 
-// ✅ FIXED: ENHANCED COLOR DETECTION WITH BEIGE SUPPORT
 function extractColor(fullText: string): string {
   const text = fullText.toLowerCase()
 
-  // Enhanced color detection with beige/cream colors
+  // Enhanced color detection
   const colorMap = {
-    // Neutral colors (check first - most specific)
-    beige: [
-      'beige',
-      'tan',
-      'khaki',
-      'sand',
-      'nude',
-      'matte beige',
-      'soft beige',
-    ],
-    cream: ['cream', 'vanilla', 'eggshell', 'linen', 'ivory'],
+    beige: ['beige', 'tan', 'khaki', 'sand', 'nude'],
+    gold: ['gold', 'golden', 'gold tone', 'gold color'],
     white: ['white', 'off-white'],
     black: ['black', 'ebony', 'charcoal'],
     gray: ['gray', 'grey', 'silver', 'slate'],
-
-    // Compound colors (check before single colors)
-    'light gray': ['light gray', 'light grey'],
-    'dark blue': ['dark blue', 'navy blue'],
-    'light blue': ['light blue', 'sky blue'],
-
-    // Primary colors
     red: ['red', 'crimson', 'scarlet'],
-    blue: ['blue', 'navy', 'cobalt', 'azure'],
+    blue: ['blue', 'navy', 'cobalt'],
     green: ['green', 'emerald', 'forest'],
     yellow: ['yellow', 'gold', 'golden'],
     brown: ['brown', 'bronze', 'chocolate'],
@@ -1108,14 +1172,6 @@ function extractColor(fullText: string): string {
     purple: ['purple', 'violet', 'lavender'],
     orange: ['orange', 'amber', 'copper'],
   }
-
-  // Check compound colors first (more specific)
-  if (text.includes('light gray') || text.includes('light grey'))
-    return 'Light Gray'
-  if (text.includes('dark blue')) return 'Dark Blue'
-  if (text.includes('light blue')) return 'Light Blue'
-  if (text.includes('soft beige') || text.includes('matte beige'))
-    return 'Beige'
 
   // Check all color variants
   for (const [colorName, variants] of Object.entries(colorMap)) {
@@ -1129,62 +1185,7 @@ function extractColor(fullText: string): string {
   return 'Multicolor'
 }
 
-// ✅ FIXED: HEADPHONE EXTRACTORS - NOW RETURNS ARRAY FOR FEATURES
-function extractHeadphoneType(fullText: string): string {
-  const text = fullText.toLowerCase()
-  if (text.includes('over-ear') || text.includes('over ear')) return 'Over-Ear'
-  if (text.includes('on-ear') || text.includes('on ear')) return 'On-Ear'
-  if (
-    text.includes('in-ear') ||
-    text.includes('in ear') ||
-    text.includes('earbuds')
-  )
-    return 'In-Ear'
-  if (text.includes('wireless') || text.includes('bluetooth')) return 'Wireless'
-  return 'Over-Ear'
-}
-
-// ✅ FIXED: NOW RETURNS ARRAY OF AI-GENERATED FEATURES
-function extractHeadphoneFeatures(fullText: string): string[] {
-  // ✅ FIXED: Return AI-generated features instead of single generic feature
-  const extractedFeatures = extractFeaturesFromContent(fullText)
-
-  // If we have AI-generated features, use them (max 3 for eBay)
-  if (extractedFeatures.length > 0) {
-    return extractedFeatures.slice(0, 3)
-  }
-
-  // Fallback to keyword detection if no AI features found
-  const features: string[] = []
-  const text = fullText.toLowerCase()
-
-  if (text.includes('noise cancelling') || text.includes('noise cancellation'))
-    features.push('Noise Cancelling')
-  if (text.includes('wireless') || text.includes('bluetooth'))
-    features.push('Wireless')
-  if (text.includes('waterproof') || text.includes('water resistant'))
-    features.push('Water Resistant')
-  if (text.includes('bass boost') || text.includes('bass'))
-    features.push('Bass Boost')
-
-  return features.length > 0 ? features : ['Standard']
-}
-
-function extractConnectivity(fullText: string): string {
-  const text = fullText.toLowerCase()
-  if (text.includes('bluetooth') || text.includes('wireless'))
-    return 'Bluetooth'
-  if (
-    text.includes('wired') ||
-    text.includes('3.5mm') ||
-    text.includes('cable')
-  )
-    return 'Wired'
-  if (text.includes('usb-c') || text.includes('usb c')) return 'USB-C'
-  return 'Bluetooth'
-}
-
-// PHONE EXTRACTORS - NOW USING FULLTEXT
+// PHONE EXTRACTORS
 function extractPhoneModel(fullText: string): string {
   const text = fullText.toLowerCase()
 
@@ -1233,7 +1234,7 @@ function extractOS(fullText: string): string {
   return 'iOS'
 }
 
-// LAPTOP EXTRACTORS - NOW USING FULLTEXT
+// LAPTOP EXTRACTORS
 function extractScreenSize(fullText: string): string {
   const sizeMatch = fullText.match(/(\d{1,2}(?:\.\d)?)\s*(?:inch|"|in)/i)
   if (sizeMatch) return `${sizeMatch[1]}"`
@@ -1270,128 +1271,53 @@ function extractLaptopOS(fullText: string): string {
   return 'Windows 11'
 }
 
-// KITCHEN APPLIANCE EXTRACTORS - NOW USING FULLTEXT
-function extractApplianceType(fullText: string): string {
+// WATCH EXTRACTORS
+function extractWatchType(fullText: string): string {
   const text = fullText.toLowerCase()
-  if (text.includes('air fryer')) return 'Air Fryer'
-  if (text.includes('coffee maker')) return 'Coffee Maker'
-  if (text.includes('blender')) return 'Blender'
-  if (text.includes('toaster')) return 'Toaster'
-  if (text.includes('microwave')) return 'Microwave'
-  return 'Kitchen Appliance'
+  if (text.includes('smartwatch') || text.includes('smart watch'))
+    return 'Smart Watch'
+  if (text.includes('digital')) return 'Digital'
+  if (text.includes('analog') || text.includes('analogue')) return 'Analog'
+  if (text.includes('automatic')) return 'Automatic'
+  if (text.includes('quartz')) return 'Quartz'
+  return 'Analog'
 }
 
-function extractCapacity(fullText: string): string {
-  const capacityMatch = fullText.match(
-    /(\d+(?:\.\d+)?)\s*(qt|quart|l|liter|cup|oz)/i
-  )
-  if (capacityMatch) {
-    return `${capacityMatch[1]} ${capacityMatch[2].toLowerCase()}`
-  }
-  return '2 qt'
-}
-
-function extractPower(fullText: string): string {
+function extractMovement(fullText: string): string {
   const text = fullText.toLowerCase()
-  if (text.includes('electric')) return 'Electric'
-  if (text.includes('gas')) return 'Gas'
-  if (text.includes('battery')) return 'Battery'
-  return 'Electric'
+  if (text.includes('automatic')) return 'Automatic'
+  if (text.includes('mechanical')) return 'Mechanical'
+  if (text.includes('quartz')) return 'Quartz'
+  if (text.includes('digital')) return 'Digital'
+  return 'Quartz'
 }
 
-// SHOE EXTRACTORS - NOW USING FULLTEXT
-function extractShoeDepartment(fullText: string): string {
-  const text = fullText.toLowerCase()
-  if (text.includes('women') || text.includes('ladies')) return 'Women'
-  if (text.includes('men') || text.includes('mens')) return 'Men'
-  if (text.includes('kids') || text.includes('children')) return 'Kids'
-  return 'Unisex'
-}
-
-function extractShoeSize(fullText: string): string {
-  const sizeMatch = fullText.match(/\b(?:size\s+)?(\d{1,2}(?:\.\d)?)\b/i)
-  if (sizeMatch) {
-    const size = parseFloat(sizeMatch[1])
-    if (size >= 4 && size <= 15) return size.toString()
-  }
-  return '10'
-}
-
-function extractShoeStyle(fullText: string): string {
-  const text = fullText.toLowerCase()
-  if (text.includes('running') || text.includes('athletic'))
-    return 'Athletic Sneakers'
-  if (text.includes('basketball')) return 'Basketball Shoes'
-  if (text.includes('casual')) return 'Casual Sneakers'
-  if (text.includes('boot')) return 'Boots'
-  return 'Athletic Sneakers'
-}
-
-function extractShoeMaterial(fullText: string): string {
+function extractBandMaterial(fullText: string): string {
   const text = fullText.toLowerCase()
   if (text.includes('leather')) return 'Leather'
-  if (text.includes('canvas')) return 'Canvas'
-  if (text.includes('mesh')) return 'Mesh'
-  if (text.includes('synthetic')) return 'Synthetic'
-  return 'Synthetic'
+  if (
+    text.includes('metal') ||
+    text.includes('steel') ||
+    text.includes('bracelet')
+  )
+    return 'Metal'
+  if (text.includes('rubber') || text.includes('silicone')) return 'Rubber'
+  if (text.includes('fabric') || text.includes('nylon')) return 'Fabric'
+  if (text.includes('gold')) return 'Gold Tone'
+  return 'Metal'
 }
 
-function extractShoeWidth(fullText: string): string {
+function extractCaseMaterial(fullText: string): string {
   const text = fullText.toLowerCase()
-  if (text.includes('wide')) return 'W'
-  if (text.includes('narrow')) return 'N'
-  return 'M'
+  if (text.includes('stainless steel')) return 'Stainless Steel'
+  if (text.includes('titanium')) return 'Titanium'
+  if (text.includes('gold')) return 'Gold'
+  if (text.includes('aluminum')) return 'Aluminum'
+  if (text.includes('plastic')) return 'Plastic'
+  return 'Metal'
 }
 
-// CLOTHING EXTRACTORS - NOW USING FULLTEXT
-function extractClothingSize(fullText: string): string {
-  const sizeMatch = fullText.match(/\b(XS|S|M|L|XL|XXL|XXXL)\b/i)
-  if (sizeMatch) return sizeMatch[1].toUpperCase()
-
-  const numericMatch = fullText.match(/\bsize\s+(\d+)\b/i)
-  if (numericMatch) return numericMatch[1]
-
-  return 'M'
-}
-
-function extractFabricMaterial(fullText: string): string {
-  const text = fullText.toLowerCase()
-  if (text.includes('cotton')) return 'Cotton'
-  if (text.includes('polyester')) return 'Polyester'
-  if (text.includes('wool')) return 'Wool'
-  if (text.includes('silk')) return 'Silk'
-  if (text.includes('denim')) return 'Denim'
-  return 'Cotton'
-}
-
-function extractShirtStyle(fullText: string): string {
-  const text = fullText.toLowerCase()
-  if (text.includes('polo')) return 'Polo'
-  if (text.includes('dress')) return 'Dress'
-  if (text.includes('casual')) return 'Casual'
-  if (text.includes('button')) return 'Button-Down'
-  return 'Casual'
-}
-
-function extractSleeveLength(fullText: string): string {
-  const text = fullText.toLowerCase()
-  if (text.includes('short sleeve')) return 'Short Sleeve'
-  if (text.includes('long sleeve')) return 'Long Sleeve'
-  if (text.includes('sleeveless')) return 'Sleeveless'
-  return 'Short Sleeve'
-}
-
-function extractFit(fullText: string): string {
-  const text = fullText.toLowerCase()
-  if (text.includes('slim')) return 'Slim'
-  if (text.includes('regular')) return 'Regular'
-  if (text.includes('relaxed')) return 'Relaxed'
-  if (text.includes('fitted')) return 'Fitted'
-  if (text.includes('loose')) return 'Loose Fit'
-  return 'Regular'
-}
-
-// GENERIC EXTRACTORS - NOW USING FULLTEXT
+// GENERIC EXTRACTORS
 function extractGenericModel(fullText: string): string {
   const modelMatch =
     fullText.match(/model\s+([a-z0-9\-]+)/i) ||
@@ -1399,11 +1325,9 @@ function extractGenericModel(fullText: string): string {
   if (modelMatch) return modelMatch[1]
 
   const text = fullText.toLowerCase()
-  if (text.includes('carhartt')) return 'Carhartt Model'
-  if (text.includes('nautica')) return 'Nautica Model'
+  if (text.includes('cheetah')) return 'Cheetah Model'
   if (text.includes('nike')) return 'Nike Model'
-  if (text.includes('chefman')) return 'Chefman Model'
-  if (text.includes('bose')) return 'Bose Model'
+  if (text.includes('apple')) return 'Apple Model'
 
   return 'Standard Model'
 }
@@ -1423,23 +1347,17 @@ function extractGenericMaterial(fullText: string): string {
   if (text.includes('fabric')) return 'Fabric'
   if (text.includes('cotton')) return 'Cotton'
   if (text.includes('polyester')) return 'Polyester'
-  if (text.includes('nonstick')) return 'Non-stick'
   return 'Mixed Materials'
 }
 
-// ✅ eBay API FUNCTIONS (UNCHANGED - USES USER TOKEN)
+// ✅ eBay API FUNCTIONS
 async function createEbayListing(
   listingData: EbayListingData,
   userAccessToken: string
 ): Promise<EbayApiResult> {
-  const apiEndpoints = [
-    'https://api.sandbox.ebay.com/ws/api.dll',
-    'https://api.sandbox.ebay.com/wsapi',
-  ]
-
   const tradingApiUrl =
     process.env.EBAY_ENVIRONMENT === 'sandbox'
-      ? apiEndpoints[0]
+      ? 'https://api.sandbox.ebay.com/ws/api.dll'
       : 'https://api.ebay.com/ws/api.dll'
 
   console.log('🌐 eBay API URL:', tradingApiUrl)
@@ -1493,7 +1411,6 @@ async function createEbayListing(
 </AddFixedPriceItemRequest>`
 
   console.log('📤 Sending XML request to eBay API...')
-  console.log('📋 XML Length:', xmlRequest.length)
 
   let finalResponse: Response | null = null
   const maxRetries = 3
@@ -1600,30 +1517,6 @@ function truncateTitle(title: string): string {
   return title.length > 80 ? title.substring(0, 77) + '...' : title
 }
 
-// ✅ UPDATED: FORMAT DESCRIPTION WITH AI-GENERATED FEATURES
-function formatEbayDescription(productContent: any): string {
-  let html = `<div style="font-family: Arial, sans-serif;">`
-
-  if (productContent.content) {
-    html += `<h3>Description</h3><p>${productContent.content.replace(/\n/g, '<br>')}</p>`
-  }
-
-  // ✅ Use extracted features from generated content instead of user input
-  const extractedFeatures = extractFeaturesFromContent(
-    productContent.content || ''
-  )
-  if (extractedFeatures.length > 0) {
-    html += `<h3>Key Features</h3><ul>`
-    extractedFeatures.forEach((feature: string) => {
-      html += `<li>${feature.trim()}</li>`
-    })
-    html += `</ul>`
-  }
-
-  html += `</div>`
-  return html
-}
-
 function mapConditionToEbay(
   condition: string,
   categoryId: string = '9355'
@@ -1699,7 +1592,10 @@ function escapeXml(text: string): string {
     .replace(/'/g, '&#39;')
 }
 
-async function refreshTokenIfNeeded(connection: any): Promise<string> {
+async function refreshTokenIfNeeded(
+  connection: any,
+  supabase: any
+): Promise<string> {
   const expiresAt = new Date(connection.expires_at)
   const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000)
 
