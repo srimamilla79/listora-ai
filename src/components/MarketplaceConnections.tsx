@@ -55,12 +55,6 @@ export default function MarketplaceConnections({
       platform: 'ebay',
       connected: false,
     },
-    {
-      platform: 'etsy',
-      connected: false,
-      disabled: true,
-      comingSoon: true,
-    },
   ])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,12 +173,6 @@ export default function MarketplaceConnections({
           },
           connectedAt: validEbayConnection?.created_at,
         },
-        {
-          platform: 'etsy',
-          connected: false,
-          disabled: true,
-          comingSoon: true,
-        },
       ]
 
       setConnections(updatedConnections)
@@ -195,7 +183,6 @@ export default function MarketplaceConnections({
         onConnectionChange('amazon', !!validAmazonConnection?.access_token)
         onConnectionChange('shopify', !!validShopifyConnection)
         onConnectionChange('ebay', !!validEbayConnection?.access_token)
-        onConnectionChange('etsy', false)
       }
     } catch (error) {
       console.error('❌ Error loading connections:', error)
@@ -205,19 +192,12 @@ export default function MarketplaceConnections({
         { platform: 'amazon', connected: false },
         { platform: 'shopify', connected: false },
         { platform: 'ebay', connected: false },
-        {
-          platform: 'etsy',
-          connected: false,
-          disabled: true,
-          comingSoon: true,
-        },
       ])
 
       if (onConnectionChange) {
         onConnectionChange('amazon', false)
         onConnectionChange('shopify', false)
         onConnectionChange('ebay', false)
-        onConnectionChange('etsy', false)
       }
     } finally {
       setLoading(false)
@@ -229,11 +209,6 @@ export default function MarketplaceConnections({
     if (!currentUserId) {
       alert('Please log in to connect your account')
       return
-    }
-
-    // Only allow connection for enabled platforms
-    if (platform === 'etsy') {
-      return // Do nothing for disabled platforms
     }
 
     // OAuth flows for enabled platforms
@@ -319,7 +294,7 @@ export default function MarketplaceConnections({
   }
 
   const connectedCount = connections.filter((c) => c.connected).length
-  const availableCount = connections.filter((c) => !c.disabled).length
+  const availableCount = connections.length // All platforms are available
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
@@ -353,7 +328,6 @@ export default function MarketplaceConnections({
           const isAmazon = connection.platform === 'amazon'
           const isShopify = connection.platform === 'shopify'
           const isEbay = connection.platform === 'ebay'
-          const isEtsy = connection.platform === 'etsy'
 
           return (
             <div
@@ -366,15 +340,7 @@ export default function MarketplaceConnections({
             >
               <div className="flex items-center space-x-4">
                 <div className="text-2xl">
-                  {isAmazon
-                    ? '📦'
-                    : isShopify
-                      ? '🛍️'
-                      : isEbay
-                        ? '🔨'
-                        : isEtsy
-                          ? '🎨'
-                          : '🏪'}
+                  {isAmazon ? '📦' : isShopify ? '🛍️' : isEbay ? '🔨' : '🏪'}
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900">
@@ -384,9 +350,7 @@ export default function MarketplaceConnections({
                         ? 'Shopify Store'
                         : isEbay
                           ? 'eBay Store'
-                          : isEtsy
-                            ? 'Etsy Shop'
-                            : 'Marketplace'}
+                          : 'Marketplace'}
                   </h4>
                   <div className="flex items-center space-x-2 mt-1">
                     {connection.connected ? (
@@ -419,9 +383,7 @@ export default function MarketplaceConnections({
                         ? 'Publish directly to your Shopify store'
                         : isEbay
                           ? "World's largest auction marketplace"
-                          : isEtsy
-                            ? 'Perfect for handmade, vintage & creative products'
-                            : ''}
+                          : ''}
                   </p>
 
                   {/* Feature tags */}
@@ -461,18 +423,6 @@ export default function MarketplaceConnections({
                         </span>
                         <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
                           ✓ Lower seller fees
-                        </span>
-                      </>
-                    ) : isEtsy && connection.comingSoon ? (
-                      <>
-                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
-                          ⏳ Handmade & vintage focus
-                        </span>
-                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
-                          ⏳ 96M active buyers
-                        </span>
-                        <span className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full text-xs">
-                          ⏳ Higher profit margins
                         </span>
                       </>
                     ) : null}

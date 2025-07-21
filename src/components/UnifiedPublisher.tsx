@@ -77,15 +77,6 @@ export default function UnifiedPublisher({
       color: 'blue',
       connected: false,
     },
-    {
-      id: 'etsy',
-      name: 'Etsy',
-      icon: '🎨',
-      color: 'purple',
-      connected: false,
-      disabled: true,
-      comingSoon: true,
-    },
   ])
 
   const [selectedPlatform, setSelectedPlatform] = useState<string>('')
@@ -294,11 +285,6 @@ export default function UnifiedPublisher({
       return
     }
 
-    // Don't allow connection for disabled platforms
-    if (platformId === 'etsy') {
-      return
-    }
-
     console.log(
       '🔗 Starting OAuth for platform:',
       platformId,
@@ -472,7 +458,7 @@ export default function UnifiedPublisher({
       const successMessage =
         selectedPlatform === 'ebay'
           ? `✅ Successfully listed on eBay! Item ID: ${result.data?.itemId || result.data?.listingId || 'Processing'}`
-          : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.data?.productId || 'N/A'}`
+          : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.productId || result.listingId || result.id || 'Unknown'}`
 
       setPublishSuccess(successMessage)
 
@@ -1073,18 +1059,6 @@ export default function UnifiedPublisher({
                   {platform.icon} {platform.name}
                 </button>
               ))}
-
-              {/* Show coming soon platforms */}
-              {platforms
-                .filter((p) => p.comingSoon)
-                .map((platform) => (
-                  <div
-                    key={platform.id}
-                    className="px-4 py-2 rounded-lg font-medium text-sm bg-yellow-100 text-yellow-700 border border-yellow-300 cursor-default"
-                  >
-                    {platform.icon} {platform.name} - Coming Soon
-                  </div>
-                ))}
             </div>
           </div>
         ) : (
@@ -1321,21 +1295,6 @@ export default function UnifiedPublisher({
                 {/* Publish Button */}
                 {publishedProducts[selectedPlatform] ? (
                   <div className="space-y-3">
-                    {/* Success message */}
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                        <p className="text-green-800 font-medium">
-                          ✅ Successfully{' '}
-                          {publishedProducts[selectedPlatform].method ===
-                          'instructions'
-                            ? 'generated instructions for'
-                            : 'published to'}{' '}
-                          {selectedPlatformData?.name}!
-                        </p>
-                      </div>
-                    </div>
-
                     {/* Instructions Download Button OR Product View Button */}
                     {publishedProducts[selectedPlatform].method ===
                     'instructions' ? (

@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import debounce from 'lodash.debounce'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { LanguagePreferencesManager } from '@/components/LanguagePreferencesManager'
@@ -127,13 +128,74 @@ export default function ProductForm({
   monthlyLimit,
   user: userProp,
 }: ProductFormProps) {
+  // Move user assignment to the top to avoid block-scoped variable error
+  const user = userProp
   // Basic state
   const [productName, setProductName] = useState('')
   const [features, setFeatures] = useState('')
   const [platform, setPlatform] = useState('amazon')
   const [generatedContent, setGeneratedContent] = useState('')
+  const [autoSaveStatus, setAutoSaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle')
+  // Debounced auto-save function
+  // Debounced auto-save function that always gets latest values
+  const debouncedAutoSave = useRef(
+    debounce(
+      async (
+        content: string,
+        productName: string,
+        features: string,
+        user: any,
+        lastGeneratedContentId: string | null
+      ) => {
+        if (!user || !productName) return
+        setAutoSaveStatus('saving')
+        try {
+          const res = await fetch('/api/content-library', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contentId: lastGeneratedContentId,
+              userId: user.id,
+              productName,
+              content,
+              features,
+            }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            setLastGeneratedContentId(data.data.id)
+            setAutoSaveStatus('saved')
+          } else {
+            setAutoSaveStatus('error')
+            addNotification('Auto-save failed. Please try again.', 'error')
+          }
+        } catch (e) {
+          setAutoSaveStatus('error')
+          addNotification(
+            'Auto-save failed. Please check your connection.',
+            'error'
+          )
+        }
+      },
+      1200
+    )
+  ).current
+  // Auto-save on generatedContent change
+  useEffect(() => {
+    if (generatedContent && user && productName) {
+      debouncedAutoSave(
+        generatedContent,
+        productName,
+        features,
+        user,
+        lastGeneratedContentId
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatedContent, productName, features, user])
   const [loading, setLoading] = useState(false)
-  const user = userProp
   const [copied, setCopied] = useState(false)
   const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([])
   const [imageProcessingEnabled, setImageProcessingEnabled] = useState(false)
@@ -288,12 +350,7 @@ export default function ProductForm({
   // Unified publish success handler
   const handlePublishSuccess = (result: any) => {
     const platform = result.platform || 'platform'
-    const id = result.listingId || result.productId || result.id || 'N/A'
-
-    addNotification(
-      `🎉 Product successfully published to ${platform}! ID: ${id}`,
-      'success'
-    )
+    console.log('🔍 Full publish result:', result)
   }
 
   // Check admin status
@@ -2396,9 +2453,26 @@ export default function ProductForm({
 
               <div className="bg-gray-50 rounded-xl p-6 border-2 border-dashed border-gray-200 h-[650px] overflow-y-auto">
                 {generatedContent ? (
-                  <div className="whitespace-pre-wrap text-gray-900 leading-relaxed">
-                    {generatedContent}
-                  </div>
+                  <>
+                    <textarea
+                      value={generatedContent}
+                      onChange={(e) => {
+                        setGeneratedContent(e.target.value)
+                        setAutoSaveStatus('idle') // Reset status only when user edits
+                      }}
+                      className="w-full h-[550px] resize-vertical rounded-lg border border-gray-300 p-4 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      placeholder="Edit your generated content here..."
+                    />
+                    <div className="flex items-center mt-2 text-xs text-gray-500">
+                      {autoSaveStatus === 'saving' && <span>Saving...</span>}
+                      {autoSaveStatus === 'saved' && (
+                        <span className="text-green-600">Saved</span>
+                      )}
+                      {autoSaveStatus === 'error' && (
+                        <span className="text-red-600">Auto-save failed</span>
+                      )}
+                    </div>
+                  </>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-gray-400">
                     <Upload className="h-12 w-12 mb-4" />
