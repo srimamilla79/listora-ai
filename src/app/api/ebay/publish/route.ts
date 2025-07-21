@@ -2,6 +2,8 @@
 // eBay listing creation with DUAL TOKEN SYSTEM - User + Application Tokens
 // ✅ TRUE eBay BEST PRACTICES 2024 (Mobile-First, 800 Character Limit)
 // ✅ ENHANCED CONTENT EXTRACTION - Rich Details from AI-Generated Content
+// ✅ CLEAN TITLE FORMATTING - No Markdown, Optimized Length
+// ✅ IMPROVED SIZE & SPECIFICATIONS DETECTION
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 
@@ -119,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     console.log('🏷️ Final category decision:', categoryResult)
 
-    // ✅ Extract AI-generated title
+    // ✅ Extract AI-generated title with enhanced cleaning
     const aiGeneratedTitle = extractTitleFromContent(
       mergedProductContent.generated_content || ''
     )
@@ -311,7 +313,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ IMPROVED DESCRIPTION FORMATTER - No Truncation
+// ✅ ENHANCED eBay DESCRIPTION FORMATTER - Rich Content + No Duplicates
+// Extracts the BEST details from AI-generated content
 function formatEbayBestPracticesDescription(productContent: any): string {
   // Parse the generated content with enhanced extraction
   const sections = parseEnhancedGeneratedContent(
@@ -628,6 +631,154 @@ function extractSpecifications(content: string): string[] {
   return specs
 }
 
+// ✅ ENHANCED TITLE EXTRACTION - Clean & Optimized for eBay
+function extractTitleFromContent(content: string): string | null {
+  // Extract from "PRODUCT TITLE/HEADLINE:" section
+  const titleMatch = content.match(
+    /###\s*1\.\s*PRODUCT TITLE\/HEADLINE:\s*\*\*(.*?)\*\*/i
+  )
+
+  if (titleMatch && titleMatch[1]) {
+    let title = titleMatch[1].trim()
+
+    // ✅ Clean up the title
+    title = cleanAndOptimizeTitle(title)
+
+    return title
+  }
+
+  // Fallback: look for any title with ** formatting
+  const fallbackMatch = content.match(
+    /\*\*(.*?(?:Premium|Professional|Luxury|Quality|Men's|Women's|Kids).*?)\*\*/i
+  )
+
+  if (fallbackMatch && fallbackMatch[1]) {
+    let title = fallbackMatch[1].trim()
+    title = cleanAndOptimizeTitle(title)
+    return title
+  }
+
+  return null
+}
+
+// ✅ CLEAN AND OPTIMIZE TITLE FOR eBay
+function cleanAndOptimizeTitle(title: string): string {
+  // Remove all markdown formatting
+  title = title.replace(/\*\*/g, '').replace(/\*/g, '')
+
+  // Remove excessive punctuation
+  title = title.replace(/[!]{2,}/g, '!').replace(/[?]{2,}/g, '?')
+
+  // Optimize common long phrases for eBay character limit
+  const optimizations: Record<string, string> = {
+    // Breathable/Material optimizations
+    'Breathable Mesh Upper': 'Breathable Mesh',
+    'with Breathable Mesh Upper': 'Breathable Mesh',
+    '& Breathable Mesh Upper': '& Breathable Design',
+    'Cushioned Sole & Breathable': 'Cushioned & Breathable',
+
+    // Design optimizations
+    'Stylish Gradient Design': 'Gradient Style',
+    'Elegant Design': 'Elegant',
+    'Premium Design': 'Premium',
+    'Professional Design': 'Professional',
+
+    // Comfort optimizations
+    'Ultimate Comfort': 'Comfort',
+    'Maximum Comfort': 'Comfort',
+    'Superior Comfort': 'Comfort',
+    'for Ultimate Comfort': 'Comfort',
+
+    // Generic optimizations
+    'High Quality': 'Quality',
+    'Premium Quality': 'Premium',
+    'Professional Grade': 'Pro',
+    'State-of-the-Art': 'Advanced',
+
+    // Shoe specific
+    "Men's Running Shoes": "Men's Runners",
+    "Women's Running Shoes": "Women's Runners",
+    'Athletic Shoes': 'Athletic',
+    'Training Shoes': 'Trainers',
+  }
+
+  // Apply optimizations
+  for (const [long, short] of Object.entries(optimizations)) {
+    title = title.replace(new RegExp(long, 'gi'), short)
+  }
+
+  // Remove redundant words if title is still too long
+  if (title.length > 75) {
+    // Remove common filler words
+    const fillerWords = [
+      ' for ',
+      ' with ',
+      ' and ',
+      ' the ',
+      ' of ',
+      ' in ',
+      ' on ',
+      ' at ',
+      ' Perfect for',
+      ' Ideal for',
+      ' Great for',
+      ' Designed for',
+    ]
+
+    for (const filler of fillerWords) {
+      if (title.length > 75) {
+        title = title.replace(new RegExp(filler, 'gi'), ' ')
+      }
+    }
+
+    // Clean up multiple spaces
+    title = title.replace(/\s+/g, ' ').trim()
+  }
+
+  // Final length check - intelligent truncation
+  if (title.length > 77) {
+    // Try to truncate at word boundary near 77 chars
+    const words = title.split(' ')
+    let optimizedTitle = ''
+
+    for (const word of words) {
+      if ((optimizedTitle + ' ' + word).length <= 77) {
+        optimizedTitle += (optimizedTitle ? ' ' : '') + word
+      } else {
+        break
+      }
+    }
+
+    title = optimizedTitle || title.substring(0, 77)
+  }
+
+  // Ensure proper capitalization
+  title = title.replace(/\b\w+/g, (word) => {
+    // Don't capitalize prepositions and articles unless they're the first word
+    const lowercaseWords = [
+      'and',
+      'or',
+      'but',
+      'for',
+      'with',
+      'by',
+      'at',
+      'in',
+      'on',
+      'of',
+      'the',
+      'a',
+      'an',
+    ]
+    return lowercaseWords.includes(word.toLowerCase()) &&
+      title.indexOf(word) !== 0
+      ? word.toLowerCase()
+      : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  })
+
+  return title.trim()
+}
+
 // ✅ ENHANCED BRAND EXTRACTION
 function extractEnhancedBrand(fullText: string): string {
   const text = fullText.toLowerCase()
@@ -664,20 +815,46 @@ function extractEnhancedBrand(fullText: string): string {
   return 'Unbranded'
 }
 
-// ✅ EXTRACT AI-GENERATED TITLE FROM CONTENT
-function extractTitleFromContent(content: string): string | null {
-  // Extract from "PRODUCT TITLE/HEADLINE:" section
-  const titleMatch = content.match(
-    /###\s*1\.\s*PRODUCT TITLE\/HEADLINE:\s*\*\*(.*?)\*\*/i
-  )
-  if (titleMatch && titleMatch[1]) {
-    return titleMatch[1].trim()
+// ✅ IMPROVED COLOR EXTRACTION - Better Gray Detection
+function extractColor(fullText: string): string {
+  const text = fullText.toLowerCase()
+
+  // Enhanced color detection with priority order
+  const colorMap = {
+    gray: [
+      'gray',
+      'grey',
+      'gradient',
+      'dark to light gray',
+      'light gray',
+      'dark gray',
+      'charcoal',
+      'slate',
+    ],
+    black: ['black', 'ebony'],
+    white: ['white', 'off-white'],
+    blue: ['blue', 'navy', 'cobalt', 'blue wave', 'dynamic blue'],
+    red: ['red', 'crimson', 'scarlet'],
+    green: ['green', 'emerald', 'forest'],
+    gold: ['gold', 'golden', 'gold tone', 'gold color'],
+    beige: ['beige', 'tan', 'khaki', 'sand', 'nude'],
+    yellow: ['yellow'],
+    brown: ['brown', 'bronze', 'chocolate'],
+    pink: ['pink', 'rose', 'magenta'],
+    purple: ['purple', 'violet', 'lavender'],
+    orange: ['orange', 'amber', 'copper'],
   }
-  // Fallback: look for any title with ** formatting
-  const fallbackMatch = content.match(
-    /\*\*(.*?(?:Premium|Professional|Luxury|Quality).*?)\*\*/i
-  )
-  return fallbackMatch ? fallbackMatch[1].trim() : null
+
+  // Check all color variants - gray patterns first for shoes
+  for (const [colorName, variants] of Object.entries(colorMap)) {
+    for (const variant of variants) {
+      if (text.includes(variant)) {
+        return colorName.charAt(0).toUpperCase() + colorName.slice(1)
+      }
+    }
+  }
+
+  return 'Multicolor'
 }
 
 // ✅ EXTRACT FEATURES FROM AI-GENERATED CONTENT
@@ -1240,14 +1417,21 @@ function extractValueForAspect(
   return 'Standard'
 }
 
-// ✅ CATEGORY-SPECIFIC ASPECTS (FALLBACK)
+// ✅ ENHANCED CATEGORY-SPECIFIC ASPECTS - Better Shoe Support
 function generateCategorySpecificAspects(
   categoryId: string,
   fullText: string
 ): Array<{ Name: string; Value: string[] }> {
   const specifics: Array<{ Name: string; Value: string[] }> = []
 
-  if (categoryId === '9355') {
+  if (categoryId === '15709') {
+    // Athletic Shoes - Enhanced specifics
+    specifics.push({ Name: 'Brand', Value: [extractEnhancedBrand(fullText)] })
+    specifics.push({ Name: 'US Shoe Size', Value: [extractShoeSize(fullText)] })
+    specifics.push({ Name: 'Color', Value: [extractColor(fullText)] })
+    specifics.push({ Name: 'Material', Value: [extractShoeMaterial(fullText)] })
+    specifics.push({ Name: 'Style', Value: [extractShoeStyle(fullText)] })
+  } else if (categoryId === '9355') {
     // Cell Phones
     specifics.push({ Name: 'Model', Value: [extractPhoneModel(fullText)] })
     specifics.push({
@@ -1293,6 +1477,58 @@ function generateCategorySpecificAspects(
   return specifics
 }
 
+// ✅ SHOE-SPECIFIC EXTRACTORS
+function extractShoeSize(fullText: string): string {
+  const text = fullText.toLowerCase()
+
+  // Look for specific sizes
+  const sizeMatch = text.match(/\b(?:size\s+)?(\d+(?:\.\d+)?)\b/i)
+  if (sizeMatch && sizeMatch[1]) {
+    const size = parseFloat(sizeMatch[1])
+    if (size >= 5 && size <= 15) {
+      return size.toString()
+    }
+  }
+
+  // Look for size ranges
+  if (
+    text.includes('various') ||
+    text.includes('multiple') ||
+    text.includes('all sizes')
+  ) {
+    return 'Various Sizes'
+  }
+
+  return '10' // Common default size
+}
+
+function extractShoeMaterial(fullText: string): string {
+  const text = fullText.toLowerCase()
+
+  if (text.includes('mesh')) return 'Mesh'
+  if (text.includes('leather')) return 'Leather'
+  if (text.includes('synthetic')) return 'Synthetic'
+  if (text.includes('canvas')) return 'Canvas'
+  if (text.includes('knit')) return 'Knit'
+  if (text.includes('fabric')) return 'Fabric'
+
+  return 'Synthetic'
+}
+
+function extractShoeStyle(fullText: string): string {
+  const text = fullText.toLowerCase()
+
+  if (text.includes('running')) return 'Running'
+  if (text.includes('training')) return 'Training'
+  if (text.includes('basketball')) return 'Basketball'
+  if (text.includes('tennis')) return 'Tennis'
+  if (text.includes('walking')) return 'Walking'
+  if (text.includes('casual')) return 'Casual'
+  if (text.includes('athletic')) return 'Athletic'
+
+  return 'Athletic'
+}
+
 // ✅ EXTRACTION FUNCTIONS
 
 function extractBrand(fullText: string): string {
@@ -1327,46 +1563,42 @@ function extractBrand(fullText: string): string {
   return 'Unbranded'
 }
 
-// ✅ IMPROVED COLOR EXTRACTION - Better Gray Detection
-function extractColor(fullText: string): string {
+// ✅ IMPROVED SIZE EXTRACTION - Better for Shoes
+function extractGenericSize(fullText: string): string {
   const text = fullText.toLowerCase()
 
-  // Enhanced color detection with priority order
-  const colorMap = {
-    gray: [
-      'gray',
-      'grey',
-      'gradient',
-      'dark to light gray',
-      'light gray',
-      'dark gray',
-      'charcoal',
-      'slate',
-    ],
-    black: ['black', 'ebony'],
-    white: ['white', 'off-white'],
-    blue: ['blue', 'navy', 'cobalt', 'blue wave', 'dynamic blue'],
-    red: ['red', 'crimson', 'scarlet'],
-    green: ['green', 'emerald', 'forest'],
-    gold: ['gold', 'golden', 'gold tone', 'gold color'],
-    beige: ['beige', 'tan', 'khaki', 'sand', 'nude'],
-    yellow: ['yellow'],
-    brown: ['brown', 'bronze', 'chocolate'],
-    pink: ['pink', 'rose', 'magenta'],
-    purple: ['purple', 'violet', 'lavender'],
-    orange: ['orange', 'amber', 'copper'],
-  }
-
-  // Check all color variants - gray patterns first for shoes
-  for (const [colorName, variants] of Object.entries(colorMap)) {
-    for (const variant of variants) {
-      if (text.includes(variant)) {
-        return colorName.charAt(0).toUpperCase() + colorName.slice(1)
-      }
+  // Look for specific shoe sizes
+  const shoeSizeMatch = text.match(/\b(size\s+)?(\d+(?:\.\d+)?)\b/i)
+  if (shoeSizeMatch && shoeSizeMatch[2]) {
+    const size = parseFloat(shoeSizeMatch[2])
+    if (size >= 5 && size <= 15) {
+      return `US ${size}`
     }
   }
 
-  return 'Multicolor'
+  // Look for clothing sizes
+  const clothingSizeMatch = text.match(
+    /\b(XS|S|M|L|XL|XXL|small|medium|large)\b/i
+  )
+  if (clothingSizeMatch) {
+    return clothingSizeMatch[1].toUpperCase()
+  }
+
+  // Look for size ranges
+  if (text.includes('various sizes') || text.includes('multiple sizes')) {
+    return 'Various Sizes'
+  }
+
+  // For shoes, default to common range
+  if (
+    text.includes('shoe') ||
+    text.includes('sneaker') ||
+    text.includes('runner')
+  ) {
+    return 'Various Sizes'
+  }
+
+  return 'One Size'
 }
 
 // PHONE EXTRACTORS
@@ -1514,12 +1746,6 @@ function extractGenericModel(fullText: string): string {
   if (text.includes('apple')) return 'Apple Model'
 
   return 'Standard Model'
-}
-
-function extractGenericSize(fullText: string): string {
-  const sizeMatch = fullText.match(/\b(XS|S|M|L|XL|XXL|small|medium|large)\b/i)
-  if (sizeMatch) return sizeMatch[1].toUpperCase()
-  return 'One Size'
 }
 
 function extractGenericMaterial(fullText: string): string {
@@ -1698,7 +1924,16 @@ async function createEbayListing(
 
 // ✅ HELPER FUNCTIONS
 function truncateTitle(title: string): string {
-  return title.length > 80 ? title.substring(0, 77) + '...' : title
+  // The title should already be optimized by cleanAndOptimizeTitle
+  // This is just a final safety check
+  if (title.length > 80) {
+    // Find the last space before character 77 to avoid cutting words
+    const cutoff = title.lastIndexOf(' ', 77)
+    return cutoff > 60
+      ? title.substring(0, cutoff) + '...'
+      : title.substring(0, 77) + '...'
+  }
+  return title
 }
 
 function mapConditionToEbay(
