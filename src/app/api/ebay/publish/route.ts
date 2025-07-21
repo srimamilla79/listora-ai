@@ -311,8 +311,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ ENHANCED eBay DESCRIPTION FORMATTER - Rich Content + No Duplicates
-// Extracts the BEST details from AI-generated content
+// ✅ IMPROVED DESCRIPTION FORMATTER - No Truncation
 function formatEbayBestPracticesDescription(productContent: any): string {
   // Parse the generated content with enhanced extraction
   const sections = parseEnhancedGeneratedContent(
@@ -333,47 +332,49 @@ function formatEbayBestPracticesDescription(productContent: any): string {
     sections.enhancedBulletPoints &&
     sections.enhancedBulletPoints.length > 0
   ) {
-    mobileContent += '<ul>'
-    charCount += 4 // <ul> = 4 characters
-
     let pointsAdded = 0
-    for (const point of sections.enhancedBulletPoints.slice(0, 5)) {
-      const liContent = `<li>${point}</li>`
 
-      // Check if adding this point would exceed 750 chars (leave buffer)
-      if (charCount + liContent.length < 750 && pointsAdded < 5) {
-        mobileContent += liContent
-        charCount += liContent.length
+    for (const point of sections.enhancedBulletPoints.slice(0, 5)) {
+      const bulletText = `• ${point}<br>`
+
+      // Check if adding this point would exceed 650 chars (more conservative)
+      if (charCount + bulletText.length < 650 && pointsAdded < 5) {
+        mobileContent += bulletText
+        charCount += bulletText.length
         pointsAdded++
       } else {
         break
       }
     }
-
-    mobileContent += '</ul>'
-    charCount += 5 // </ul> = 5 characters
   }
 
-  // Add concise product highlight if space allows
-  if (sections.productHighlight && charCount < 600) {
+  // Add concise product highlight if space allows (more generous allowance)
+  if (sections.productHighlight && charCount < 500) {
     const remainingChars = 750 - charCount
-    const words = sections.productHighlight.split(' ')
-    let briefDesc = ''
+    let briefDesc = sections.productHighlight
 
-    for (const word of words) {
-      if ((briefDesc + ' ' + word).length < remainingChars - 20) {
-        briefDesc += (briefDesc ? ' ' : '') + word
-      } else {
-        break
+    // If description is too long, intelligently truncate at sentence boundary
+    if (briefDesc.length > remainingChars - 20) {
+      const sentences = briefDesc.split('. ')
+      briefDesc = ''
+
+      for (const sentence of sentences) {
+        const nextLength = briefDesc.length + sentence.length + 2
+        if (nextLength < remainingChars - 10) {
+          briefDesc += (briefDesc ? '. ' : '') + sentence
+        } else {
+          break
+        }
+      }
+
+      // Add period if we truncated
+      if (!briefDesc.endsWith('.') && briefDesc.length > 30) {
+        briefDesc += '.'
       }
     }
 
-    if (briefDesc !== sections.productHighlight && briefDesc.length > 20) {
-      briefDesc += '...'
-    }
-
-    if (briefDesc.length > 20) {
-      mobileContent += `<br>${briefDesc}`
+    if (briefDesc.length > 30) {
+      mobileContent += `<br><br>${briefDesc}`
     }
   }
 
@@ -381,37 +382,65 @@ function formatEbayBestPracticesDescription(productContent: any): string {
   html += `</span>` // End mobile description
 
   // ✅ DESKTOP DESCRIPTION - Additional details (NO DUPLICATES)
-  // Only add desktop content if it's different from mobile content
-  if (sections.detailedFeatures && sections.detailedFeatures.length > 0) {
-    html += `<br><br><strong>Product Features:</strong><br>`
+  let desktopContent = ''
 
-    // Add detailed features that weren't in mobile bullets
-    for (let i = 0; i < Math.min(sections.detailedFeatures.length, 3); i++) {
+  // Add detailed features that weren't in mobile bullets
+  if (sections.detailedFeatures && sections.detailedFeatures.length > 0) {
+    desktopContent += `<br><br><strong>Product Features:</strong><br>`
+
+    for (let i = 0; i < Math.min(sections.detailedFeatures.length, 4); i++) {
       const feature = sections.detailedFeatures[i]
-      if (feature && feature.length > 30) {
+      if (feature && feature.length > 20) {
         // Ensure this content isn't already in mobile section
-        if (
-          !mobileContent
-            .toLowerCase()
-            .includes(feature.toLowerCase().substring(0, 30))
-        ) {
-          html += `${feature}<br>`
+        const featureStart = feature.toLowerCase().substring(0, 25)
+        if (!mobileContent.toLowerCase().includes(featureStart)) {
+          // Ensure complete sentences
+          let completeFeature = feature
+          if (
+            !feature.endsWith('.') &&
+            !feature.endsWith('!') &&
+            !feature.endsWith('?')
+          ) {
+            completeFeature += '.'
+          }
+          desktopContent += `${completeFeature}<br>`
         }
       }
     }
   }
 
-  // ✅ PRODUCT SPECIFICATIONS (Enhanced extraction)
+  // ✅ PRODUCT SPECIFICATIONS (Enhanced extraction - no duplicates)
   if (sections.specifications && sections.specifications.length > 0) {
-    html += `<br><strong>Specifications:</strong><br>`
-    sections.specifications.forEach((spec) => {
-      html += `${spec}<br>`
+    desktopContent += `<br><strong>Specifications:</strong><br>`
+
+    // Remove duplicate brand specifications
+    const uniqueSpecs = sections.specifications.filter((spec, index, arr) => {
+      const specType = spec.split(':')[0].toLowerCase()
+      return (
+        arr.findIndex((s) => s.split(':')[0].toLowerCase() === specType) ===
+        index
+      )
+    })
+
+    uniqueSpecs.forEach((spec) => {
+      desktopContent += `${spec}<br>`
     })
   }
 
-  // ✅ SIMPLE ITEM INFORMATION (No fancy tables)
+  html += desktopContent
+
+  // ✅ SIMPLE ITEM INFORMATION (No duplicates)
+  const brand = extractEnhancedBrand(
+    productContent.generated_content || productContent.product_name
+  )
+  const brandAlreadyShown = desktopContent
+    .toLowerCase()
+    .includes(`brand: ${brand.toLowerCase()}`)
+
   html += `<br><strong>Condition:</strong> New<br>`
-  html += `<strong>Brand:</strong> ${extractEnhancedBrand(productContent.generated_content || productContent.product_name)}<br>`
+  if (!brandAlreadyShown) {
+    html += `<strong>Brand:</strong> ${brand}<br>`
+  }
   html += `<strong>Shipping:</strong> Fast shipping available<br>`
   html += `<strong>Returns:</strong> 30-day return policy<br><br>`
 
@@ -1298,27 +1327,37 @@ function extractBrand(fullText: string): string {
   return 'Unbranded'
 }
 
+// ✅ IMPROVED COLOR EXTRACTION - Better Gray Detection
 function extractColor(fullText: string): string {
   const text = fullText.toLowerCase()
 
-  // Enhanced color detection
+  // Enhanced color detection with priority order
   const colorMap = {
-    beige: ['beige', 'tan', 'khaki', 'sand', 'nude'],
-    gold: ['gold', 'golden', 'gold tone', 'gold color'],
+    gray: [
+      'gray',
+      'grey',
+      'gradient',
+      'dark to light gray',
+      'light gray',
+      'dark gray',
+      'charcoal',
+      'slate',
+    ],
+    black: ['black', 'ebony'],
     white: ['white', 'off-white'],
-    black: ['black', 'ebony', 'charcoal'],
-    gray: ['gray', 'grey', 'silver', 'slate'],
+    blue: ['blue', 'navy', 'cobalt', 'blue wave', 'dynamic blue'],
     red: ['red', 'crimson', 'scarlet'],
-    blue: ['blue', 'navy', 'cobalt'],
     green: ['green', 'emerald', 'forest'],
-    yellow: ['yellow', 'gold', 'golden'],
+    gold: ['gold', 'golden', 'gold tone', 'gold color'],
+    beige: ['beige', 'tan', 'khaki', 'sand', 'nude'],
+    yellow: ['yellow'],
     brown: ['brown', 'bronze', 'chocolate'],
     pink: ['pink', 'rose', 'magenta'],
     purple: ['purple', 'violet', 'lavender'],
     orange: ['orange', 'amber', 'copper'],
   }
 
-  // Check all color variants
+  // Check all color variants - gray patterns first for shoes
   for (const [colorName, variants] of Object.entries(colorMap)) {
     for (const variant of variants) {
       if (text.includes(variant)) {
