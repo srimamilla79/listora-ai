@@ -1,6 +1,7 @@
 // src/app/api/ebay/publish/route.ts
 // eBay listing creation with DUAL TOKEN SYSTEM - User + Application Tokens
 // ✅ TRUE eBay BEST PRACTICES 2024 (Mobile-First, 800 Character Limit)
+// ✅ ENHANCED CONTENT EXTRACTION - Rich Details from AI-Generated Content
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
     // Prepare eBay listing data
     const listingData: EbayListingData = {
       Title: truncateTitle(finalTitle),
-      Description: formatEbayBestPracticesDescription(mergedProductContent), // ✅ NEW: TRUE eBay best practices
+      Description: formatEbayBestPracticesDescription(mergedProductContent), // ✅ ENHANCED: Rich content extraction
       PrimaryCategory: { CategoryID: categoryResult.categoryId },
       StartPrice: publishingOptions.price.toString(),
       Quantity: publishingOptions.quantity,
@@ -310,11 +311,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ TRUE eBay BEST PRACTICES DESCRIPTION FORMATTER
-// Mobile-First, 800 Character Mobile Limit, Simple HTML Only
+// ✅ ENHANCED eBay DESCRIPTION FORMATTER - Rich Content + No Duplicates
+// Extracts the BEST details from AI-generated content
 function formatEbayBestPracticesDescription(productContent: any): string {
-  // Parse the generated content
-  const sections = parseGeneratedContent(productContent.generated_content || '')
+  // Parse the generated content with enhanced extraction
+  const sections = parseEnhancedGeneratedContent(
+    productContent.generated_content || ''
+  )
 
   // ✅ eBay Mobile-Optimized Description Format
   let html = `<div vocab="https://schema.org/" typeof="Product">`
@@ -325,20 +328,20 @@ function formatEbayBestPracticesDescription(productContent: any): string {
   let mobileContent = ''
   let charCount = 0
 
-  // Add key selling points (max 5 for mobile)
-  if (sections.bulletPoints && sections.bulletPoints.length > 0) {
+  // Add enhanced key selling points (max 5 for mobile)
+  if (
+    sections.enhancedBulletPoints &&
+    sections.enhancedBulletPoints.length > 0
+  ) {
     mobileContent += '<ul>'
     charCount += 4 // <ul> = 4 characters
 
     let pointsAdded = 0
-    for (const point of sections.bulletPoints.slice(0, 5)) {
-      const [title] = point.split(':')
-      const cleanTitle = title.trim()
-      const liContent = `<li>${cleanTitle}</li>`
+    for (const point of sections.enhancedBulletPoints.slice(0, 5)) {
+      const liContent = `<li>${point}</li>`
 
-      // Check if adding this point would exceed 800 chars
-      if (charCount + liContent.length < 750) {
-        // Leave buffer for closing tags
+      // Check if adding this point would exceed 750 chars (leave buffer)
+      if (charCount + liContent.length < 750 && pointsAdded < 5) {
         mobileContent += liContent
         charCount += liContent.length
         pointsAdded++
@@ -351,42 +354,64 @@ function formatEbayBestPracticesDescription(productContent: any): string {
     charCount += 5 // </ul> = 5 characters
   }
 
-  // Add brief description if space allows
-  if (sections.shortDescription && charCount < 600) {
+  // Add concise product highlight if space allows
+  if (sections.productHighlight && charCount < 600) {
     const remainingChars = 750 - charCount
-    const briefDesc = sections.shortDescription.substring(
-      0,
-      remainingChars - 20
-    )
-    mobileContent += `<br>${briefDesc}`
+    const words = sections.productHighlight.split(' ')
+    let briefDesc = ''
+
+    for (const word of words) {
+      if ((briefDesc + ' ' + word).length < remainingChars - 20) {
+        briefDesc += (briefDesc ? ' ' : '') + word
+      } else {
+        break
+      }
+    }
+
+    if (briefDesc !== sections.productHighlight && briefDesc.length > 20) {
+      briefDesc += '...'
+    }
+
+    if (briefDesc.length > 20) {
+      mobileContent += `<br>${briefDesc}`
+    }
   }
 
   html += mobileContent
   html += `</span>` // End mobile description
 
-  // ✅ DESKTOP DESCRIPTION (can be longer, but keep simple)
-  // Add product details for desktop viewers
-  if (sections.fullDescription) {
-    html += `<br><br><strong>Product Details:</strong><br>`
+  // ✅ DESKTOP DESCRIPTION - Additional details (NO DUPLICATES)
+  // Only add desktop content if it's different from mobile content
+  if (sections.detailedFeatures && sections.detailedFeatures.length > 0) {
+    html += `<br><br><strong>Product Features:</strong><br>`
 
-    const paragraphs = sections.fullDescription.split('\n\n')
-    for (let i = 0; i < Math.min(paragraphs.length, 3); i++) {
-      // Limit to 3 paragraphs
-      const paragraph = paragraphs[i].trim()
-      if (paragraph && paragraph.length > 20) {
-        // Keep paragraphs under 300 characters each
-        const shortParagraph =
-          paragraph.length > 300
-            ? paragraph.substring(0, 300) + '...'
-            : paragraph
-        html += `${shortParagraph}<br><br>`
+    // Add detailed features that weren't in mobile bullets
+    for (let i = 0; i < Math.min(sections.detailedFeatures.length, 3); i++) {
+      const feature = sections.detailedFeatures[i]
+      if (feature && feature.length > 30) {
+        // Ensure this content isn't already in mobile section
+        if (
+          !mobileContent
+            .toLowerCase()
+            .includes(feature.toLowerCase().substring(0, 30))
+        ) {
+          html += `${feature}<br>`
+        }
       }
     }
   }
 
+  // ✅ PRODUCT SPECIFICATIONS (Enhanced extraction)
+  if (sections.specifications && sections.specifications.length > 0) {
+    html += `<br><strong>Specifications:</strong><br>`
+    sections.specifications.forEach((spec) => {
+      html += `${spec}<br>`
+    })
+  }
+
   // ✅ SIMPLE ITEM INFORMATION (No fancy tables)
-  html += `<strong>Condition:</strong> New<br>`
-  html += `<strong>Brand:</strong> ${extractBrand(productContent.generated_content || productContent.product_name)}<br>`
+  html += `<br><strong>Condition:</strong> New<br>`
+  html += `<strong>Brand:</strong> ${extractEnhancedBrand(productContent.generated_content || productContent.product_name)}<br>`
   html += `<strong>Shipping:</strong> Fast shipping available<br>`
   html += `<strong>Returns:</strong> 30-day return policy<br><br>`
 
@@ -401,15 +426,15 @@ function formatEbayBestPracticesDescription(productContent: any): string {
   return html
 }
 
-// ✅ PARSE AI-GENERATED CONTENT SECTIONS
-function parseGeneratedContent(content: string) {
+// ✅ ENHANCED CONTENT PARSING - Extracts Rich Details
+function parseEnhancedGeneratedContent(content: string) {
   const sections = {
     title: '',
-    shortDescription: '',
+    enhancedBulletPoints: [] as string[],
+    productHighlight: '',
+    detailedFeatures: [] as string[],
+    specifications: [] as string[],
     fullDescription: '',
-    bulletPoints: [] as string[],
-    instagramCaption: '',
-    blogIntro: '',
   }
 
   try {
@@ -417,7 +442,7 @@ function parseGeneratedContent(content: string) {
 
     let currentSection = ''
     let description: string[] = []
-    let bulletPoints: string[] = []
+    let enhancedBullets: string[] = []
 
     for (let i = 0; i < lines.length; i++) {
       const trimmed = lines[i].trim()
@@ -455,39 +480,159 @@ function parseGeneratedContent(content: string) {
         continue
       }
 
-      // Process content based on current section
+      // ✅ ENHANCED BULLET POINT EXTRACTION
       if (currentSection === 'bullets') {
         if (trimmed.startsWith('-') && trimmed.includes('**')) {
           const bulletMatch = trimmed.match(/^-\s*\*\*(.*?)\*\*:\s*(.*)/)
           if (bulletMatch) {
-            bulletPoints.push(`${bulletMatch[1]}: ${bulletMatch[2]}`)
+            const title = bulletMatch[1]
+            const description = bulletMatch[2]
+
+            // Extract key descriptive phrases (first meaningful part)
+            let keyDesc = description
+
+            // Take content up to first comma or period, but ensure minimum length
+            if (description.includes(',')) {
+              keyDesc = description.split(',')[0]
+            } else if (description.includes('.')) {
+              keyDesc = description.split('.')[0]
+            }
+
+            // If too short, take more content
+            if (keyDesc.length < 30 && description.length > keyDesc.length) {
+              const words = description.split(' ')
+              keyDesc = words.slice(0, Math.min(12, words.length)).join(' ')
+            }
+
+            // Create enhanced bullet point with rich details
+            enhancedBullets.push(`${title}: ${keyDesc}`)
           }
         }
-      } else if (currentSection === 'description') {
+      }
+
+      // ✅ ENHANCED DESCRIPTION EXTRACTION
+      else if (currentSection === 'description') {
         if (
-          trimmed.length > 10 &&
+          trimmed.length > 15 &&
           !trimmed.match(/^#{1,3}/) &&
           !trimmed.match(/^\*?\*?[A-Z\s]+:?\*?\*?$/) &&
           !trimmed.includes('**')
         ) {
-          description.push(trimmed)
+          // Prioritize sentences with rich product details
+          const hasRichDetails = trimmed.match(
+            /\b(gradient|mesh|cushioned|air pockets|wave patterns|transition|breathable|visible|striking|dynamic|flexible|shock absorption)\b/i
+          )
+
+          if (hasRichDetails) {
+            description.unshift(trimmed) // Put rich descriptions first
+          } else {
+            description.push(trimmed)
+          }
         }
       }
     }
 
-    sections.bulletPoints = bulletPoints
+    sections.enhancedBulletPoints = enhancedBullets
     sections.fullDescription = description.join('\n\n')
-    sections.shortDescription = description[0] || ''
+
+    // Extract product highlight (first rich description sentence)
+    if (description.length > 0) {
+      sections.productHighlight = description[0]
+    }
+
+    // Extract detailed features (remaining descriptions)
+    if (description.length > 1) {
+      sections.detailedFeatures = description.slice(1, 4) // Take 2-3 additional features
+    }
+
+    // Extract specifications from detailed content
+    sections.specifications = extractSpecifications(content)
   } catch (error) {
-    console.error('❌ Error parsing content:', error)
+    console.error('❌ Error parsing enhanced content:', error)
+    // Fallback to basic extraction
     const cleanContent = content.replace(/\*\*/g, '').replace(/#{1,6}\s*/g, '')
     const paragraphs = cleanContent
       .split('\n\n')
       .filter((p) => p.trim().length > 50)
-    sections.fullDescription = paragraphs[0] || cleanContent.substring(0, 300)
+    sections.productHighlight = paragraphs[0] || cleanContent.substring(0, 200)
+    sections.enhancedBulletPoints = [
+      'High Quality Product',
+      'Professional Design',
+      'Durable Construction',
+    ]
   }
 
   return sections
+}
+
+// ✅ EXTRACT PRODUCT SPECIFICATIONS
+function extractSpecifications(content: string): string[] {
+  const specs: string[] = []
+  const text = content.toLowerCase()
+
+  // Look for specific product attributes mentioned in content
+  const specPatterns = [
+    {
+      pattern: /material[:\s]+(mesh|leather|synthetic|cotton|polyester|nylon)/i,
+      format: 'Material: $1',
+    },
+    { pattern: /sole[:\s]+(rubber|eva|air|cushioned)/i, format: 'Sole: $1' },
+    { pattern: /color[:\s]+([\w\s]+?)(?:\.|,|$)/i, format: 'Color: $1' },
+    { pattern: /size[:\s]+([\d\.]+ ?\w*)/i, format: 'Size: $1' },
+    { pattern: /weight[:\s]+([\d\.]+ ?\w+)/i, format: 'Weight: $1' },
+  ]
+
+  specPatterns.forEach(({ pattern, format }) => {
+    const match = content.match(pattern)
+    if (match && match[1]) {
+      const value = match[1].trim().replace(/\.$/, '')
+      specs.push(format.replace('$1', value))
+    }
+  })
+
+  // Add brand if found
+  const brand = extractEnhancedBrand(content)
+  if (brand && brand !== 'Unbranded') {
+    specs.unshift(`Brand: ${brand}`)
+  }
+
+  return specs
+}
+
+// ✅ ENHANCED BRAND EXTRACTION
+function extractEnhancedBrand(fullText: string): string {
+  const text = fullText.toLowerCase()
+
+  // Shoe/Athletic brands (priority for athletic footwear)
+  if (text.includes('adidas')) return 'Adidas'
+  if (text.includes('nike')) return 'Nike'
+  if (text.includes('jordan')) return 'Air Jordan'
+  if (text.includes('puma')) return 'PUMA'
+  if (text.includes('under armour')) return 'Under Armour'
+  if (text.includes('new balance')) return 'New Balance'
+  if (text.includes('reebok')) return 'Reebok'
+  if (text.includes('converse')) return 'Converse'
+  if (text.includes('vans')) return 'Vans'
+  if (text.includes('skechers')) return 'Skechers'
+
+  // Electronics brands
+  if (text.includes('apple')) return 'Apple'
+  if (text.includes('samsung')) return 'Samsung'
+  if (text.includes('google')) return 'Google'
+  if (text.includes('sony')) return 'Sony'
+  if (text.includes('lg')) return 'LG'
+  if (text.includes('microsoft')) return 'Microsoft'
+
+  // Watch brands
+  if (text.includes('cheetah')) return 'Cheetah'
+  if (text.includes('rolex')) return 'Rolex'
+  if (text.includes('omega')) return 'Omega'
+  if (text.includes('seiko')) return 'Seiko'
+  if (text.includes('casio')) return 'Casio'
+  if (text.includes('fossil')) return 'Fossil'
+  if (text.includes('timex')) return 'Timex'
+
+  return 'Unbranded'
 }
 
 // ✅ EXTRACT AI-GENERATED TITLE FROM CONTENT
