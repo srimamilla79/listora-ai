@@ -1,5 +1,5 @@
-// src/app/api/store-images-auto/route.ts - HYBRID VERSION (Best of Both)
-// This combines your existing auth logic with the blob URL fixes
+// src/app/api/store-images-auto/route.ts - FIXED VERSION
+// ✅ Resolves blob URL server-side fetch issues
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 🔧 KEEPING YOUR AUTH LOGIC (it works well)
     console.log('2. Getting cookies...')
 
     // Create Supabase admin client
@@ -78,7 +77,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 🔧 KEEPING YOUR FOLDER STRUCTURE
     const timestamp = new Date().toISOString().split('T')[0]
     const folderName = `${userId}/${productName
       .toLowerCase()
@@ -86,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📁 Creating image folder:', folderName)
 
-    // 🔧 FIXED: Enhanced blob/data URL conversion that actually works
+    // ✅ FIXED: Enhanced blob/data URL conversion that handles blob URL issues
     const convertImageData = async (
       imageData: string,
       index: number,
@@ -99,21 +97,27 @@ export async function POST(request: NextRequest) {
 
       try {
         if (imageData.startsWith('blob:')) {
-          // 🔧 KEY FIX: This is where your current version fails
-          console.log(`🔄 Converting blob URL for ${type} image ${index + 1}`)
+          // ✅ FIXED: Skip blob URLs and warn user
+          console.warn(
+            `⚠️ Blob URLs cannot be processed on server-side for ${type} image ${index + 1}`
+          )
+          console.warn(
+            `💡 Tip: This happens when images are generated in browser but not converted to data URLs`
+          )
 
-          // Add timeout protection
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 sec timeout
+          // Option 1: Skip blob URLs entirely (safest)
+          return null
 
+          // Option 2: If you want to attempt processing (risky), use this instead:
+          /*
           try {
-            // This fetch call is the problematic one in your current version
+            // Very short timeout for blob URLs since they often fail
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 sec only
+
             const response = await fetch(imageData, {
               signal: controller.signal,
               method: 'GET',
-              headers: {
-                'Cache-Control': 'no-cache',
-              },
             })
 
             clearTimeout(timeoutId)
@@ -128,45 +132,112 @@ export async function POST(request: NextRequest) {
               throw new Error('Empty blob received')
             }
 
-            console.log(
-              `✅ Blob converted successfully for ${type} image ${index + 1}, size: ${blob.size}`
-            )
+            console.log(`✅ Blob converted successfully for ${type} image ${index + 1}, size: ${blob.size}`)
             return blob
-          } catch (fetchError) {
-            clearTimeout(timeoutId)
-            throw fetchError
+          } catch (blobError) {
+            console.warn(`⚠️ Blob URL failed for ${type} image ${index + 1}:`, blobError.message)
+            return null
           }
+          */
         } else if (imageData.startsWith('data:')) {
-          // Your existing data URL logic works fine
+          // ✅ Data URL processing works fine
           console.log(`🔄 Converting data URL for ${type} image ${index + 1}`)
 
-          const arr = imageData.split(',')
-          const mime = arr[0].match(/:(.*?);/)![1]
-          const bstr = atob(arr[1])
-          let n = bstr.length
-          const u8arr = new Uint8Array(n)
-          while (n--) {
-            u8arr[n] = bstr.charCodeAt(n)
-          }
+          try {
+            const arr = imageData.split(',')
+            if (arr.length !== 2) {
+              throw new Error('Invalid data URL format')
+            }
 
-          const blob = new Blob([u8arr], { type: mime })
+            const mimeMatch = arr[0].match(/:(.*?);/)
+            if (!mimeMatch) {
+              throw new Error('Invalid data URL MIME type')
+            }
+
+            const mime = mimeMatch[1]
+            const bstr = atob(arr[1])
+            let n = bstr.length
+            const u8arr = new Uint8Array(n)
+            while (n--) {
+              u8arr[n] = bstr.charCodeAt(n)
+            }
+
+            const blob = new Blob([u8arr], { type: mime })
+
+            if (blob.size === 0) {
+              throw new Error('Empty blob created from data URL')
+            }
+
+            console.log(
+              `✅ Data URL converted successfully for ${type} image ${index + 1}, size: ${blob.size}`
+            )
+            return blob
+          } catch (dataError) {
+            console.error(
+              `❌ Data URL conversion failed for ${type} image ${index + 1}:`,
+              dataError
+            )
+            return null
+          }
+        } else if (
+          imageData.startsWith('http://') ||
+          imageData.startsWith('https://')
+        ) {
+          // ✅ Handle HTTP URLs (external images)
           console.log(
-            `✅ Data URL converted successfully for ${type} image ${index + 1}`
+            `🔄 Fetching external image for ${type} image ${index + 1}`
           )
-          return blob
+
+          try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 sec for external URLs
+
+            const response = await fetch(imageData, {
+              signal: controller.signal,
+              method: 'GET',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; Listora-AI/1.0)',
+                Accept: 'image/*',
+              },
+            })
+
+            clearTimeout(timeoutId)
+
+            if (!response.ok) {
+              throw new Error(
+                `HTTP fetch failed: ${response.status} ${response.statusText}`
+              )
+            }
+
+            const blob = await response.blob()
+
+            if (blob.size === 0) {
+              throw new Error('Empty image received from URL')
+            }
+
+            console.log(
+              `✅ External image fetched successfully for ${type} image ${index + 1}, size: ${blob.size}`
+            )
+            return blob
+          } catch (httpError) {
+            console.error(
+              `❌ HTTP URL fetch failed for ${type} image ${index + 1}:`,
+              httpError
+            )
+            return null
+          }
         } else {
-          throw new Error(
-            `Unsupported image format: ${imageData.substring(0, 20)}...`
+          console.warn(
+            `⚠️ Unsupported image format for ${type} image ${index + 1}: ${imageData.substring(0, 30)}...`
           )
+          return null
         }
       } catch (error) {
         console.error(`❌ Failed to convert ${type} image ${index + 1}:`, error)
-        // 🔧 KEY CHANGE: Return null instead of throwing to allow partial success
         return null
       }
     }
 
-    // 🔧 KEEPING YOUR DATA STRUCTURE
     const storedImages = {
       original: [] as string[],
       processed: {
@@ -187,7 +258,7 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    // 🔧 ENHANCED: Process original images with better error handling
+    // Process original images with better error handling
     console.log('📂 Processing original images...')
     if (originalImages && originalImages.length > 0) {
       const originalPromises = originalImages.map(
@@ -205,9 +276,9 @@ export async function POST(request: NextRequest) {
             const filePath = `${folderName}/${fileName}`
 
             const { error: uploadError } = await supabaseAdmin.storage
-              .from('listora-images') // 🔧 KEEPING YOUR BUCKET NAME
+              .from('listora-images')
               .upload(filePath, blob, {
-                contentType: 'image/jpeg',
+                contentType: blob.type || 'image/jpeg',
                 upsert: true,
               })
 
@@ -246,7 +317,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 🔧 ENHANCED: Process platform images with better error handling
+    // Process platform images with better error handling
     console.log('🎨 Processing platform-specific images...')
     const platforms = ['amazon', 'shopify', 'etsy', 'instagram'] as const
 
@@ -273,9 +344,9 @@ export async function POST(request: NextRequest) {
             const filePath = `${folderName}/${fileName}`
 
             const { error: uploadError } = await supabaseAdmin.storage
-              .from('listora-images') // 🔧 KEEPING YOUR BUCKET NAME
+              .from('listora-images')
               .upload(filePath, blob, {
-                contentType: 'image/jpeg',
+                contentType: blob.type || 'image/jpeg',
                 upsert: true,
               })
 
@@ -318,12 +389,15 @@ export async function POST(request: NextRequest) {
 
     await Promise.all(platformPromises)
 
-    // 🔧 KEEPING YOUR DATABASE UPDATE LOGIC
     console.log('💾 Updating database record:', productContentId)
 
     const totalImagesStored =
       storedImages.original.length +
       Object.values(storedImages.processed).flat().length
+
+    const totalImagesAttempted =
+      (originalImages?.length || 0) +
+      Object.values(processedImages || {}).flat().length
 
     // Only update if we successfully stored at least some images
     if (totalImagesStored > 0) {
@@ -343,7 +417,6 @@ export async function POST(request: NextRequest) {
 
       if (updateError) {
         console.error('❌ Database update error:', updateError)
-        // Don't fail the whole operation, just log it
       } else {
         console.log('✅ Database record updated successfully')
       }
@@ -352,24 +425,37 @@ export async function POST(request: NextRequest) {
     const endTime = Date.now()
     const duration = Math.round((endTime - startTime) / 1000)
 
-    console.log(`✅ Auto image storage completed successfully in ${duration}s`)
-    console.log(`📊 Images stored: ${totalImagesStored} total`)
+    console.log(`✅ Auto image storage completed in ${duration}s`)
+    console.log(
+      `📊 Images stored: ${totalImagesStored}/${totalImagesAttempted}`
+    )
 
-    // 🔧 ENHANCED: Better response with partial success info
+    // ✅ Enhanced response with detailed success/failure info
+    const success = totalImagesStored > 0
+    const partialSuccess =
+      totalImagesStored > 0 && totalImagesStored < totalImagesAttempted
+
     return NextResponse.json({
-      success: true,
+      success,
+      partialSuccess,
       imageFolder: folderName,
       storedImages,
       publicUrls,
       duration,
-      message: `${totalImagesStored} images stored automatically in ${duration}s`,
-      // 🔧 NEW: Partial success information
+      message: success
+        ? `${totalImagesStored}/${totalImagesAttempted} images stored successfully in ${duration}s`
+        : 'No images could be stored. Check image formats.',
       stats: {
         totalStored: totalImagesStored,
+        totalAttempted: totalImagesAttempted,
         originalStored: storedImages.original.length,
         processedStored: Object.values(storedImages.processed).flat().length,
         originalAttempted: originalImages?.length || 0,
         processedAttempted: Object.values(processedImages || {}).flat().length,
+        successRate:
+          totalImagesAttempted > 0
+            ? Math.round((totalImagesStored / totalImagesAttempted) * 100)
+            : 0,
       },
     })
   } catch (error) {
@@ -378,7 +464,7 @@ export async function POST(request: NextRequest) {
 
     console.error('❌ Auto store images error after', duration + 's:', error)
 
-    // 🔧 ENHANCED: Better error response
+    // Enhanced error handling
     let errorMessage = 'Failed to store images automatically'
 
     if (error instanceof Error) {
@@ -386,7 +472,14 @@ export async function POST(request: NextRequest) {
         error.message.includes('timeout') ||
         error.message.includes('AbortError')
       ) {
-        errorMessage = 'Image processing timed out. Try with smaller images.'
+        errorMessage =
+          'Image processing timed out. Try with smaller images or data URLs instead of blob URLs.'
+      } else if (
+        error.message.includes('fetch failed') ||
+        error.message.includes('invalid method')
+      ) {
+        errorMessage =
+          'Image format not supported on server. Please use data URLs instead of blob URLs.'
       } else if (error.message.includes('Blob fetch failed')) {
         errorMessage =
           'Failed to process image data. Please refresh and try again.'
@@ -400,6 +493,7 @@ export async function POST(request: NextRequest) {
         error: errorMessage,
         duration,
         details: error instanceof Error ? error.message : 'Unknown error',
+        tip: 'If using blob URLs, convert images to data URLs in frontend before sending to server.',
       },
       { status: 500 }
     )

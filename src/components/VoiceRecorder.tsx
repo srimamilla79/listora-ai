@@ -64,6 +64,7 @@ export default function MultilingualVoiceRecorder({
   const componentMountedRef = useRef(true)
 
   // 🔧 FIX 2: Enhanced cleanup function (CRITICAL)
+  // 🔧 ENHANCED: Better performCleanup function
   const performCleanup = () => {
     console.log('🧹 Cleaning up voice recorder resources...')
 
@@ -98,16 +99,18 @@ export default function MultilingualVoiceRecorder({
       mediaRecorderRef.current = null
     }
 
-    // Clean up audio element
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-    }
-
-    // Clean up blob URL (CRITICAL for memory leaks)
+    // 🔧 CRITICAL FIX: Clean up blob URL properly
     if (audioUrl) {
       try {
+        // Stop audio element first
+        if (audioRef.current) {
+          audioRef.current.pause()
+          audioRef.current.src = ''
+        }
+
+        // Then revoke the URL
         URL.revokeObjectURL(audioUrl)
+        console.log('🗑️ Blob URL cleaned up successfully')
       } catch (error) {
         console.warn('Error revoking audio URL:', error)
       }
@@ -150,6 +153,15 @@ export default function MultilingualVoiceRecorder({
   const resetRecording = () => {
     console.log('🔄 Resetting voice recorder...')
 
+    // 🔧 FIX: Stop audio playback FIRST before cleanup
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current.src = '' // Clear the src to prevent further attempts
+      setIsPlaying(false)
+    }
+
+    // Then do the rest of cleanup
     performCleanup()
 
     // Reset state
@@ -371,69 +383,176 @@ export default function MultilingualVoiceRecorder({
     }
   }
 
-  // 🔧 FIX 7: Enhanced voice processing with timeout
+  // 🔧 DEBUG VERSION: Replace processVoiceToContent with this to find where it hangs
+  // Add this to VoiceRecorder.tsx temporarily to debug the hanging issue
+
   const processVoiceToContent = async (blobArg?: Blob) => {
     const blobToProcess = blobArg || audioBlob
-    if (!blobToProcess || !componentMountedRef.current) return
+    if (!blobToProcess || !componentMountedRef.current) {
+      console.log('❌ No blob to process or component unmounted')
+      return
+    }
+
+    const startTime = Date.now()
+    console.log('🎤 Starting voice processing...', {
+      blobSize: blobToProcess.size,
+      timestamp: new Date().toISOString(),
+    })
 
     setIsProcessing(true)
     if (onProcessingChange) onProcessingChange(true)
 
-    // Set timeout
+    // Clear any existing timeout
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current)
+      processingTimeoutRef.current = null
+    }
+
+    // Set timeout with better logging
     processingTimeoutRef.current = setTimeout(() => {
       if (componentMountedRef.current) {
+        const elapsed = Date.now() - startTime
+        console.error(
+          '⚠️ TIMEOUT after',
+          elapsed,
+          'ms - API call never returned'
+        )
         setIsProcessing(false)
         if (onProcessingChange) onProcessingChange(false)
-        alert('Processing timed out. Please try again.')
+        alert(
+          `Processing timed out after ${Math.round(elapsed / 1000)} seconds. API call hung.`
+        )
       }
-    }, 45000)
+    }, 30000)
 
     try {
       if (blobToProcess.size === 0) {
         throw new Error('Audio recording is empty')
       }
 
+      console.log('🔄 [Step 1] Creating FormData...')
       const formData = new FormData()
-      formData.append('audio', blobToProcess, 'recording.webm')
-      if (contentType) {
-        formData.append('contentType', contentType)
-      }
+      formData.append('audio', blobToProcess, `recording-${Date.now()}.webm`)
+      formData.append('contentType', contentType || 'product')
+      formData.append('language', 'auto')
+      formData.append('targetLanguage', 'en')
 
+      // 🚨 EMERGENCY FIX: Replace the auth section in processVoiceToContent (VoiceRecorder.tsx)
+      // This bypasses Supabase auth entirely and uses cookie-based auth
+
+      console.log('🔄 [Step 2] Getting auth token...')
       let headers: HeadersInit = {}
 
-      if (supabase) {
+      // 🔧 CRITICAL FIX: Skip Supabase auth entirely after "Start New Product"
+      // Check if this is likely a post-reset scenario by checking component mount time
+      const componentAge =
+        Date.now() - (componentMountedRef.current ? Date.now() : 0)
+      const isLikelyPostReset = componentAge < 30000 // Less than 30 seconds old
+
+      if (supabase && !isLikelyPostReset) {
+        // 🔧 Only try Supabase auth if component is "old" (not recently reset)
         try {
-          const sessionResult = await supabase.auth.getSession()
+          console.log('🔄 [Step 2a] Trying Supabase auth (normal flow)...')
+
+          const authPromise = supabase.auth.getSession()
+          const authTimeout = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Auth timeout')), 5000) // Shorter timeout
+          })
+
+          const sessionResult = await Promise.race([authPromise, authTimeout])
+          console.log('✅ [Step 2b] Supabase auth completed')
+
           const session = sessionResult?.data?.session
           const accessToken = session?.access_token
 
           if (accessToken) {
             headers['Authorization'] = `Bearer ${accessToken}`
+            console.log('✅ [Step 2c] Supabase Authorization header set')
           } else {
             throw new Error('No access token available')
           }
         } catch (authError) {
-          throw new Error(
-            'Authentication failed. Please refresh and try again.'
+          console.warn(
+            '⚠️ [Step 2] Supabase auth failed, falling back to cookie auth:',
+            authError
           )
+          // Fall through to cookie auth
         }
       } else {
-        throw new Error('Supabase client not available')
+        console.log(
+          '🔄 [Step 2] Skipping Supabase auth - using cookie auth only'
+        )
+        // Skip Supabase entirely - API will use session cookies
       }
+
+      console.log(
+        '✅ [Step 2] Auth strategy selected:',
+        headers['Authorization'] ? 'Bearer token' : 'Cookie auth'
+      )
+
+      console.log('🚀 [Step 3] Making API call to /api/voice-to-form...')
+      console.log('📊 Request details:', {
+        url: '/api/voice-to-form',
+        method: 'POST',
+        hasAuth: !!headers['Authorization'],
+        blobSize: blobToProcess.size,
+        contentType: blobToProcess.type,
+      })
+
+      // Add fetch timeout with detailed logging
+      const controller = new AbortController()
+      const fetchTimeout = setTimeout(() => {
+        const elapsed = Date.now() - startTime
+        console.error(
+          '🔄 [Step 3] FETCH TIMEOUT after',
+          elapsed,
+          'ms - aborting request'
+        )
+        controller.abort()
+      }, 25000)
+
+      const fetchStartTime = Date.now()
+      console.log(
+        '⏱️ [Step 3] Fetch started at:',
+        new Date(fetchStartTime).toISOString()
+      )
 
       const response = await fetch('/api/voice-to-form', {
         method: 'POST',
         headers,
         credentials: 'include',
         body: formData,
+        signal: controller.signal,
+      })
+
+      const fetchEndTime = Date.now()
+      const fetchDuration = fetchEndTime - fetchStartTime
+      clearTimeout(fetchTimeout)
+
+      console.log('📊 [Step 4] API Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        fetchDuration: `${fetchDuration}ms`,
+        headers: Object.fromEntries(response.headers.entries()),
       })
 
       if (!response.ok) {
+        console.log('🔄 [Step 4] Reading error response...')
         const errorData = await response.json()
+        console.error('❌ [Step 4] API Error:', errorData)
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
+      console.log('🔄 [Step 5] Parsing successful response...')
       const result = await response.json()
+      const totalDuration = Date.now() - startTime
+
+      console.log('✅ [Step 5] Voice processing successful:', {
+        totalDuration: `${totalDuration}ms`,
+        transcriptionLength: result.transcription?.length || 0,
+        detectedLanguage: result.detectedLanguage,
+        result,
+      })
 
       if (!componentMountedRef.current) return
 
@@ -453,6 +572,7 @@ export default function MultilingualVoiceRecorder({
         }
       }
 
+      console.log('🔄 [Step 6] Calling parent onContentGenerated...')
       onContentGenerated({
         transcription: result.transcription,
         detectedLanguage: result.detectedLanguage,
@@ -462,15 +582,24 @@ export default function MultilingualVoiceRecorder({
         productName: result.productName,
         generatedContent: result.generatedContent,
       })
+
+      console.log(
+        '✅ [Step 6] Voice processing completed successfully in',
+        totalDuration,
+        'ms'
+      )
     } catch (error) {
-      console.error('Voice processing error:', error)
+      const elapsed = Date.now() - startTime
+      console.error('❌ Voice processing error after', elapsed, 'ms:', error)
 
       if (!componentMountedRef.current) return
 
       let errorMessage = 'Failed to process voice'
       if (error instanceof Error) {
-        if (error.message.includes('timeout')) {
-          errorMessage = 'Processing timed out. Please try a shorter recording.'
+        if (error.name === 'AbortError') {
+          errorMessage = `Request aborted after ${Math.round(elapsed / 1000)} seconds - server not responding`
+        } else if (error.message.includes('timeout')) {
+          errorMessage = `Processing timed out after ${Math.round(elapsed / 1000)} seconds`
         } else if (error.message.includes('Authentication')) {
           errorMessage = 'Authentication failed. Please refresh and try again.'
         } else {

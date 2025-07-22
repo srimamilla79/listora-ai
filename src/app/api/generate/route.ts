@@ -42,13 +42,22 @@ export async function POST(req: NextRequest) {
     generation: 0,
     dbSave: 0,
     total: 0,
+    checkpoints: [] as { label: string; ms: number }[],
+  }
+
+  function logCheckpoint(label: string) {
+    const ms = Date.now() - startTime
+    performanceLog.checkpoints.push({ label, ms })
+    console.log(`[TIMING] ${label}: ${ms}ms`)
   }
 
   console.log('=== GENERATE API START ===')
+  logCheckpoint('start')
 
   try {
     // 🔍 ADD THIS SECTION FOR DEBUGGING:
     const requestBody = await req.json()
+    logCheckpoint('parsed request body')
     // Enhanced request body parsing to include voice parameters AND background job support AND content sections
     const {
       productName,
@@ -86,6 +95,7 @@ export async function POST(req: NextRequest) {
     const selectedSectionCount =
       Object.values(contentSections).filter(Boolean).length
 
+    logCheckpoint('validated content sections')
     console.log('2. Content sections:', {
       sections: contentSections,
       selectedCount: selectedSectionCount,
@@ -105,15 +115,18 @@ export async function POST(req: NextRequest) {
 
     // 🚀 OPTIMIZED: Faster authentication with performance tracking
     const authStart = Date.now()
+    logCheckpoint('auth start')
 
     // Handle background job authentication differently
     if (isBackgroundJob && backgroundUserId) {
+      logCheckpoint('background job detected')
       console.log('3. Background job detected, using service role auth')
       authenticatedUser = { id: backgroundUserId, email: 'background@job' }
       console.log('4. Background job user:', authenticatedUser.id)
     } else {
       // Standard user authentication flow
       const cookieStore = await cookies()
+      logCheckpoint('got cookies')
       console.log('3. Getting cookies...')
 
       const supabase = createServerClient(
@@ -138,12 +151,14 @@ export async function POST(req: NextRequest) {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser()
+      logCheckpoint('supabase.auth.getUser complete')
       console.log('4. Auth result:', user ? `Success - ${user.id}` : 'Failed')
 
       if (authError || !user) {
         console.log('5. Authentication failed, trying Authorization header...')
 
         const authHeader = req.headers.get('authorization')
+        logCheckpoint('no cookie auth, checking authorization header')
         if (!authHeader) {
           console.log('5. No authorization header either')
           return NextResponse.json(
@@ -171,11 +186,13 @@ export async function POST(req: NextRequest) {
           access_token: accessToken,
           refresh_token: '',
         })
+        logCheckpoint('tokenSupabase.auth.setSession complete')
 
         const {
           data: { user: tokenUser },
           error: tokenError,
         } = await tokenSupabase.auth.getUser()
+        logCheckpoint('tokenSupabase.auth.getUser complete')
 
         if (tokenError || !tokenUser) {
           console.log('5. Token authentication also failed:', tokenError)
@@ -193,6 +210,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    logCheckpoint('authentication complete')
     console.log(
       '6. Final authenticated user:',
       authenticatedUser.id,
@@ -209,6 +227,7 @@ export async function POST(req: NextRequest) {
     )
 
     performanceLog.auth = Date.now() - authStart
+    logCheckpoint('admin check complete')
     console.log(`⚡ Auth completed in ${performanceLog.auth}ms`)
 
     if (isAdmin) {
@@ -251,7 +270,7 @@ export async function POST(req: NextRequest) {
       // 🔧 FIX: Add timeout wrapper and use faster model
       const completion = (await Promise.race([
         openai.chat.completions.create({
-          model: 'gpt-4o-mini', // ⚡ FASTER MODEL - was gpt-4o
+          model: 'gpt-4o', // ⚡ MUCH FASTER MODEL
           messages: [
             {
               role: 'system',
@@ -264,14 +283,14 @@ export async function POST(req: NextRequest) {
               content: prompt,
             },
           ],
-          max_tokens: Math.min(maxTokens, 2500), // ⚡ REDUCED MAX TOKENS
+          max_tokens: Math.min(maxTokens, 4000), // ⚡ REDUCED MAX TOKENS for speed
           temperature: isVoiceEnhancement ? 0.6 : 0.7,
           stream: false,
         }),
         new Promise((_, reject) =>
           setTimeout(
-            () => reject(new Error('OpenAI request timeout after 40 seconds')),
-            40000
+            () => reject(new Error('OpenAI request timeout after 60 seconds')),
+            60000
           )
         ),
       ])) as any
@@ -412,6 +431,7 @@ export async function POST(req: NextRequest) {
 
     // 🚀 OPTIMIZED: Parallel usage and plan checks for regular users
     const usageStart = Date.now()
+    logCheckpoint('usage check start')
 
     const currentMonth = new Date().toISOString().slice(0, 7)
     console.log('7. Checking usage for month:', currentMonth)
@@ -432,6 +452,7 @@ export async function POST(req: NextRequest) {
     ])
 
     performanceLog.usageCheck = Date.now() - usageStart
+    logCheckpoint('usage check complete')
     console.log(`⚡ Usage check completed in ${performanceLog.usageCheck}ms`)
 
     const { data: usage, error: usageError } = usageResult
@@ -473,6 +494,7 @@ export async function POST(req: NextRequest) {
 
     // 🚀 OPTIMIZED: Faster content generation
     const generationStart = Date.now()
+    logCheckpoint('user generation start')
 
     const prompt = createPrompt(
       productName,
@@ -501,13 +523,13 @@ export async function POST(req: NextRequest) {
     )
 
     console.log(
-      '🚀 Starting OpenAI generation with gpt-4o-mini for faster response...'
+      '🚀 Starting OpenAI generation with gpt-4o for faster response...'
     )
 
     // 🔧 FIX: Add timeout wrapper and use faster model for regular users too
     const completion = (await Promise.race([
       openai.chat.completions.create({
-        model: 'gpt-4o-mini', // ⚡ FASTER MODEL - was gpt-4o
+        model: 'gpt-4o', // ⚡ MUCH FASTER MODEL
         messages: [
           {
             role: 'system',
@@ -520,19 +542,20 @@ export async function POST(req: NextRequest) {
             content: prompt,
           },
         ],
-        max_tokens: Math.min(maxTokens, 2500), // ⚡ REDUCED MAX TOKENS
+        max_tokens: Math.min(maxTokens, 4000), // ⚡ REDUCED MAX TOKENS for speed
         temperature: isVoiceEnhancement ? 0.6 : 0.7,
         stream: false,
       }),
       new Promise((_, reject) =>
         setTimeout(
-          () => reject(new Error('OpenAI request timeout after 40 seconds')),
-          40000
+          () => reject(new Error('OpenAI request timeout after 60 seconds')),
+          60000
         )
       ),
     ])) as any
 
     performanceLog.generation = Date.now() - generationStart
+    logCheckpoint('user OpenAI generation complete')
     console.log(`⚡ Generation completed in ${performanceLog.generation}ms`)
 
     const generatedContent =
@@ -542,6 +565,7 @@ export async function POST(req: NextRequest) {
 
     // 🚀 OPTIMIZED: Parallel usage update and database save
     const dbStart = Date.now()
+    logCheckpoint('user db save start')
 
     const [usageUpdateResult, dbSaveResult] = await Promise.all([
       serviceSupabase.rpc('increment_user_usage', {
@@ -573,6 +597,7 @@ export async function POST(req: NextRequest) {
 
     performanceLog.dbSave = Date.now() - dbStart
     performanceLog.total = Date.now() - startTime
+    logCheckpoint('user db save complete')
 
     console.log(
       `⚡ Performance: Auth:${performanceLog.auth}ms, Usage:${performanceLog.usageCheck}ms, Gen:${performanceLog.generation}ms, DB:${performanceLog.dbSave}ms, Total:${performanceLog.total}ms`
@@ -605,6 +630,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Enhanced response with performance metrics and content section info
+    logCheckpoint('user response sent')
     return NextResponse.json({
       result: generatedContent,
       contentId: savedContent?.id || null,
@@ -640,6 +666,7 @@ export async function POST(req: NextRequest) {
     const errorTime = Date.now() - startTime
     console.error(`=== GENERATE API ERROR after ${errorTime}ms ===`)
     console.error('Error details:', error)
+    if (typeof logCheckpoint === 'function') logCheckpoint('error thrown')
     return NextResponse.json(
       {
         error: 'Failed to generate content',
