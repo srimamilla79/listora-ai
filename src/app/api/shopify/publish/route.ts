@@ -1,5 +1,5 @@
-// src/app/api/shopify/publish/route.ts - UNIVERSAL CONTENT PARSER
-// Works with ANY content format - structured, unstructured, or mixed
+// src/app/api/shopify/publish/route.ts - PROFESSIONAL SHOPIFY BEST PRACTICES 2024
+// Follows Shopify's recommended description format for better conversion
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 
@@ -49,14 +49,14 @@ export async function POST(request: NextRequest) {
     const shopDomain = connection.platform_store_info.shop_domain
     const accessToken = connection.access_token
 
-    // ✅ UNIVERSAL: Parse ANY content format
-    const contentSections = parseUniversalContent(
+    // ✅ ENHANCED: Parse content with professional formatting
+    const contentSections = parseEnhancedContent(
       mergedProductContent.generated_content,
       mergedProductContent.product_name
     )
 
-    // ✅ Create Shopify product with universal data
-    const shopifyProduct = createShopifyProduct(
+    // ✅ Create Shopify product with professional data
+    const shopifyProduct = createProfessionalShopifyProduct(
       contentSections,
       mergedProductContent,
       publishingOptions,
@@ -170,248 +170,444 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ UNIVERSAL CONTENT PARSER - Works with ANY format
-function parseUniversalContent(content: string, fallbackTitle?: string) {
-  console.log('🔍 Universal parsing started...')
+// ✅ ENHANCED: Content Parser with Better Structure
+function parseEnhancedContent(content: string, fallbackTitle?: string) {
+  console.log('🔍 Enhanced parsing started...')
 
   const sections = {
     title: '',
-    description: '',
+    shortDescription: '', // NEW: Brief intro paragraph
+    keyBenefits: [] as string[], // NEW: Main selling points
     bulletPoints: [] as string[],
+    specifications: [] as string[], // NEW: Technical details
     features: [] as string[],
   }
 
   try {
-    // ✅ UNIVERSAL TITLE EXTRACTION
-    sections.title = extractUniversalTitle(content, fallbackTitle)
+    // ✅ ENHANCED TITLE EXTRACTION
+    sections.title = extractEnhancedTitle(content, fallbackTitle)
 
-    // ✅ UNIVERSAL DESCRIPTION EXTRACTION
-    sections.description = extractUniversalDescription(content)
+    // ✅ ENHANCED CONTENT PARSING
+    const parsedContent = parseStructuredContent(content)
 
-    // ✅ UNIVERSAL BULLET POINTS EXTRACTION
-    sections.bulletPoints = extractUniversalBulletPoints(content)
+    sections.shortDescription = parsedContent.shortDescription
+    sections.keyBenefits = parsedContent.keyBenefits
+    sections.bulletPoints = parsedContent.bulletPoints
+    sections.specifications = parsedContent.specifications
+    sections.features = parsedContent.features
 
-    // ✅ UNIVERSAL FEATURES EXTRACTION
-    sections.features = extractUniversalFeatures(content)
-
-    console.log('✅ Universal parsing results:', {
+    console.log('✅ Enhanced parsing results:', {
       title: sections.title.substring(0, 50) + '...',
-      description: sections.description.substring(0, 100) + '...',
+      shortDescription: sections.shortDescription.substring(0, 100) + '...',
+      keyBenefitsCount: sections.keyBenefits.length,
       bulletCount: sections.bulletPoints.length,
-      featuresCount: sections.features.length,
+      specificationsCount: sections.specifications.length,
     })
   } catch (error) {
-    console.error('❌ Universal parsing error:', error)
+    console.error('❌ Enhanced parsing error:', error)
 
-    // ✅ ABSOLUTE FALLBACK - Always works
-    sections.title =
-      fallbackTitle || extractFirstMeaningfulLine(content) || 'Premium Product'
-    sections.description = content
-      .replace(/\*\*/g, '')
-      .replace(/#{1,6}/g, '')
-      .trim()
-      .substring(0, 500)
+    // ✅ FALLBACK with proper structure
+    sections.title = fallbackTitle || 'Premium Product'
+    sections.shortDescription = extractBriefDescription(content)
+    sections.keyBenefits = [
+      'Premium Quality',
+      'Professional Design',
+      'Reliable Performance',
+    ]
     sections.bulletPoints = content.match(/^-\s*.+$/gm)?.slice(0, 5) || []
   }
 
   return sections
 }
 
-// ✅ EXTRACT TITLE FROM ANY FORMAT - FIXED FOR YOUR EXACT FORMAT
-function extractUniversalTitle(
-  content: string,
-  fallbackTitle?: string
-): string {
-  console.log('🔍 Extracting universal title from content...')
-  console.log('🔍 Content preview:', content.substring(0, 300))
+// ✅ ENHANCED: Title Extraction (Same as before but cleaned up)
+function extractEnhancedTitle(content: string, fallbackTitle?: string): string {
+  console.log('🔍 Extracting enhanced title...')
 
-  // Try multiple title patterns - FIXED for your exact format
   const titlePatterns = [
-    // Your exact format: **1. PRODUCT TITLE/HEADLINE:**
     /\*\*1\.\s*PRODUCT\s+TITLE[\/\s]*HEADLINE[:\s]*\*\*\s*\n([^\n\*]+)/i,
     /\*\*1\.\s*PRODUCT\s+TITLE[:\s]*\*\*\s*\n([^\n\*]+)/i,
-
-    // Alternative formats
     /(?:\*\*)?1\.?\s*(?:PRODUCT\s+)?TITLE[:\s\/]*(?:HEADLINE)?[:\s]*(?:\*\*)?\s*[\n\r]*([^\n\r\*]+)/i,
     /(?:\*\*)?(?:PRODUCT\s+)?TITLE[:\s]*(?:\*\*)?\s*[\n\r]*([^\n\r\*]+)/i,
     /#{1,6}\s*TITLE[:\s]*([^\n\r]+)/i,
-
-    // Quote patterns
     /"([^"]{10,100})"/,
-
-    // First meaningful line that looks like a title
     /^([A-Z][^.\n]{10,80})$/m,
   ]
 
-  for (let i = 0; i < titlePatterns.length; i++) {
-    const pattern = titlePatterns[i]
+  for (const pattern of titlePatterns) {
     const match = content.match(pattern)
-    console.log(
-      `🔍 Pattern ${i + 1} match:`,
-      match ? match[1]?.substring(0, 50) : 'No match'
-    )
-
     if (match && match[1]) {
       let title = match[1].trim()
-
-      // Clean the title
-      title = title
-        .replace(/\*\*/g, '') // Remove bold
-        .replace(/\*/g, '') // Remove italic
-        .replace(/#{1,6}\s*/g, '') // Remove headers
-        .replace(/^[-•]\s*/, '') // Remove bullets
-        .replace(/[^\w\s-,&()'/]/g, ' ') // Remove special chars except common ones
-        .replace(/\s+/g, ' ') // Normalize spaces
-        .trim()
-
-      // Validate title quality
-      if (title.length >= 10 && title.length <= 150 && /[a-zA-Z]/.test(title)) {
+      title = cleanTitle(title)
+      if (title.length >= 10 && title.length <= 150) {
         console.log('✅ Found valid title:', title)
         return title
       }
     }
   }
 
-  // Use fallback title or extract from content
-  const fallback =
+  return (
     fallbackTitle || extractFirstMeaningfulLine(content) || 'Premium Product'
-  console.log('⚠️ Using fallback title:', fallback)
-  return fallback
+  )
 }
 
-// ✅ EXTRACT DESCRIPTION FROM ANY FORMAT
-function extractUniversalDescription(content: string): string {
-  console.log('🔍 Extracting universal description...')
+// ✅ NEW: Parse Structured Content for Better Organization
+function parseStructuredContent(content: string) {
+  const result = {
+    shortDescription: '',
+    keyBenefits: [] as string[],
+    bulletPoints: [] as string[],
+    specifications: [] as string[],
+    features: [] as string[],
+  }
 
-  // Try structured description patterns first
-  const structuredPatterns = [
-    /(?:\*\*)?3\.?\s*(?:DETAILED\s*)?(?:PRODUCT\s*)?DESCRIPTION[:\s]*(?:\*\*)?\s*[\n\r]+([\s\S]*?)(?=(?:\*\*)?[4-9]\.|$)/i,
-    /(?:\*\*)?DESCRIPTION[:\s]*(?:\*\*)?\s*[\n\r]+([\s\S]*?)(?=(?:\*\*)?[A-Z\s]*:|$)/i,
-    /#{1,6}\s*DESCRIPTION[:\s]*[\n\r]+([\s\S]*?)(?=#{1,6}|$)/i,
-  ]
+  // Extract sections
+  const sections = content.split(/(?=\*\*\d+\.)/g)
 
-  for (const pattern of structuredPatterns) {
-    const match = content.match(pattern)
-    if (match && match[1] && match[1].trim().length > 50) {
-      let description = match[1].trim()
-      description = cleanTextContent(description)
-      if (description.length > 50) {
-        console.log(
-          '✅ Found structured description:',
-          description.substring(0, 100) + '...'
-        )
-        return description
+  for (const section of sections) {
+    const cleanSection = section.trim()
+
+    // Description section
+    if (
+      cleanSection.match(
+        /\*\*3\.\s*(?:DETAILED\s*)?(?:PRODUCT\s*)?DESCRIPTION/i
+      )
+    ) {
+      const descMatch = cleanSection.match(
+        /\*\*3\.\s*(?:DETAILED\s*)?(?:PRODUCT\s*)?DESCRIPTION[:\s]*\*\*\s*\n([\s\S]+)/i
+      )
+      if (descMatch) {
+        const fullDesc = cleanTextContent(descMatch[1])
+        // Extract first 1-2 sentences for short description
+        const sentences = fullDesc.split(/[.!?]+/)
+        result.shortDescription = sentences.slice(0, 2).join('. ').trim()
+        if (result.shortDescription && !result.shortDescription.endsWith('.')) {
+          result.shortDescription += '.'
+        }
+      }
+    }
+
+    // Key selling points section
+    else if (
+      cleanSection.match(
+        /\*\*2\.\s*(?:KEY\s*)?(?:SELLING\s*)?(?:POINTS|FEATURES|BENEFITS)/i
+      )
+    ) {
+      const bulletMatches = cleanSection.match(
+        /^[\s]*[-•*]\s*\*\*([^*]+)\*\*:\s*([^\n]+)/gm
+      )
+      if (bulletMatches) {
+        bulletMatches.forEach((match) => {
+          const bulletMatch = match.match(
+            /^[\s]*[-•*]\s*\*\*([^*]+)\*\*:\s*([^\n]+)/
+          )
+          if (bulletMatch) {
+            const title = bulletMatch[1].trim()
+            const description = cleanTextContent(bulletMatch[2])
+            result.keyBenefits.push(`${title}: ${description}`)
+          }
+        })
       }
     }
   }
 
-  // Try to extract largest paragraph
-  const paragraphs = content
-    .split(/\n\s*\n/)
-    .map((p) => cleanTextContent(p))
-    .filter((p) => p.length > 100 && !p.match(/^[\d\s\*\-#]/)) // Skip lists and headers
-    .sort((a, b) => b.length - a.length)
-
-  if (paragraphs.length > 0) {
-    console.log(
-      '✅ Found paragraph description:',
-      paragraphs[0].substring(0, 100) + '...'
-    )
-    return paragraphs[0]
+  // Fallback extraction if structured parsing fails
+  if (result.keyBenefits.length === 0) {
+    result.keyBenefits = extractFallbackBenefits(content)
   }
 
-  // Fallback: clean entire content
-  const fallbackDesc = cleanTextContent(content).substring(0, 500)
-  console.log(
-    '✅ Using fallback description:',
-    fallbackDesc.substring(0, 100) + '...'
-  )
-  return fallbackDesc
+  if (!result.shortDescription) {
+    result.shortDescription = extractBriefDescription(content)
+  }
+
+  // Extract bullet points
+  result.bulletPoints = extractCleanBulletPoints(content)
+
+  // Extract specifications
+  result.specifications = extractProductSpecs(content)
+
+  return result
 }
 
-// ✅ EXTRACT BULLET POINTS FROM ANY FORMAT
-function extractUniversalBulletPoints(content: string): string[] {
-  console.log('🔍 Extracting universal bullet points...')
-
-  const bulletPoints: string[] = []
-
-  // Pattern 1: Lines starting with - or •
-  const dashBullets = content.match(/^[\s]*[-•]\s*(.+)$/gm)
-  if (dashBullets) {
-    dashBullets.forEach((bullet) => {
-      const clean = cleanTextContent(bullet.replace(/^[\s]*[-•]\s*/, ''))
-      if (clean.length > 10 && clean.length < 200) {
-        bulletPoints.push(clean)
-      }
-    })
-  }
-
-  // Pattern 2: Lines starting with numbers
-  const numberedBullets = content.match(/^[\s]*\d+[\.\)]\s*(.+)$/gm)
-  if (numberedBullets) {
-    numberedBullets.forEach((bullet) => {
-      const clean = cleanTextContent(bullet.replace(/^[\s]*\d+[\.\)]\s*/, ''))
-      if (clean.length > 10 && clean.length < 200) {
-        bulletPoints.push(clean)
-      }
-    })
-  }
-
-  // Pattern 3: Key-value pairs with colons
-  const keyValuePairs = content.match(
-    /^[\s]*([A-Z][^:\n]{3,30}):\s*([^:\n]{10,150})$/gm
+// ✅ NEW: Extract Brief Description (1-2 sentences max)
+function extractBriefDescription(content: string): string {
+  // Look for description section first
+  const descMatch = content.match(
+    /\*\*3\.\s*(?:DETAILED\s*)?(?:PRODUCT\s*)?DESCRIPTION[:\s]*\*\*\s*\n([\s\S]*?)(?=\*\*\d+\.|$)/i
   )
-  if (keyValuePairs) {
-    keyValuePairs.forEach((pair) => {
-      const clean = cleanTextContent(pair)
-      if (clean.length > 10 && clean.length < 200) {
-        bulletPoints.push(clean)
-      }
-    })
+
+  let description = ''
+  if (descMatch) {
+    description = cleanTextContent(descMatch[1])
+  } else {
+    // Fallback: find largest meaningful paragraph
+    const paragraphs = content
+      .split(/\n\s*\n/)
+      .map((p) => cleanTextContent(p))
+      .filter((p) => p.length > 100 && !p.match(/^[\d\s\*\-#]/))
+      .sort((a, b) => b.length - a.length)
+
+    description = paragraphs[0] || cleanTextContent(content)
   }
 
-  // Deduplicate and limit
-  const uniqueBullets = [...new Set(bulletPoints)].slice(0, 8)
-  console.log(`✅ Found ${uniqueBullets.length} bullet points`)
+  // Extract first 1-2 sentences only
+  const sentences = description.split(/[.!?]+/)
+  let shortDesc = sentences.slice(0, 2).join('. ').trim()
 
-  return uniqueBullets
+  // Ensure it ends with a period
+  if (shortDesc && !shortDesc.endsWith('.')) {
+    shortDesc += '.'
+  }
+
+  // Limit to 200 characters max for mobile readability
+  if (shortDesc.length > 200) {
+    shortDesc = shortDesc.substring(0, 197) + '...'
+  }
+
+  return shortDesc || 'Premium quality product designed for modern needs.'
 }
 
-// ✅ EXTRACT FEATURES FROM ANY FORMAT
-function extractUniversalFeatures(content: string): string[] {
-  const features: string[] = []
+// ✅ NEW: Extract Key Benefits (Main selling points)
+function extractFallbackBenefits(content: string): string[] {
+  const benefits: string[] = []
 
-  // Look for feature keywords
-  const featureKeywords = [
-    'premium',
-    'quality',
-    'durable',
-    'lightweight',
-    'wireless',
-    'bluetooth',
-    'waterproof',
-    'eco-friendly',
-    'handmade',
-    'authentic',
-    'certified',
-    'comfortable',
-    'stylish',
-    'modern',
-    'classic',
-    'vintage',
-    'luxury',
+  // Look for bold titles with descriptions
+  const boldMatches = content.match(
+    /\*\*([^*]{5,30})\*\*[:\s]*([^.\n]{20,100})/g
+  )
+  if (boldMatches) {
+    boldMatches.forEach((match) => {
+      const parts = match.match(/\*\*([^*]{5,30})\*\*[:\s]*([^.\n]{20,100})/)
+      if (parts) {
+        const title = cleanTextContent(parts[1])
+        const desc = cleanTextContent(parts[2])
+        if (title && desc && desc.length > 10) {
+          benefits.push(`${title}: ${desc}`)
+        }
+      }
+    })
+  }
+
+  // Fallback to generic benefits if none found
+  if (benefits.length === 0) {
+    const content_lower = content.toLowerCase()
+    if (
+      content_lower.includes('premium') ||
+      content_lower.includes('quality')
+    ) {
+      benefits.push(
+        'Premium Quality: Built with superior materials and craftsmanship'
+      )
+    }
+    if (
+      content_lower.includes('comfort') ||
+      content_lower.includes('ergonomic')
+    ) {
+      benefits.push('Enhanced Comfort: Designed for optimal user experience')
+    }
+    if (
+      content_lower.includes('durable') ||
+      content_lower.includes('lasting')
+    ) {
+      benefits.push('Long-lasting Durability: Made to withstand daily use')
+    }
+  }
+
+  return benefits.slice(0, 4) // Limit to 4 key benefits
+}
+
+// ✅ NEW: Extract Clean Bullet Points
+function extractCleanBulletPoints(content: string): string[] {
+  const bullets: string[] = []
+
+  // Pattern 1: Standard bullets with bold titles
+  const bulletMatches = content.match(
+    /^[\s]*[-•*]\s*\*\*([^*]+)\*\*:\s*([^\n]+)/gm
+  )
+  if (bulletMatches) {
+    bulletMatches.forEach((match) => {
+      const parts = match.match(/^[\s]*[-•*]\s*\*\*([^*]+)\*\*:\s*([^\n]+)/)
+      if (parts) {
+        const title = cleanTextContent(parts[1])
+        const desc = cleanTextContent(parts[2])
+        bullets.push(`${title}: ${desc}`)
+      }
+    })
+  }
+
+  // Pattern 2: Simple bullet points
+  if (bullets.length === 0) {
+    const simpleBullets = content.match(/^[\s]*[-•*]\s*([^\n]{10,100})/gm)
+    if (simpleBullets) {
+      simpleBullets.forEach((bullet) => {
+        const clean = cleanTextContent(bullet.replace(/^[\s]*[-•*]\s*/, ''))
+        if (clean.length > 10) {
+          bullets.push(clean)
+        }
+      })
+    }
+  }
+
+  return bullets.slice(0, 6) // Limit to 6 bullets
+}
+
+// ✅ NEW: Extract Product Specifications
+function extractProductSpecs(content: string): string[] {
+  const specs: string[] = []
+
+  // Look for specification patterns
+  const specPatterns = [
+    /(?:material|size|weight|color|brand|model|type)[:\s]+([^\n,]{3,30})/gi,
+    /([A-Z][a-z]+):\s*([^\n,]{3,30})/g,
   ]
 
-  featureKeywords.forEach((keyword) => {
-    if (content.toLowerCase().includes(keyword)) {
-      features.push(keyword.charAt(0).toUpperCase() + keyword.slice(1))
+  specPatterns.forEach((pattern) => {
+    const matches = content.matchAll(pattern)
+    for (const match of matches) {
+      if (match[1] && match[2]) {
+        const key = match[1].trim()
+        const value = cleanTextContent(match[2])
+        if (value.length > 2 && value.length < 50) {
+          specs.push(`${key}: ${value}`)
+        }
+      } else if (match[1] && match[1].length > 5) {
+        specs.push(cleanTextContent(match[1]))
+      }
     }
   })
 
-  return [...new Set(features)].slice(0, 10)
+  return [...new Set(specs)].slice(0, 5) // Remove duplicates, limit to 5
 }
 
-// ✅ HELPER: Clean text content
+// ✅ PROFESSIONAL: Shopify Description Formatter - Following Best Practices
+function formatProfessionalShopifyDescription(sections: any): string {
+  console.log('🎨 Professional Shopify formatting started...')
+
+  let html = ''
+
+  // ✅ 1. BRIEF INTRODUCTION (Mobile-friendly)
+  if (sections.shortDescription) {
+    html += `<p>${sections.shortDescription}</p>\n\n`
+  }
+
+  // ✅ 2. KEY BENEFITS (What makes this product special)
+  if (sections.keyBenefits && sections.keyBenefits.length > 0) {
+    html += `<h3>✨ Why Choose This Product</h3>\n<ul>\n`
+
+    sections.keyBenefits.slice(0, 4).forEach((benefit: string) => {
+      const cleanBenefit = cleanTextContent(benefit)
+      html += `<li><strong>${cleanBenefit}</strong></li>\n`
+    })
+
+    html += `</ul>\n\n`
+  }
+
+  // ✅ 3. DETAILED FEATURES (Bulleted list)
+  if (sections.bulletPoints && sections.bulletPoints.length > 0) {
+    html += `<h3>🔥 Product Features</h3>\n<ul>\n`
+
+    sections.bulletPoints.slice(0, 6).forEach((point: string) => {
+      const cleanPoint = cleanTextContent(point)
+      if (cleanPoint.length > 5) {
+        html += `<li>${cleanPoint}</li>\n`
+      }
+    })
+
+    html += `</ul>\n\n`
+  }
+
+  // ✅ 4. SPECIFICATIONS (If available)
+  if (sections.specifications && sections.specifications.length > 0) {
+    html += `<h3>📋 Specifications</h3>\n<ul>\n`
+
+    sections.specifications.slice(0, 5).forEach((spec: string) => {
+      const cleanSpec = cleanTextContent(spec)
+      html += `<li>${cleanSpec}</li>\n`
+    })
+
+    html += `</ul>\n\n`
+  }
+
+  // ✅ 5. TRUST SIGNALS (Professional closing)
+  html += `<h3>🛡️ Our Promise</h3>\n`
+  html += `<p>We stand behind the quality of our products. Each item is carefully selected and tested to meet our high standards. Your satisfaction is our priority.</p>\n\n`
+
+  // ✅ 6. CALL TO ACTION
+  html += `<p><strong>Ready to experience the difference? Add to cart now and enjoy fast, reliable shipping!</strong></p>`
+
+  console.log('✅ Professional Shopify description formatted:', {
+    totalLength: html.length,
+    sections: ['Introduction', 'Benefits', 'Features', 'Specs', 'Trust', 'CTA'],
+  })
+
+  return html
+}
+
+// ✅ CREATE PROFESSIONAL SHOPIFY PRODUCT
+function createProfessionalShopifyProduct(
+  contentSections: any,
+  mergedProductContent: any,
+  publishingOptions: any,
+  images: string[],
+  connection: any
+) {
+  return {
+    product: {
+      title:
+        contentSections.title ||
+        mergedProductContent.product_name ||
+        'Premium Product',
+      body_html: formatProfessionalShopifyDescription(contentSections),
+      vendor:
+        extractBrand(
+          contentSections.shortDescription + ' ' + contentSections.title
+        ) ||
+        connection.platform_store_info.shop_name ||
+        'Premium Brand',
+      product_type: detectProductType(
+        contentSections.shortDescription + ' ' + contentSections.title
+      ),
+      status: 'draft',
+      variants: [
+        {
+          price: publishingOptions.price.toString(),
+          inventory_quantity: publishingOptions.quantity,
+          sku: publishingOptions.sku,
+          requires_shipping: true,
+          taxable: true,
+          inventory_management: 'shopify',
+          fulfillment_service: 'manual',
+          inventory_policy: 'deny',
+          weight: estimateWeight(contentSections.shortDescription),
+          weight_unit: 'lb',
+        },
+      ],
+      images: prepareShopifyImages(images, contentSections.title),
+      tags: generateEnhancedTags(contentSections),
+      seo: {
+        title: `${contentSections.title} | ${connection.platform_store_info.shop_name}`,
+        description:
+          contentSections.shortDescription
+            .substring(0, 160)
+            .replace(/<[^>]*>/g, '') + '...',
+      },
+    },
+  }
+}
+
+// ✅ HELPER FUNCTIONS (Enhanced)
+
+function cleanTitle(title: string): string {
+  return title
+    .replace(/\*\*/g, '') // Remove bold
+    .replace(/\*/g, '') // Remove italic
+    .replace(/#{1,6}\s*/g, '') // Remove headers
+    .replace(/^\s*[-•]\s*/, '') // Remove bullets
+    .replace(/[^\w\s-,&()'/]/g, ' ') // Remove special chars except common ones
+    .replace(/\s+/g, ' ') // Normalize spaces
+    .trim()
+}
+
 function cleanTextContent(text: string): string {
   return text
     .replace(/\*\*/g, '') // Remove bold
@@ -424,7 +620,6 @@ function cleanTextContent(text: string): string {
     .trim()
 }
 
-// ✅ HELPER: Extract first meaningful line
 function extractFirstMeaningfulLine(content: string): string {
   const lines = content.split('\n')
   for (const line of lines) {
@@ -440,137 +635,6 @@ function extractFirstMeaningfulLine(content: string): string {
   return 'Premium Product'
 }
 
-// ✅ SIMPLE CLEAN FORMATTER - Like Adidas Example
-function formatShopifyDescription(sections: any): string {
-  let html = ''
-
-  console.log('🎨 Simple clean formatting:', {
-    hasDescription: !!sections.description,
-    bulletCount: sections.bulletPoints.length,
-    featuresCount: sections.features.length,
-  })
-
-  // ✅ MAIN DESCRIPTION - Clean paragraph, no styling
-  if (sections.description) {
-    html += sections.description
-    html += '<br><br>'
-  }
-
-  // ✅ KEY FEATURES - Simple format like Adidas example
-  if (sections.bulletPoints && sections.bulletPoints.length > 0) {
-    html += '✨ Key Features<br>'
-
-    sections.bulletPoints.slice(0, 6).forEach((point: string) => {
-      const cleanPoint = cleanTextContent(point)
-      if (cleanPoint.length > 5) {
-        html += `• ${cleanPoint}<br>`
-      }
-    })
-    html += '<br>'
-  }
-
-  // ✅ PRODUCT DETAILS - Additional content if available
-  if (sections.description && sections.bulletPoints.length > 0) {
-    html += '📋 Product Details<br>'
-
-    // Create additional details from the description
-    const sentences = sections.description.split('. ')
-    if (sentences.length > 1) {
-      // Take second part of description or create generic details
-      const additionalInfo = sentences.slice(1, 3).join('. ')
-      if (additionalInfo.length > 50) {
-        html += additionalInfo
-        if (!additionalInfo.endsWith('.')) html += '.'
-      } else {
-        // Generic professional details based on product type
-        html += createGenericDetails(sections.description, sections.title)
-      }
-    } else {
-      html += createGenericDetails(sections.description, sections.title)
-    }
-  }
-
-  console.log('✅ Simple clean description formatted successfully')
-  return html
-}
-
-// ✅ CREATE GENERIC PROFESSIONAL DETAILS
-function createGenericDetails(description: string, title: string): string {
-  const content = (description + ' ' + title).toLowerCase()
-
-  if (content.includes('gold') || content.includes('metal')) {
-    return 'This premium precious metal piece represents both investment value and timeless elegance. Each item undergoes rigorous quality control to ensure authenticity and purity. Perfect for collectors, investors, and those who appreciate fine craftsmanship. The secure packaging and certification guarantee make this an ideal choice for building a diversified portfolio or as a meaningful gift for special occasions.'
-  }
-
-  if (content.includes('shoes') || content.includes('footwear')) {
-    return 'Designed with advanced materials and construction techniques, these shoes deliver exceptional performance and durability. The innovative design ensures optimal comfort during extended wear, whether for athletic activities or casual use. Quality craftsmanship meets modern style, making these shoes suitable for various occasions and environments.'
-  }
-
-  if (content.includes('clothing') || content.includes('apparel')) {
-    return 'Crafted from premium materials with attention to detail, this garment combines style and functionality. The design focuses on comfort and versatility, making it suitable for various occasions. Quality construction ensures long-lasting wear and easy care, while the timeless style transcends seasonal trends.'
-  }
-
-  if (content.includes('electronics') || content.includes('device')) {
-    return 'Engineered with cutting-edge technology and premium components, this device delivers reliable performance and user satisfaction. The intuitive design ensures easy operation while maintaining professional standards. Advanced features are balanced with user-friendly functionality, making it suitable for both casual and professional use.'
-  }
-
-  // Generic fallback
-  return 'Carefully crafted with attention to quality and detail, this product represents excellent value and reliable performance. The thoughtful design considers both functionality and aesthetics, ensuring satisfaction with every use. Whether for personal use or as a gift, this product meets high standards of quality and craftsmanship.'
-}
-
-// ✅ CREATE SHOPIFY PRODUCT WITH UNIVERSAL DATA
-function createShopifyProduct(
-  contentSections: any,
-  mergedProductContent: any,
-  publishingOptions: any,
-  images: string[],
-  connection: any
-) {
-  return {
-    product: {
-      title:
-        contentSections.title ||
-        mergedProductContent.product_name ||
-        'Premium Product',
-      body_html: formatShopifyDescription(contentSections),
-      vendor:
-        extractBrand(
-          contentSections.description + ' ' + contentSections.title
-        ) ||
-        connection.platform_store_info.shop_name ||
-        'Premium Brand',
-      product_type: detectProductType(
-        contentSections.description + ' ' + contentSections.title
-      ),
-      status: 'draft',
-      variants: [
-        {
-          price: publishingOptions.price.toString(),
-          inventory_quantity: publishingOptions.quantity,
-          sku: publishingOptions.sku,
-          requires_shipping: true,
-          taxable: true,
-          inventory_management: 'shopify',
-          fulfillment_service: 'manual',
-          inventory_policy: 'deny',
-          weight: estimateWeight(contentSections.description),
-          weight_unit: 'lb',
-        },
-      ],
-      images: prepareShopifyImages(images, contentSections.title),
-      tags: generateTags(contentSections),
-      seo: {
-        title: `${contentSections.title} | ${connection.platform_store_info.shop_name}`,
-        description:
-          contentSections.description
-            .substring(0, 160)
-            .replace(/<[^>]*>/g, '') + '...',
-      },
-    },
-  }
-}
-
-// ✅ HELPER FUNCTIONS
 function extractBrand(content: string): string {
   const brands = [
     'Adidas',
@@ -621,14 +685,24 @@ function estimateWeight(content: string): number {
   return 1.0
 }
 
-function generateTags(sections: any): string {
+function generateEnhancedTags(sections: any): string {
   const tags = new Set<string>()
 
-  // Extract from features
+  // Extract from features and benefits
   sections.features?.forEach((feature: string) => tags.add(feature))
+  sections.keyBenefits?.forEach((benefit: string) => {
+    const words = benefit.split(':')[0].split(' ')
+    words.forEach((word) => {
+      if (word.length > 3) tags.add(word)
+    })
+  })
 
   // Extract from content
-  const content = (sections.description + ' ' + sections.title).toLowerCase()
+  const content = (
+    sections.shortDescription +
+    ' ' +
+    sections.title
+  ).toLowerCase()
   if (content.includes('premium')) tags.add('Premium')
   if (content.includes('luxury')) tags.add('Luxury')
   if (content.includes('quality')) tags.add('Quality')

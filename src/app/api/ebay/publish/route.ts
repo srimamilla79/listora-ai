@@ -2,8 +2,9 @@
 // eBay listing creation with DUAL TOKEN SYSTEM - User + Application Tokens
 // ✅ TRUE eBay BEST PRACTICES 2024 (Mobile-First, 800 Character Limit)
 // ✅ BULLETPROOF CONTENT EXTRACTION - Never Fails, Always Lists
-// ✅ TAXONOMY API INTEGRATION - Smart Category Detection
+// ✅ TAXONOMY API INTEGRATION - Smart Category Detection with Department Support
 // ✅ AI-GENERATED CONTENT ONLY - Rich Details from Generated Content
+// ✅ ALL CRITICAL FIXES APPLIED - Title, Department, Enhanced Extraction
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 
@@ -42,7 +43,7 @@ interface CategoryResult {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🛒 eBay publish route called - BULLETPROOF VERSION')
+    console.log('🛒 eBay publish route called - COMPLETE ENHANCED VERSION')
 
     const { productContent, images, publishingOptions, userId } =
       await request.json()
@@ -72,6 +73,18 @@ export async function POST(request: NextRequest) {
       price: publishingOptions?.price,
       imageCount: images?.length || 0,
     })
+
+    // ✅ CRITICAL: Validate images before proceeding
+    if (!images || images.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'At least 1 image is required for eBay listings. Please upload images and try again.',
+          platform: 'ebay',
+        },
+        { status: 400 }
+      )
+    }
 
     // Get eBay connection (use most recent active one)
     const { data: connections, error: connectionError } = await supabase
@@ -121,7 +134,7 @@ export async function POST(request: NextRequest) {
 
     console.log('🏷️ Final category decision:', categoryResult)
 
-    // ✅ Extract AI-generated title with bulletproof cleaning
+    // ✅ Extract AI-generated title with enhanced cleaning - NO MORE BAD TITLES
     const aiGeneratedTitle = extractTitleFromContent(
       mergedProductContent.generated_content || ''
     )
@@ -129,6 +142,23 @@ export async function POST(request: NextRequest) {
       aiGeneratedTitle || cleanProductName(mergedProductContent.product_name)
 
     console.log('🎯 Using title:', finalTitle)
+
+    // ✅ PRE-PUBLISH VALIDATION
+    const validation = validateEbayRequirements(
+      finalTitle,
+      images?.length || 0,
+      categoryResult.categoryId,
+      fullText
+    )
+    if (!validation.isValid) {
+      return NextResponse.json(
+        {
+          error: `eBay listing requirements not met: ${validation.errors.join(', ')}`,
+          platform: 'ebay',
+        },
+        { status: 400 }
+      )
+    }
 
     // Prepare eBay listing data
     const listingData: EbayListingData = {
@@ -169,15 +199,13 @@ export async function POST(request: NextRequest) {
       DispatchTimeMax: 3,
     }
 
-    // Add images if available
-    if (images && images.length > 0) {
-      listingData.PictureDetails = {
-        PictureURL: images.slice(0, 12), // eBay allows max 12 images
-      }
-      console.log('🖼️ Added images:', images.length)
+    // Add images - eBay requires at least 1
+    listingData.PictureDetails = {
+      PictureURL: images.slice(0, 12), // eBay allows max 12 images
     }
+    console.log('🖼️ Added images:', images.length)
 
-    // ✅ BULLETPROOF ITEM SPECIFICS GENERATION (maintains Taxonomy API)
+    // ✅ ENHANCED ITEM SPECIFICS GENERATION (maintains Taxonomy API with Department support)
     listingData.ItemSpecifics = await generateSmartItemSpecifics(
       categoryResult,
       fullText
@@ -312,7 +340,64 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ BULLETPROOF eBay DESCRIPTION FORMATTER - eBay 2024 Best Practices
+// ✅ ENHANCED: Pre-Publish Validation
+function validateEbayRequirements(
+  title: string,
+  imageCount: number,
+  categoryId: string,
+  fullText: string
+): { isValid: boolean; errors: string[] } {
+  const errors: string[] = []
+
+  // Check title
+  if (!title || title.length < 15) {
+    errors.push('Title must be at least 15 characters long')
+  }
+
+  if (title && title.endsWith(':')) {
+    errors.push(
+      'Title cannot end with a colon - appears to be an incomplete bullet point'
+    )
+  }
+
+  if (title && title.toLowerCase().includes('craftsmanship:')) {
+    errors.push(
+      'Title appears to be a feature description, not a product title'
+    )
+  }
+
+  // Check images
+  if (imageCount === 0) {
+    errors.push('At least 1 image is required for eBay listings')
+  }
+
+  // Check category-specific requirements
+  const clothingCategories = [
+    '57989',
+    '57990',
+    '57991',
+    '11450',
+    '15687',
+    '15709',
+  ]
+  if (clothingCategories.includes(categoryId)) {
+    const hasGenderIndicator = /\b(men'?s?|women'?s?|unisex|kids?)\b/i.test(
+      fullText
+    )
+    if (!hasGenderIndicator && !fullText.toLowerCase().includes('adult')) {
+      errors.push(
+        "Department/Gender information needed for clothing items (e.g., Men's, Women's, Unisex)"
+      )
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  }
+}
+
+// ✅ ENHANCED: eBay DESCRIPTION FORMATTER - eBay 2024 Best Practices
 // Uses ONLY AI-generated content, never fails, mobile-first
 function formatEbayBestPracticesDescription(productContent: any): string {
   try {
@@ -341,7 +426,7 @@ function formatEbayBestPracticesDescription(productContent: any): string {
         const bulletText = `• ${point}<br>`
 
         // Conservative character limit for mobile (eBay 2024 best practice)
-        if (charCount + bulletText.length < 600 && pointsAdded < 5) {
+        if (charCount + bulletText.length < 650 && pointsAdded < 5) {
           mobileContent += bulletText
           charCount += bulletText.length
           pointsAdded++
@@ -352,7 +437,7 @@ function formatEbayBestPracticesDescription(productContent: any): string {
     }
 
     // Add concise product highlight if space allows
-    if (sections.productHighlight && charCount < 450) {
+    if (sections.productHighlight && charCount < 500) {
       const remainingChars = 750 - charCount
       let briefDesc = sections.productHighlight
 
@@ -489,7 +574,7 @@ function formatEbayBestPracticesDescription(productContent: any): string {
   }
 }
 
-// ✅ BULLETPROOF: Enhanced Content Parsing - Never Fails, Always Extracts
+// ✅ ENHANCED: Bulletproof Content Parsing - Never Fails, Always Extracts
 function parseEnhancedGeneratedContent(content: string) {
   const sections = {
     title: '',
@@ -705,36 +790,70 @@ function parseEnhancedGeneratedContent(content: string) {
   return sections
 }
 
-// ✅ BULLETPROOF: Title Extraction - Multiple Patterns, Always Works
+// ✅ ENHANCED: Title Extraction - Skip Bullet Points, Find Real Titles
 function extractTitleFromContent(content: string): string | null {
   try {
     if (!content || content.length < 5) return null
 
-    // Multiple title extraction patterns for maximum compatibility
+    console.log(
+      '🔍 Extracting title from content preview:',
+      content.substring(0, 200)
+    )
+
+    // Multiple title extraction patterns - Skip bullet point patterns
     const patterns = [
-      // Standard format
-      /###\s*1\.\s*PRODUCT TITLE\/HEADLINE:\s*\*\*(.*?)\*\*/i,
-      // Alternative formats
-      /#{1,6}\s*PRODUCT\s+TITLE[:\s]*\*\*(.*?)\*\*/i,
-      /#{1,6}\s*TITLE[:\s]*\*\*(.*?)\*\*/i,
-      /#{1,6}\s*HEADLINE[:\s]*\*\*(.*?)\*\*/i,
-      // Any bold text that looks like a title
-      /\*\*(.*?(?:Men's|Women's|Kids|Premium|Professional|Quality).*?)\*\*/i,
-      // Fallback: any substantial bold text
-      /\*\*([^*]{15,80})\*\*/i,
+      // Primary: Look for actual title sections
+      /(?:^|\n)#+\s*(?:\d+\.\s*)?(?:PRODUCT\s+)?TITLE[:\s]*\*\*([^*\n]+?)\*\*(?:\n|$)/i,
+      /(?:^|\n)#+\s*(?:\d+\.\s*)?HEADLINE[:\s]*\*\*([^*\n]+?)\*\*(?:\n|$)/i,
+
+      // Secondary: Look for section headers that are product titles
+      /(?:^|\n)#+\s*(?:\d+\.\s*)?([^#\n:]{20,80})(?:\n|$)/,
+
+      // Tertiary: Bold text that looks like product names (not features)
+      /\*\*([^*:\n]{20,80}(?:Men's|Women's|Kids|Premium|Professional|Quality|Shoes|Shirt|Watch|Phone)[^*:\n]{0,20})\*\*/i,
     ]
 
     for (const pattern of patterns) {
       const match = content.match(pattern)
       if (match && match[1]) {
         let title = match[1].trim()
+
+        // Skip if it's clearly a feature/bullet point (contains colons or feature words)
+        if (title.includes(':') && title.length < 50) {
+          console.log('⚠️ Skipping bullet point title:', title)
+          continue
+        }
+        if (title.toLowerCase().includes('craftsmanship')) {
+          console.log('⚠️ Skipping craftsmanship title:', title)
+          continue
+        }
+        if (title.toLowerCase().includes('feature')) {
+          console.log('⚠️ Skipping feature title:', title)
+          continue
+        }
+        if (title.toLowerCase().includes('comfortable')) {
+          console.log('⚠️ Skipping comfortable title:', title)
+          continue
+        }
+        if (title.toLowerCase().includes('design:')) {
+          console.log('⚠️ Skipping design title:', title)
+          continue
+        }
+        if (title.toLowerCase().includes('quality:')) {
+          console.log('⚠️ Skipping quality title:', title)
+          continue
+        }
+
+        // Clean and validate
         title = cleanAndOptimizeTitle(title)
-        if (title.length >= 10) {
+        if (title.length >= 15 && title.length <= 80) {
+          console.log('✅ Extracted valid title:', title)
           return title
         }
       }
     }
 
+    console.log('⚠️ No valid title found in content')
     return null
   } catch (error) {
     console.error('❌ Title extraction error:', error)
@@ -742,7 +861,7 @@ function extractTitleFromContent(content: string): string | null {
   }
 }
 
-// ✅ BULLETPROOF: Title Cleaning - Never Fails, Always Valid
+// ✅ ENHANCED: Title Cleaning - Never Fails, Always Valid
 function cleanAndOptimizeTitle(title: string): string {
   try {
     if (!title) return 'Quality Product'
@@ -800,15 +919,16 @@ function cleanAndOptimizeTitle(title: string): string {
   }
 }
 
-// ✅ BULLETPROOF: Clean Product Name Fallback
+// ✅ ENHANCED: Clean Product Name Fallback
 function cleanProductName(productName: string): string {
   try {
     if (!productName) return 'Quality Product'
 
     let cleaned = productName.replace(/\*\*/g, '').trim()
 
-    if (cleaned.length < 5) {
-      return 'Quality Product'
+    // Ensure minimum length and add context if needed
+    if (cleaned.length < 10) {
+      cleaned = `${cleaned} - Premium Quality Item`
     }
 
     if (cleaned.length > 77) {
@@ -854,7 +974,7 @@ function extractSpecifications(content: string): string[] {
   }
 }
 
-// ✅ BULLETPROOF: Brand Extraction - Always Returns Valid Brand
+// ✅ ENHANCED: Brand Extraction - Always Returns Valid Brand
 function extractBrandSafe(fullText: string): string {
   try {
     if (!fullText) return 'Unbranded'
@@ -893,7 +1013,7 @@ function extractBrandSafe(fullText: string): string {
   }
 }
 
-// ✅ BULLETPROOF: Color Extraction - Always Returns Valid Color
+// ✅ ENHANCED: Color Extraction - Better Detection, Always Returns Valid Color
 function extractColorSafe(fullText: string): string {
   try {
     if (!fullText) return 'Multi'
@@ -938,6 +1058,127 @@ function extractColorSafe(fullText: string): string {
     return 'Multi'
   } catch (error) {
     return 'Multi'
+  }
+}
+
+// ✅ ENHANCED: Size Extraction Functions
+function extractShoeSize(fullText: string): string {
+  try {
+    // Look for specific shoe size patterns
+    const sizePatterns = [
+      /\bsize[:\s]+(\d{1,2}(?:\.\d)?)\b/i,
+      /\b(\d{1,2}(?:\.\d)?)\s*(?:us|size)\b/i,
+      /\bus\s*(\d{1,2}(?:\.\d)?)\b/i,
+    ]
+
+    for (const pattern of sizePatterns) {
+      const match = fullText.match(pattern)
+      if (match && match[1]) {
+        const size = parseFloat(match[1])
+        if (size >= 5 && size <= 16) {
+          // Valid shoe size range
+          return match[1]
+        }
+      }
+    }
+
+    return 'Various Sizes Available'
+  } catch (error) {
+    return 'Various Sizes Available'
+  }
+}
+
+function extractClothingSize(fullText: string): string {
+  try {
+    const sizePatterns = [
+      /\bsize[:\s]+(xs|s|m|l|xl|xxl|xxxl|small|medium|large|extra\s*large)\b/i,
+      /\b(xs|s|m|l|xl|xxl|xxxl)\b/i,
+      /\b(small|medium|large)\b/i,
+    ]
+
+    for (const pattern of sizePatterns) {
+      const match = fullText.match(pattern)
+      if (match && match[1]) {
+        const size = match[1].trim().toUpperCase()
+        // Normalize size names
+        if (size.includes('SMALL')) return 'S'
+        if (size.includes('MEDIUM')) return 'M'
+        if (size.includes('LARGE') && !size.includes('EXTRA')) return 'L'
+        if (size.includes('EXTRA') && size.includes('LARGE')) return 'XL'
+        return size
+      }
+    }
+
+    return 'Various Sizes Available'
+  } catch (error) {
+    return 'Various Sizes Available'
+  }
+}
+
+function extractMaterialEnhanced(fullText: string): string {
+  try {
+    const text = fullText.toLowerCase()
+
+    // Priority order - most specific first
+    const materials = [
+      { pattern: 'mesh', name: 'Mesh' },
+      { pattern: 'leather', name: 'Leather' },
+      { pattern: 'synthetic leather', name: 'Synthetic Leather' },
+      { pattern: 'cotton', name: 'Cotton' },
+      { pattern: 'linen', name: 'Linen' },
+      { pattern: 'polyester', name: 'Polyester' },
+      { pattern: 'nylon', name: 'Nylon' },
+      { pattern: 'canvas', name: 'Canvas' },
+      { pattern: 'denim', name: 'Denim' },
+      { pattern: 'wool', name: 'Wool' },
+      { pattern: 'silk', name: 'Silk' },
+      { pattern: 'rubber', name: 'Rubber' },
+      { pattern: 'synthetic', name: 'Synthetic' },
+      { pattern: 'fabric', name: 'Fabric' },
+    ]
+
+    for (const material of materials) {
+      if (text.includes(material.pattern)) {
+        return material.name
+      }
+    }
+
+    return 'Mixed Materials'
+  } catch (error) {
+    return 'Mixed Materials'
+  }
+}
+
+function extractPhoneModel(fullText: string): string {
+  try {
+    const text = fullText.toLowerCase()
+
+    // iPhone models
+    if (text.includes('iphone')) {
+      const iphoneMatch = fullText.match(
+        /iphone\s*(\d{1,2}(?:\s*pro|plus|mini)?)/i
+      )
+      if (iphoneMatch) return `iPhone ${iphoneMatch[1]}`
+      return 'iPhone'
+    }
+
+    // Samsung models
+    if (text.includes('galaxy')) {
+      const galaxyMatch = fullText.match(/galaxy\s*([a-z0-9\s]+)/i)
+      if (galaxyMatch) return `Galaxy ${galaxyMatch[1].trim()}`
+      return 'Galaxy'
+    }
+
+    // Google Pixel
+    if (text.includes('pixel')) {
+      const pixelMatch = fullText.match(/pixel\s*(\d+[a-z]*)/i)
+      if (pixelMatch) return `Pixel ${pixelMatch[1]}`
+      return 'Pixel'
+    }
+
+    return 'Smartphone'
+  } catch (error) {
+    return 'Smartphone'
   }
 }
 
@@ -1241,7 +1482,7 @@ async function getRequiredAspectsWithAppToken(
   }
 }
 
-// ✅ BULLETPROOF: Category Detection - Always Returns Valid Category
+// ✅ ENHANCED: Category Detection - Always Returns Valid Category
 function detectVerifiedCategory(fullText: string): string {
   try {
     if (!fullText) return '9355' // Safe fallback
@@ -1282,6 +1523,18 @@ function detectVerifiedCategory(fullText: string): string {
     ) {
       console.log('✅ Detected SHOES category')
       return '15709' // Athletic Shoes
+    }
+
+    // CLOTHING - Check for shirts, pants, etc.
+    if (
+      text.includes('shirt') ||
+      text.includes('t-shirt') ||
+      text.includes('polo') ||
+      text.includes('linen') ||
+      text.includes('cotton shirt')
+    ) {
+      console.log('✅ Detected CLOTHING category')
+      return '57990' // Casual Shirts (Men's)
     }
 
     // WATCHES
@@ -1332,7 +1585,7 @@ function detectVerifiedCategory(fullText: string): string {
   }
 }
 
-// ✅ BULLETPROOF ITEM SPECIFICS GENERATION (maintains Taxonomy API)
+// ✅ ENHANCED: Item Specifics Generation with Enhanced Taxonomy Integration
 async function generateSmartItemSpecifics(
   categoryResult: CategoryResult,
   fullText: string
@@ -1340,21 +1593,26 @@ async function generateSmartItemSpecifics(
   try {
     const specifics: Array<{ Name: string; Value: string[] }> = []
 
-    // Always add safe basics with validation
+    console.log(
+      `🔍 Generating item specifics for category: ${categoryResult.categoryId} (${categoryResult.source})`
+    )
+
+    // Always add basic brand and color first
     const brand = extractBrandSafe(fullText)
     const color = extractColorSafe(fullText)
 
-    if (brand && brand !== 'Unbranded') {
+    if (brand && brand !== 'Unbranded' && brand !== 'Unknown') {
       specifics.push({ Name: 'Brand', Value: [brand] })
     }
 
-    if (color && color !== 'Multi') {
+    if (color && color !== 'Multi' && color !== 'Unknown') {
       specifics.push({ Name: 'Color', Value: [color] })
     }
 
-    try {
-      // ✅ TAXONOMY API FIRST (if available)
-      if (categoryResult.source === 'taxonomy_api') {
+    // ✅ TAXONOMY API INTEGRATION (if available)
+    if (categoryResult.source === 'taxonomy_api') {
+      try {
+        console.log('🎯 Using Taxonomy API for required aspects...')
         const appToken = await getApplicationToken()
         const requiredAspects = await getRequiredAspectsWithAppToken(
           categoryResult.categoryId,
@@ -1362,13 +1620,14 @@ async function generateSmartItemSpecifics(
         )
 
         console.log(
-          `📊 Found ${requiredAspects.length} required aspects for category ${categoryResult.categoryId}`
+          `📊 Found ${requiredAspects.length} required aspects from Taxonomy API`
         )
 
-        // Generate values for required aspects
-        requiredAspects.forEach((aspect) => {
+        // Process each required aspect from Taxonomy API
+        for (const aspect of requiredAspects) {
           const aspectName = aspect.localizedAspectName
 
+          // Skip if we already have this aspect
           const existingAspect = specifics.find(
             (s) => s.Name.toLowerCase() === aspectName.toLowerCase()
           )
@@ -1379,45 +1638,62 @@ async function generateSmartItemSpecifics(
               aspectName,
               categoryResult.categoryId
             )
-            if (value && value !== 'Standard') {
+
+            // Only add if we got a meaningful value
+            if (value && value !== 'Unknown' && value !== 'Standard') {
               specifics.push({ Name: aspectName, Value: [value] })
+              console.log(`✅ Added required aspect: ${aspectName} = ${value}`)
+            } else if (aspectName.toLowerCase().includes('department')) {
+              // Department is critical for clothing - force a value
+              const department = extractValueForAspect(
+                fullText,
+                'Department',
+                categoryResult.categoryId
+              )
+              specifics.push({ Name: aspectName, Value: [department] })
+              console.log(`✅ Added critical Department aspect: ${department}`)
             }
           }
-        })
-      } else {
-        // ✅ BULLETPROOF FALLBACK (if Taxonomy API not available)
-        const categorySpecifics = generateCategorySpecificAspects(
-          categoryResult.categoryId,
-          fullText
+        }
+      } catch (taxonomyError) {
+        console.error(
+          '❌ Taxonomy API error, falling back to category-specific:',
+          taxonomyError
         )
-        specifics.push(...categorySpecifics)
-      }
-    } catch (taxonomyError) {
-      console.error(
-        '❌ Taxonomy API error, using safe fallback:',
-        taxonomyError
-      )
-
-      // Add minimal safe category-specific specs
-      if (categoryResult.categoryId === '15709') {
-        // Athletic Shoes
-        specifics.push({ Name: 'Style', Value: ['Athletic'] })
-        specifics.push({ Name: 'Department', Value: ['Unisex Adult'] })
-      } else if (categoryResult.categoryId === '31387') {
-        // Watches
-        specifics.push({ Name: 'Type', Value: ['Wristwatch'] })
-      } else if (categoryResult.categoryId === '9355') {
-        // Phones
-        specifics.push({ Name: 'Model', Value: ['Smartphone'] })
+        // Fall through to category-specific fallback
       }
     }
 
-    // Ensure minimum specs (eBay requirement)
+    // ✅ CATEGORY-SPECIFIC FALLBACKS (if Taxonomy API not available or failed)
+    if (categoryResult.source !== 'taxonomy_api' || specifics.length < 2) {
+      console.log('🔄 Adding category-specific fallback aspects...')
+
+      const categorySpecifics = generateCategorySpecificAspectsEnhanced(
+        categoryResult.categoryId,
+        fullText
+      )
+
+      // Add category-specific aspects that we don't already have
+      for (const catSpec of categorySpecifics) {
+        const exists = specifics.find(
+          (s) => s.Name.toLowerCase() === catSpec.Name.toLowerCase()
+        )
+
+        if (!exists) {
+          specifics.push(catSpec)
+          console.log(
+            `✅ Added fallback aspect: ${catSpec.Name} = ${catSpec.Value[0]}`
+          )
+        }
+      }
+    }
+
+    // ✅ ENSURE MINIMUM REQUIREMENTS
     if (specifics.length === 0) {
       specifics.push({ Name: 'Type', Value: ['Standard'] })
     }
 
-    // Validate all values before returning
+    // ✅ VALIDATE AND CLEAN
     const validatedSpecifics = specifics.filter(
       (spec) =>
         spec.Name &&
@@ -1426,21 +1702,29 @@ async function generateSmartItemSpecifics(
         spec.Value[0] &&
         spec.Value[0].length > 0 &&
         spec.Value[0] !== 'undefined' &&
-        spec.Value[0] !== 'null'
+        spec.Value[0] !== 'null' &&
+        spec.Value[0] !== 'Unknown'
     )
 
-    console.log('📋 Final validated item specifics:', validatedSpecifics)
+    console.log(
+      `📋 Final item specifics (${validatedSpecifics.length}):`,
+      validatedSpecifics.map((s) => `${s.Name}: ${s.Value[0]}`).join(', ')
+    )
+
     return validatedSpecifics.length > 0
       ? validatedSpecifics
       : [{ Name: 'Type', Value: ['Standard'] }]
   } catch (error) {
     console.error('❌ Item specifics generation error:', error)
     // Ultra-safe fallback
-    return [{ Name: 'Type', Value: ['Standard'] }]
+    return [
+      { Name: 'Brand', Value: [extractBrandSafe(fullText)] },
+      { Name: 'Type', Value: ['Standard'] },
+    ]
   }
 }
 
-// ✅ EXTRACT VALUE FOR ASPECT (UNCHANGED - supports Taxonomy API)
+// ✅ ENHANCED: Aspect Value Extraction - Proper Department Detection
 function extractValueForAspect(
   fullText: string,
   aspectName: string,
@@ -1450,21 +1734,86 @@ function extractValueForAspect(
     const text = fullText.toLowerCase()
     const aspect = aspectName.toLowerCase()
 
-    // Universal aspect handling
+    console.log(
+      `🔍 Extracting value for aspect: ${aspectName} in category: ${categoryId}`
+    )
+
+    // Department - CRITICAL for clothing categories
+    if (aspect.includes('department')) {
+      let department = 'Unisex Adult' // Safe default
+
+      // Check for gender indicators in the text
+      if (/\b(men'?s?|male|gentleman|man|men)\b/i.test(fullText)) {
+        department = 'Men'
+      } else if (/\b(women'?s?|female|ladies?|woman|women)\b/i.test(fullText)) {
+        department = 'Women'
+      } else if (/\b(unisex|both|everyone|adult)\b/i.test(fullText)) {
+        department = 'Unisex Adult'
+      } else if (/\b(kids?|children|youth|boy|girl)\b/i.test(fullText)) {
+        department = 'Kids'
+      }
+
+      console.log(`✅ Department detected: ${department}`)
+      return department
+    }
+
+    // Universal aspects
     if (aspect.includes('brand')) return extractBrandSafe(fullText)
     if (aspect.includes('color') || aspect.includes('colour'))
       return extractColorSafe(fullText)
-    if (aspect.includes('model')) return extractGenericModel(fullText)
-    if (aspect.includes('size')) return extractGenericSize(fullText)
-    if (aspect.includes('material')) return extractGenericMaterial(fullText)
 
-    // Category-specific aspect handling
+    // Size - Enhanced for different categories
+    if (aspect.includes('size')) {
+      // For shoes
+      if (
+        categoryId === '15709' ||
+        text.includes('shoe') ||
+        text.includes('sneaker')
+      ) {
+        const shoeSize = extractShoeSize(fullText)
+        if (shoeSize !== 'Various Sizes Available') return shoeSize
+      }
+
+      // For clothing
+      const clothingSize = extractClothingSize(fullText)
+      if (clothingSize !== 'Various Sizes Available') return clothingSize
+
+      return 'Various Sizes Available'
+    }
+
+    // Material - Enhanced detection
+    if (aspect.includes('material')) {
+      const material = extractMaterialEnhanced(fullText)
+      if (material !== 'Mixed Materials') return material
+    }
+
+    // Style - Enhanced for shoes and clothing
+    if (aspect.includes('style')) {
+      if (categoryId === '15709') {
+        // Athletic Shoes
+        if (text.includes('running')) return 'Running'
+        if (text.includes('basketball')) return 'Basketball'
+        if (text.includes('tennis')) return 'Tennis'
+        if (text.includes('casual')) return 'Casual'
+        if (text.includes('athletic')) return 'Athletic'
+        return 'Running' // Default for athletic shoes
+      }
+
+      // General style detection
+      if (text.includes('casual')) return 'Casual'
+      if (text.includes('formal')) return 'Formal'
+      if (text.includes('business')) return 'Business'
+      return 'Casual'
+    }
+
+    // Category-specific handling
     if (categoryId === '9355') {
       // Cell Phones
       if (aspect.includes('storage')) return extractStorageCapacity(fullText)
       if (aspect.includes('network')) return extractNetwork(fullText)
       if (aspect.includes('operating system') || aspect.includes('os'))
         return extractOS(fullText)
+      if (aspect.includes('model')) return extractPhoneModel(fullText)
     } else if (categoryId === '177') {
       // Laptops
       if (aspect.includes('screen size')) return extractScreenSize(fullText)
@@ -1481,36 +1830,77 @@ function extractValueForAspect(
       if (aspect.includes('band material')) return extractBandMaterial(fullText)
     }
 
+    // If no specific value found, return a safe default
+    console.log(
+      `⚠️ No specific value found for aspect: ${aspectName}, using default`
+    )
     return 'Standard'
   } catch (error) {
+    console.error(`❌ Error extracting value for aspect ${aspectName}:`, error)
     return 'Standard'
   }
 }
 
-// ✅ CATEGORY-SPECIFIC ASPECTS (FALLBACK)
-function generateCategorySpecificAspects(
+// ✅ ENHANCED: Category-Specific Aspects
+function generateCategorySpecificAspectsEnhanced(
   categoryId: string,
   fullText: string
 ): Array<{ Name: string; Value: string[] }> {
   try {
     const specifics: Array<{ Name: string; Value: string[] }> = []
+    const text = fullText.toLowerCase()
 
     if (categoryId === '15709') {
       // Athletic Shoes
+      // Department is REQUIRED for shoes
+      const department = extractValueForAspect(
+        fullText,
+        'Department',
+        categoryId
+      )
+      specifics.push({ Name: 'Department', Value: [department] })
+
       specifics.push({ Name: 'Style', Value: ['Athletic'] })
-      specifics.push({ Name: 'Department', Value: ['Unisex Adult'] })
+
+      const size = extractShoeSize(fullText)
+      if (size !== 'Various Sizes Available') {
+        specifics.push({ Name: "US Shoe Size (Men's)", Value: [size] })
+      }
+    } else if (
+      ['57989', '57990', '57991', '11450', '15687'].includes(categoryId)
+    ) {
+      // Clothing categories - Department is REQUIRED
+      const department = extractValueForAspect(
+        fullText,
+        'Department',
+        categoryId
+      )
+      specifics.push({ Name: 'Department', Value: [department] })
+
+      const size = extractClothingSize(fullText)
+      if (size !== 'Various Sizes Available') {
+        specifics.push({ Name: 'Size', Value: [size] })
+      }
+
+      const material = extractMaterialEnhanced(fullText)
+      if (material !== 'Mixed Materials') {
+        specifics.push({ Name: 'Material', Value: [material] })
+      }
     } else if (categoryId === '9355') {
       // Cell Phones
-      specifics.push({ Name: 'Model', Value: ['Smartphone'] })
+      specifics.push({ Name: 'Model', Value: [extractPhoneModel(fullText)] })
       specifics.push({ Name: 'Network', Value: ['Unlocked'] })
     } else if (categoryId === '177') {
       // Laptops
-      specifics.push({ Name: 'Processor', Value: ['Intel'] })
-      specifics.push({ Name: 'Operating System', Value: ['Windows 11'] })
+      specifics.push({ Name: 'Processor', Value: [extractProcessor(fullText)] })
+      specifics.push({
+        Name: 'Operating System',
+        Value: [extractLaptopOS(fullText)],
+      })
     } else if (categoryId === '31387') {
       // Watches
-      specifics.push({ Name: 'Type', Value: ['Wristwatch'] })
-      specifics.push({ Name: 'Movement', Value: ['Quartz'] })
+      specifics.push({ Name: 'Type', Value: [extractWatchType(fullText)] })
+      specifics.push({ Name: 'Movement', Value: [extractMovement(fullText)] })
     } else {
       // Universal fallback
       specifics.push({ Name: 'Type', Value: ['Standard'] })
@@ -1518,51 +1908,13 @@ function generateCategorySpecificAspects(
 
     return specifics
   } catch (error) {
+    console.error('❌ Category-specific aspects error:', error)
     return [{ Name: 'Type', Value: ['Standard'] }]
   }
 }
 
 // ✅ EXTRACTION FUNCTIONS (Safe versions)
 
-function extractGenericModel(fullText: string): string {
-  try {
-    const modelMatch =
-      fullText.match(/model\s+([a-z0-9\-]+)/i) ||
-      fullText.match(/\b([a-z]{2,}\-?\d{2,})\b/i)
-    if (modelMatch) return modelMatch[1]
-
-    return 'Standard Model'
-  } catch (error) {
-    return 'Standard Model'
-  }
-}
-
-function extractGenericSize(fullText: string): string {
-  try {
-    const sizeMatch = fullText.match(
-      /\b(XS|S|M|L|XL|XXL|small|medium|large)\b/i
-    )
-    if (sizeMatch) return sizeMatch[1].toUpperCase()
-    return 'One Size'
-  } catch (error) {
-    return 'One Size'
-  }
-}
-
-function extractGenericMaterial(fullText: string): string {
-  try {
-    const text = fullText.toLowerCase()
-    if (text.includes('metal')) return 'Metal'
-    if (text.includes('plastic')) return 'Plastic'
-    if (text.includes('fabric')) return 'Fabric'
-    if (text.includes('leather')) return 'Leather'
-    return 'Mixed Materials'
-  } catch (error) {
-    return 'Mixed Materials'
-  }
-}
-
-// Additional extraction functions (shortened for space - same safe pattern)
 function extractStorageCapacity(fullText: string): string {
   try {
     const storageMatch = fullText.match(/(\d+)\s*(gb|tb)/i)
@@ -1883,7 +2235,14 @@ function mapConditionToEbay(
     '171485',
     '20667',
   ]
-  const clothingCategories = ['1059', '11554', '15709']
+  const clothingCategories = [
+    '1059',
+    '11554',
+    '15709',
+    '57989',
+    '57990',
+    '57991',
+  ]
   const watchCategories = ['31387']
 
   if (electronicsCategories.includes(categoryId)) {
