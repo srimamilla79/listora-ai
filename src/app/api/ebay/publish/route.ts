@@ -460,13 +460,17 @@ function extractBrandSafe(fullText: string): string {
 function isCommonWord(word: string): boolean {
   const commonWords = [
     'Men',
-    'Mens', // Add this
+    'Mens',
     'Women',
-    'Womens', // Add this
+    'Womens',
     'Ladies',
-    'Kids', // Add this
-    'Boys', // Add this
-    'Girls', // Add this
+    'Kids',
+    'Boys',
+    'Girls',
+    'Lenin', // Add this - it's a shirt type, not a brand
+    'Oxford', // Add common shirt types
+    'Button',
+    'Dress',
     'Premium',
     'Quality',
     'Professional',
@@ -677,9 +681,9 @@ function parseEnhancedGeneratedContent(content: string) {
       }
     }
 
-    // ✅ ENHANCED: Extract DESCRIPTION from Section 3 (bulletproof social media cleaning)
+    // ✅ ENHANCED: Extract DESCRIPTION from Section 3 (bulletproof section boundary)
     let descMatch = content.match(
-      /\*\*3\.\s*DETAILED\s+PRODUCT\s+DESCRIPTION:\*\*\s*\n([\s\S]*?)(?=\n\*\*4\.|$)/i
+      /\*\*3\.\s*DETAILED\s+PRODUCT\s+DESCRIPTION:\*\*\s*\n([\s\S]*?)(?=\n?\*\*4\.|$)/i
     )
 
     // Fallback pattern for edge cases
@@ -692,6 +696,25 @@ function parseEnhancedGeneratedContent(content: string) {
     if (descMatch) {
       let rawDesc = descMatch[1].trim()
 
+      // ✅ AGGRESSIVE CLEAN: Stop at any section marker
+      const sectionMarkers = [
+        /\*\*4\./i,
+        /\*\*5\./i,
+        /\*\*6\./i,
+        /INSTAGRAM CAPTION/i,
+        /BLOG INTRO/i,
+        /CALL-TO-ACTION/i,
+      ]
+
+      for (const marker of sectionMarkers) {
+        const markerIndex = rawDesc.search(marker)
+        if (markerIndex > -1) {
+          rawDesc = rawDesc.substring(0, markerIndex).trim()
+          console.log(`✅ Stopped extraction at: ${marker}`)
+          break
+        }
+      }
+
       // ✅ CLEAN: Remove any social media content that leaked through
       rawDesc = rawDesc
         .replace(/#[\w]+/g, '') // Remove hashtags
@@ -701,10 +724,16 @@ function parseEnhancedGeneratedContent(content: string) {
         .replace(/Visit our.*store.*/gi, '') // Remove store CTAs
         .replace(/Shop now.*/gi, '') // Remove shop CTAs
         .replace(/\*\*\d+\.\*\*/g, '') // Remove section headers like **4.** **5.**
+        .replace(/\*\*BLOG INTRO:\*\*/gi, '') // Remove blog intro headers
+        .replace(/\*\*INSTAGRAM CAPTION:\*\*/gi, '') // Remove Instagram headers
         .split('\n')
         .filter((line) => !line.toLowerCase().includes('instagram'))
         .filter((line) => !line.toLowerCase().includes('#'))
         .filter((line) => !line.toLowerCase().includes('mensfashion'))
+        .filter((line) => !line.toLowerCase().includes('blog intro'))
+        .filter(
+          (line) => !line.toLowerCase().includes('unlock unmatched elegance')
+        )
         .filter((line) => !/^\s*\*\*\d+\.\*\*\s*$/.test(line)) // Remove standalone section numbers
         .join('\n')
         .trim()
