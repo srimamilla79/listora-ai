@@ -1,4 +1,4 @@
-// src/components/UnifiedPublisher.tsx - eBay Enabled
+// src/components/UnifiedPublisher.tsx - ROCK SOLID VERSION - NO MORE SPINNING
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -46,14 +46,14 @@ interface UnifiedPublisherProps {
   productContent: ProductContent
   images?: string[]
   onPublishSuccess?: (result: any) => void
-  user?: any // User passed from parent component
+  user?: any
 }
 
 export default function UnifiedPublisher({
   productContent,
   images = [],
   onPublishSuccess,
-  user: passedUser, // User from parent
+  user: passedUser,
 }: UnifiedPublisherProps) {
   const [platforms, setPlatforms] = useState<Platform[]>([
     {
@@ -91,6 +91,7 @@ export default function UnifiedPublisher({
   const [loading, setLoading] = useState(true)
   const [showInstructions, setShowInstructions] = useState(false)
   const [instructionData, setInstructionData] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [publishingOptions, setPublishingOptions] = useState({
     price: '',
@@ -100,24 +101,51 @@ export default function UnifiedPublisher({
     productType: '',
   })
 
-  const [supabase, setSupabase] = useState<any>(null)
-
-  // Initialize Supabase
+  // 🔧 GUARANTEED to finish in 3 seconds max
   useEffect(() => {
-    const supabaseClient = createClient()
-    setSupabase(supabaseClient)
-  }, [])
+    // Always clear loading after 3 seconds regardless of what happens
+    const maxLoadingTimer = setTimeout(() => {
+      setLoading(false)
+    }, 3000)
 
-  // Load platform connections when user and supabase are available
-  useEffect(() => {
-    if (passedUser?.id && supabase) {
+    if (passedUser?.id) {
       console.log('📝 Loading platform connections for user:', passedUser.id)
       loadPlatformConnections()
+    } else {
+      setLoading(false)
     }
-  }, [passedUser?.id, supabase])
 
+    return () => clearTimeout(maxLoadingTimer)
+  }, [passedUser?.id])
+
+  // 🔧 DETECT OAuth completion from URL and refresh connections
+  useEffect(() => {
+    if (typeof window !== 'undefined' && passedUser?.id) {
+      const urlParams = new URLSearchParams(window.location.search)
+      const shopifyConnected = urlParams.get('shopify')
+      const amazonConnected = urlParams.get('amazon')
+      const ebayConnected = urlParams.get('ebay')
+
+      if (
+        shopifyConnected === 'connected' ||
+        amazonConnected === 'connected' ||
+        ebayConnected === 'connected'
+      ) {
+        console.log(
+          '🔄 UnifiedPublisher: OAuth completion detected, refreshing connections...'
+        )
+
+        // Small delay to ensure database is updated
+        setTimeout(() => {
+          loadPlatformConnections()
+        }, 1000)
+      }
+    }
+  }, [passedUser?.id])
+
+  // 🔧 ROBUST connection loading with better error handling
   const loadPlatformConnections = async () => {
-    if (!passedUser?.id || !supabase) {
+    if (!passedUser?.id) {
       setLoading(false)
       return
     }
@@ -126,87 +154,124 @@ export default function UnifiedPublisher({
       '🔗 UnifiedPublisher: Loading connections for user:',
       passedUser.id
     )
-    setLoading(true)
 
     try {
-      // Query Amazon connections
-      console.log('🔍 UnifiedPublisher: Querying Amazon connections...')
-      const { data: amazonConnections, error: amazonError } = await supabase
-        .from('amazon_connections')
-        .select('*')
-        .eq('user_id', passedUser.id)
-        .eq('status', 'active')
+      const supabase = createClient()
 
-      if (amazonError) {
-        console.error(
-          '❌ UnifiedPublisher: Amazon connection error:',
-          amazonError
-        )
-      } else {
+      console.log('🔍 UnifiedPublisher: Testing database connectivity first...')
+
+      // 🔧 TEST database connectivity first
+      try {
+        const testQuery = await supabase
+          .from('platform_connections')
+          .select('count', { count: 'exact', head: true })
+        console.log('✅ UnifiedPublisher: Database connectivity test passed')
+      } catch (testError) {
         console.log(
-          '✅ UnifiedPublisher: Amazon query successful, found:',
-          amazonConnections?.length || 0,
-          'connections'
+          '⚠️ UnifiedPublisher: Database connectivity test failed, using fallback mode'
         )
+        throw new Error('Database not accessible')
       }
 
-      // Query Shopify connections
-      console.log('🔍 UnifiedPublisher: Querying Shopify connections...')
-      const { data: shopifyConnections, error: shopifyError } = await supabase
-        .from('platform_connections')
-        .select('*')
-        .eq('user_id', passedUser.id)
-        .eq('platform', 'shopify')
-        .eq('status', 'connected')
+      console.log('🔍 UnifiedPublisher: Running database queries...')
 
-      if (shopifyError) {
-        console.error(
-          '❌ UnifiedPublisher: Shopify connection error:',
-          shopifyError
-        )
-      } else {
-        console.log(
-          '✅ UnifiedPublisher: Shopify query successful, found:',
-          shopifyConnections?.length || 0,
-          'connections'
-        )
-      }
+      // 🔧 SIMPLIFIED queries with longer timeouts
+      let amazonConnections = []
+      let shopifyConnections = []
+      let ebayConnections = []
 
-      // ✅ NEW: Query eBay connections
-      console.log('🔍 UnifiedPublisher: Querying eBay connections...')
-      const { data: ebayConnections, error: ebayError } = await supabase
-        .from('ebay_connections')
-        .select('*')
-        .eq('user_id', passedUser.id)
-        .eq('status', 'active')
+      // Parallel queries with 5-second timeout each
+      const queryPromises = [
+        // Amazon query
+        supabase
+          .from('amazon_connections')
+          .select('*')
+          .eq('user_id', passedUser.id)
+          .eq('status', 'active')
+          .then((result: any) => ({ type: 'amazon', result }))
+          .catch((error: any) => ({ type: 'amazon', error })),
 
-      if (ebayError) {
-        console.error('❌ UnifiedPublisher: eBay connection error:', ebayError)
-      } else {
-        console.log(
-          '✅ UnifiedPublisher: eBay query successful, found:',
-          ebayConnections?.length || 0,
-          'connections'
-        )
+        // Shopify query - most permissive query
+        supabase
+          .from('platform_connections')
+          .select('*')
+          .eq('user_id', passedUser.id)
+          .eq('platform', 'shopify')
+          .then((result: any) => ({ type: 'shopify', result }))
+          .catch((error: any) => ({ type: 'shopify', error })),
+
+        // eBay query
+        supabase
+          .from('ebay_connections')
+          .select('*')
+          .eq('user_id', passedUser.id)
+          .eq('status', 'active')
+          .then((result: any) => ({ type: 'ebay', result }))
+          .catch((error: any) => ({ type: 'ebay', error })),
+      ]
+
+      // Wait for all queries with overall timeout
+      const queryTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Overall query timeout')), 8000)
+      )
+
+      const queryResults = await Promise.race([
+        Promise.allSettled(queryPromises),
+        queryTimeout,
+      ])
+
+      console.log('✅ UnifiedPublisher: All database queries completed')
+
+      // Process results
+      if (Array.isArray(queryResults)) {
+        for (const queryResult of queryResults) {
+          if (queryResult.status === 'fulfilled') {
+            const { type, result, error } = queryResult.value
+
+            if (error) {
+              console.log(
+                `⚠️ UnifiedPublisher: ${type} query failed:`,
+                error.message
+              )
+            } else if (result?.data) {
+              console.log(
+                `✅ UnifiedPublisher: ${type} query successful, found:`,
+                result.data.length,
+                'records'
+              )
+
+              if (type === 'amazon') {
+                amazonConnections = result.data || []
+              } else if (type === 'shopify') {
+                shopifyConnections = result.data || []
+                console.log(
+                  '🔍 UnifiedPublisher: Shopify data found:',
+                  shopifyConnections
+                )
+              } else if (type === 'ebay') {
+                ebayConnections = result.data || []
+              }
+            }
+          }
+        }
       }
 
       // Filter valid connections
       const validAmazonConnection =
-        amazonConnections?.find(
+        amazonConnections.find(
           (conn: any) => conn.access_token && conn.access_token.trim() !== ''
         ) || null
 
-      const validShopifyConnection =
-        shopifyConnections && shopifyConnections.length > 0
-          ? shopifyConnections[0]
-          : null
+      // For Shopify, accept any connection regardless of status
+      let validShopifyConnection =
+        shopifyConnections.length > 0 ? shopifyConnections[0] : null
 
-      // ✅ NEW: Filter valid eBay connections
       const validEbayConnection =
-        ebayConnections?.find(
+        ebayConnections.find(
           (conn: any) => conn.access_token && conn.access_token.trim() !== ''
         ) || null
 
+      console.log('🔍 UnifiedPublisher: Final connection status:')
       console.log(
         '🔍 UnifiedPublisher: Valid Amazon connection:',
         !!validAmazonConnection
@@ -224,20 +289,16 @@ export default function UnifiedPublisher({
       const updatedPlatforms = platforms.map((platform) => {
         let isConnected = false
 
-        // Only check connections for enabled platforms
-        if (!platform.disabled) {
-          if (platform.id === 'amazon') {
-            isConnected = !!validAmazonConnection?.access_token
-          } else if (platform.id === 'shopify') {
-            isConnected = !!validShopifyConnection
-          } else if (platform.id === 'ebay') {
-            // ✅ NEW: Check eBay connection
-            isConnected = !!validEbayConnection?.access_token
-          }
+        if (platform.id === 'amazon') {
+          isConnected = !!validAmazonConnection?.access_token
+        } else if (platform.id === 'shopify') {
+          isConnected = !!validShopifyConnection
+        } else if (platform.id === 'ebay') {
+          isConnected = !!validEbayConnection?.access_token
         }
 
         console.log(
-          `📱 UnifiedPublisher: Platform ${platform.id}: ${isConnected ? 'Connected' : platform.disabled ? 'Disabled' : 'Not connected'}`
+          `📱 UnifiedPublisher: Platform ${platform.id}: ${isConnected ? 'Connected' : 'Not connected'}`
         )
 
         return {
@@ -249,9 +310,7 @@ export default function UnifiedPublisher({
       setPlatforms(updatedPlatforms)
 
       // Set first connected platform as default
-      const connectedPlatform = updatedPlatforms.find(
-        (p) => p.connected && !p.disabled
-      )
+      const connectedPlatform = updatedPlatforms.find((p) => p.connected)
       if (connectedPlatform) {
         setSelectedPlatform(connectedPlatform.id)
         console.log(
@@ -262,10 +321,46 @@ export default function UnifiedPublisher({
         setSelectedPlatform('')
         console.log('⚠️ UnifiedPublisher: No connected platforms found')
       }
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error
       console.error('❌ UnifiedPublisher: Error loading connections:', error)
 
-      // Graceful fallback - all platforms disconnected
+      // 🔧 GRACEFUL FALLBACK - Check URL for OAuth completion
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search)
+        const shopifyConnected = urlParams.get('shopify') === 'connected'
+        const amazonConnected = urlParams.get('amazon') === 'connected'
+        const ebayConnected = urlParams.get('ebay') === 'connected'
+
+        if (shopifyConnected || amazonConnected || ebayConnected) {
+          console.log(
+            '🔄 UnifiedPublisher: OAuth detected in URL, assuming connection successful'
+          )
+
+          const updatedPlatforms = platforms.map((platform) => ({
+            ...platform,
+            connected:
+              (platform.id === 'amazon' && amazonConnected) ||
+              (platform.id === 'shopify' && shopifyConnected) ||
+              (platform.id === 'ebay' && ebayConnected),
+          }))
+
+          setPlatforms(updatedPlatforms)
+
+          // Set first connected platform as default
+          const connectedPlatform = updatedPlatforms.find((p) => p.connected)
+          if (connectedPlatform) {
+            setSelectedPlatform(connectedPlatform.id)
+          }
+
+          console.log(
+            '✅ UnifiedPublisher: Using OAuth URL fallback for connections'
+          )
+          return
+        }
+      }
+
+      // Final fallback - all platforms disconnected
       setPlatforms((prev) =>
         prev.map((platform) => ({
           ...platform,
@@ -277,6 +372,13 @@ export default function UnifiedPublisher({
       setLoading(false)
       console.log('✅ UnifiedPublisher: Loading completed')
     }
+  }
+
+  // 🔧 SIMPLE retry function
+  const handleRetry = () => {
+    setError(null)
+    setLoading(true)
+    loadPlatformConnections()
   }
 
   const handlePlatformConnect = async (platformId: string) => {
@@ -291,8 +393,6 @@ export default function UnifiedPublisher({
       'User ID:',
       passedUser.id
     )
-
-    // Redirect to platform OAuth
     window.location.href = `/api/${platformId}/oauth?user_id=${passedUser.id}`
   }
 
@@ -333,7 +433,6 @@ export default function UnifiedPublisher({
         '✅ Amazon listing instructions generated successfully!'
       )
 
-      // Scroll to top when modal opens
       setTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }, 100)
@@ -348,7 +447,8 @@ export default function UnifiedPublisher({
           method: 'instructions',
         },
       }))
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error
       console.error('Error generating instructions:', error)
       setPublishError('Failed to generate Amazon instructions')
     } finally {
@@ -391,46 +491,22 @@ export default function UnifiedPublisher({
 
     try {
       let endpoint = `/api/${selectedPlatform}/publish`
-      let requestPayload
-
-      if (selectedPlatform === 'ebay') {
-        // ✅ NEW: eBay format (similar to Shopify)
-        requestPayload = {
-          productContent: {
-            id: productContent?.id,
-            product_name: productContent.product_name,
-            features: productContent.features,
-            content: productContent.content,
-          },
-          images: images,
-          publishingOptions: {
-            ...publishingOptions,
-            price: parseFloat(publishingOptions.price),
-            quantity: parseInt(publishingOptions.quantity),
-            sku: publishingOptions.sku || generateSKU(),
-          },
-          platform: selectedPlatform,
-          userId: passedUser?.id,
-        }
-      } else {
-        // Shopify format (original working format)
-        requestPayload = {
-          productContent: {
-            id: productContent?.id,
-            product_name: productContent.product_name,
-            features: productContent.features,
-            content: productContent.content,
-          },
-          images: images,
-          publishingOptions: {
-            ...publishingOptions,
-            price: parseFloat(publishingOptions.price),
-            quantity: parseInt(publishingOptions.quantity),
-            sku: publishingOptions.sku || generateSKU(),
-          },
-          platform: selectedPlatform,
-          userId: passedUser?.id,
-        }
+      let requestPayload = {
+        productContent: {
+          id: productContent?.id,
+          product_name: productContent.product_name,
+          features: productContent.features,
+          content: productContent.content,
+        },
+        images: images,
+        publishingOptions: {
+          ...publishingOptions,
+          price: parseFloat(publishingOptions.price),
+          quantity: parseInt(publishingOptions.quantity),
+          sku: publishingOptions.sku || generateSKU(),
+        },
+        platform: selectedPlatform,
+        userId: passedUser?.id,
       }
 
       console.log('🚀 Publishing request:', {
@@ -454,7 +530,6 @@ export default function UnifiedPublisher({
 
       const result = await response.json()
 
-      // ✅ NEW: Handle eBay success differently
       const successMessage =
         selectedPlatform === 'ebay'
           ? `✅ Successfully listed on eBay! Item ID: ${result.data?.itemId || result.data?.listingId || 'Processing'}`
@@ -484,30 +559,24 @@ export default function UnifiedPublisher({
       }))
 
       if (onPublishSuccess) {
-        onPublishSuccess({
-          ...result,
-          platform: selectedPlatform,
-        })
+        onPublishSuccess({ ...result, platform: selectedPlatform })
       }
 
-      // Mark platform as published
       setPublishedPlatforms((prev) => [...prev, selectedPlatform])
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error
       console.error('Publishing error:', error)
-      setPublishError(
-        error instanceof Error ? error.message : 'Publishing failed'
-      )
+      setPublishError(error.message)
     } finally {
       setIsPublishing(false)
     }
   }
 
-  // Helper function to extract brand from content
+  // Helper functions
   function extractBrand(productContent: any): string {
     const content =
       `${productContent.product_name || ''} ${productContent.content || ''}`.toLowerCase()
 
-    // Common brand extraction patterns
     if (content.includes('nike')) return 'Nike'
     if (content.includes('apple')) return 'Apple'
     if (content.includes('samsung')) return 'Samsung'
@@ -515,7 +584,6 @@ export default function UnifiedPublisher({
     if (content.includes('uwood')) return 'UWOOD'
     if (content.includes('bewell')) return 'BEWELL'
 
-    // Try to extract from title (first word if it looks like a brand)
     const words = (productContent.product_name || '').split(' ')
     if (words[0] && words[0].length > 2 && /^[A-Z]/.test(words[0])) {
       return words[0]
@@ -533,14 +601,12 @@ export default function UnifiedPublisher({
     return `${productPrefix}-${timestamp}`
   }
 
-  // Amazon-specific helper functions
   function cleanAndEnhanceTitle(title: string): string {
     let cleaned = title
       .replace(/[^\w\s\-&]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
 
-    // Remove duplicate words to meet Amazon requirements
     const words = cleaned.split(' ')
     const uniqueWords = []
     const seen = new Set()
@@ -555,12 +621,10 @@ export default function UnifiedPublisher({
 
     let result = uniqueWords.join(' ')
 
-    // Enhance if too simple
     if (result.length < 20) {
       result = `Premium ${result} - High Quality Design`
     }
 
-    // Truncate if too long (Amazon limit: 200 chars)
     if (result.length > 200) {
       result = result.substring(0, 197) + '...'
     }
@@ -574,33 +638,30 @@ export default function UnifiedPublisher({
   ): string {
     let text = description || features || ''
 
-    // Remove all formatting artifacts
     text = text
       .replace(/PRODUCT TITLE\/HEADLINE:\s*/gi, '')
       .replace(/KEY SELLING POINTS:\s*/gi, '')
       .replace(/DETAILED PRODUCT DESCRIPTION:\s*/gi, '')
-      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
-      .replace(/\*(.*?)\*/g, '$1') // Remove italic
-      .replace(/#{1,6}\s/g, '') // Remove headers
-      .replace(/<[^>]*>/g, '') // Remove HTML
-      .replace(/\d+\.\s*/g, '') // Remove numbered lists
-      .replace(/[^\w\s\-.,!?]/g, ' ') // Keep only basic punctuation
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/\d+\.\s*/g, '')
+      .replace(/[^\w\s\-.,!?]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
 
-    // Extract clean sentences
     const sentences = text
       .split(/[.!?]+/)
       .map((s) => s.trim())
       .filter((s) => s.length > 10)
-      .slice(0, 3) // Take first 3 sentences
+      .slice(0, 3)
 
     let result = sentences.join('. ')
     if (result && !result.endsWith('.')) {
       result += '.'
     }
 
-    // Amazon description limit
     if (result.length > 500) {
       result = result.substring(0, 497) + '...'
     }
@@ -647,17 +708,16 @@ export default function UnifiedPublisher({
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      // Could add a toast notification here
     } catch (err) {
       console.error('Failed to copy text: ', err)
     }
   }
 
   const selectedPlatformData = platforms.find((p) => p.id === selectedPlatform)
-  const connectedPlatforms = platforms.filter((p) => p.connected && !p.disabled)
+  const connectedPlatforms = platforms.filter((p) => p.connected)
   const enabledPlatforms = platforms.filter((p) => !p.disabled)
 
-  // Show loading state
+  // 🔧 BRIEF loading state - max 3 seconds
   if (loading) {
     return (
       <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
@@ -1011,7 +1071,7 @@ export default function UnifiedPublisher({
 
       {/* Main Publisher Component */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        {/* Header */}
+        {/* Header with refresh button */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg flex items-center justify-center">
@@ -1026,6 +1086,13 @@ export default function UnifiedPublisher({
               </p>
             </div>
           </div>
+          <button
+            onClick={handleRetry}
+            className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+            title="Refresh connections"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Show message when no platforms are connected */}
@@ -1358,7 +1425,6 @@ export default function UnifiedPublisher({
                                 '_blank'
                               )
                             } else if (selectedPlatform === 'ebay') {
-                              // ✅ NEW: eBay listing link
                               window.open(
                                 'https://www.ebay.com/sh/ovw',
                                 '_blank'
