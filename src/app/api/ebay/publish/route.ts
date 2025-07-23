@@ -810,6 +810,7 @@ function getFallbackContent() {
 }
 
 // ✅ ENHANCED: Title Extraction - Skip Bullet Points, Find Real Titles
+// ✅ FIXED: Title Extraction - Use Same Pattern as Shopify
 function extractTitleFromContent(content: string): string | null {
   try {
     if (!content || content.length < 5) return null
@@ -819,55 +820,41 @@ function extractTitleFromContent(content: string): string | null {
       content.substring(0, 200)
     )
 
-    // Multiple title extraction patterns - Skip bullet point patterns
-    const patterns = [
-      // Primary: Look for actual title sections
-      /(?:^|\n)#+\s*(?:\d+\.\s*)?(?:PRODUCT\s+)?TITLE[:\s]*\*\*([^*\n]+?)\*\*(?:\n|$)/i,
-      /(?:^|\n)#+\s*(?:\d+\.\s*)?HEADLINE[:\s]*\*\*([^*\n]+?)\*\*(?:\n|$)/i,
-
-      // Secondary: Look for section headers that are product titles
-      /(?:^|\n)#+\s*(?:\d+\.\s*)?([^#\n:]{20,80})(?:\n|$)/,
-
-      // Tertiary: Bold text that looks like product names (not features)
-      /\*\*([^*:\n]{20,80}(?:Men's|Women's|Kids|Premium|Professional|Quality|Shoes|Shirt|Watch|Phone)[^*:\n]{0,20})\*\*/i,
+    // ✅ ENHANCED: Multiple title extraction patterns - Same as Shopify
+    const titlePatterns = [
+      // Pattern 1: **1. PRODUCT TITLE/HEADLINE:** Title (without quotes)
+      /\*\*1\.\s*PRODUCT\s+TITLE[\/\s]*HEADLINE[:\s]*\*\*\s*\n([^\n\*]+)/i,
+      // Pattern 2: **1. PRODUCT TITLE:** Title
+      /\*\*1\.\s*PRODUCT\s+TITLE[:\s]*\*\*\s*\n([^\n\*]+)/i,
+      // Pattern 3: With quotes (your original pattern)
+      /\*\*1\.\s*PRODUCT\s+TITLE\/HEADLINE:\*\*\s*\n\s*"([^"]+)"/i,
+      // Pattern 4: More flexible
+      /(?:\*\*)?1\.?\s*(?:PRODUCT\s+)?TITLE[:\s\/]*(?:HEADLINE)?[:\s]*(?:\*\*)?\s*[\n\r]*([^\n\r\*]+)/i,
     ]
 
-    for (const pattern of patterns) {
+    for (let i = 0; i < titlePatterns.length; i++) {
+      const pattern = titlePatterns[i]
       const match = content.match(pattern)
+
       if (match && match[1]) {
         let title = match[1].trim()
+
+        console.log(`🔍 Pattern ${i + 1} matched:`, title)
 
         // Skip if it's clearly a feature/bullet point (contains colons or feature words)
         if (title.includes(':') && title.length < 50) {
           console.log('⚠️ Skipping bullet point title:', title)
           continue
         }
-        if (title.toLowerCase().includes('craftsmanship')) {
-          console.log('⚠️ Skipping craftsmanship title:', title)
-          continue
-        }
-        if (title.toLowerCase().includes('feature')) {
-          console.log('⚠️ Skipping feature title:', title)
-          continue
-        }
-        if (title.toLowerCase().includes('comfortable')) {
-          console.log('⚠️ Skipping comfortable title:', title)
-          continue
-        }
-        if (title.toLowerCase().includes('design:')) {
-          console.log('⚠️ Skipping design title:', title)
-          continue
-        }
-        if (title.toLowerCase().includes('quality:')) {
-          console.log('⚠️ Skipping quality title:', title)
-          continue
-        }
 
         // Clean and validate
         title = cleanAndOptimizeTitle(title)
+
         if (title.length >= 15 && title.length <= 80) {
           console.log('✅ Extracted valid title:', title)
           return title
+        } else {
+          console.log(`⚠️ Title length invalid: ${title.length} characters`)
         }
       }
     }
