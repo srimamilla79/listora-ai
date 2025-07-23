@@ -460,8 +460,13 @@ function extractBrandSafe(fullText: string): string {
 function isCommonWord(word: string): boolean {
   const commonWords = [
     'Men',
+    'Mens', // Add this
     'Women',
+    'Womens', // Add this
     'Ladies',
+    'Kids', // Add this
+    'Boys', // Add this
+    'Girls', // Add this
     'Premium',
     'Quality',
     'Professional',
@@ -538,9 +543,23 @@ function formatEbayBestPracticesDescription(productContent: any): string {
       })
     }
 
-    // ✅ UNIVERSAL: Brand Section (only if brand mentioned in YOUR content)
+    // ✅ UNIVERSAL: Brand Section (only if brand mentioned in YOUR content AND not gender words)
     const brand = extractBrandSafe(productContent.generated_content || '')
-    if (brand && brand !== 'Unbranded') {
+    if (
+      brand &&
+      brand !== 'Unbranded' &&
+      ![
+        'Men',
+        'Mens',
+        'Women',
+        'Womens',
+        'Ladies',
+        'Unisex',
+        'Kids',
+        'Boys',
+        'Girls',
+      ].includes(brand)
+    ) {
       const brandDescription = extractBrandDescription(
         productContent.generated_content,
         brand
@@ -660,7 +679,7 @@ function parseEnhancedGeneratedContent(content: string) {
 
     // ✅ ENHANCED: Extract DESCRIPTION from Section 3 (bulletproof social media cleaning)
     let descMatch = content.match(
-      /\*\*3\.\s*DETAILED\s+PRODUCT\s+DESCRIPTION:\*\*\s*\n([\s\S]*?)(?=\*\*4\.|$)/i
+      /\*\*3\.\s*DETAILED\s+PRODUCT\s+DESCRIPTION:\*\*\s*\n([\s\S]*?)(?=\n\*\*4\.|$)/i
     )
 
     // Fallback pattern for edge cases
@@ -680,9 +699,13 @@ function parseEnhancedGeneratedContent(content: string) {
         .replace(/Tap the link in our bio.*/gi, '') // Remove Instagram CTAs
         .replace(/Ready to own.*/gi, '') // Remove promotional CTAs
         .replace(/Visit our.*store.*/gi, '') // Remove store CTAs
+        .replace(/Shop now.*/gi, '') // Remove shop CTAs
+        .replace(/\*\*\d+\.\*\*/g, '') // Remove section headers like **4.** **5.**
         .split('\n')
         .filter((line) => !line.toLowerCase().includes('instagram'))
         .filter((line) => !line.toLowerCase().includes('#'))
+        .filter((line) => !line.toLowerCase().includes('mensfashion'))
+        .filter((line) => !/^\s*\*\*\d+\.\*\*\s*$/.test(line)) // Remove standalone section numbers
         .join('\n')
         .trim()
 
