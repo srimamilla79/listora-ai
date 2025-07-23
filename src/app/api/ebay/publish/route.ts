@@ -744,42 +744,68 @@ function cleanTextContent(text: string): string {
     .trim()
 }
 
-// ✅ HELPER: Create fallback bullets from content
+// ✅ UNIVERSAL: Extract bullets from Section 2 (works for ANY product)
 function createFallbackBullets(content: string): string[] {
   const bullets: string[] = []
-  const text = content.toLowerCase()
 
-  if (text.includes('gradient') && text.includes('style')) {
-    bullets.push(
-      'Sleek Gradient Style: Eye-catching design with sophisticated color transition'
-    )
+  // Look for Section 2 content (universal pattern)
+  const benefitsMatch = content.match(
+    /\*\*2\.\s*KEY\s*SELLING\s*POINTS[:\s]*\*\*\s*\n([\s\S]*?)(?=\*\*[3-9]\.|$)/i
+  )
+
+  if (benefitsMatch) {
+    const benefitsSection = benefitsMatch[1]
+    console.log('✅ Found Section 2 content for bullets')
+
+    // Extract bullets with flexible patterns (universal)
+    const bulletPatterns = [
+      /^[\s]*-\s*\*\*([^*]+?)\*\*:\s*([^\n\r]+)/gm,
+      /^[\s]*-\s*\*\*([^*]+?)\*\*\s*:\s*([^\n\r]+)/gm,
+      /^[\s]*-\s*\*\*([^*]+?)\*\*\s+([^\n\r]+)/gm,
+      /[\s]*-\s*\*\*([^*]+?)\*\*:\s*([^\n\r]+)/gm,
+    ]
+
+    for (let i = 0; i < bulletPatterns.length; i++) {
+      const pattern = bulletPatterns[i]
+      const matches = [...benefitsSection.matchAll(pattern)]
+
+      if (matches.length > 0) {
+        console.log(
+          `✅ Using pattern ${i + 1} - found ${matches.length} bullets`
+        )
+
+        matches.forEach((match) => {
+          if (match[1] && match[2]) {
+            const title = match[1].trim().replace(/:+$/, '')
+            const description = match[2].trim()
+
+            if (title.length > 3 && description.length > 10) {
+              bullets.push(`${title}: ${description}`)
+              console.log(
+                '✅ Added bullet:',
+                `${title}: ${description.substring(0, 40)}...`
+              )
+            }
+          }
+        })
+
+        if (bullets.length > 0) break
+      }
+    }
   }
 
-  if (text.includes('breathable') && text.includes('mesh')) {
-    bullets.push(
-      'Breathable Comfort: Mesh upper keeps feet cool and comfortable'
-    )
-  }
-
-  if (text.includes('cushioning') || text.includes('cushioned')) {
-    bullets.push(
-      'Superior Cushioning: Advanced sole technology for maximum comfort'
-    )
-  }
-
-  if (text.includes('durable')) {
-    bullets.push('Durable Design: Built to last with quality materials')
-  }
-
+  // Universal fallback (only if NO bullets found at all)
   if (bullets.length === 0) {
+    console.log('⚠️ No Section 2 bullets found, using universal fallback')
     bullets.push(
       'Premium Quality: Built with superior materials and craftsmanship'
     )
     bullets.push('Modern Design: Stylish and contemporary aesthetic')
-    bullets.push('Comfortable Fit: Designed for all-day comfort')
+    bullets.push('Enhanced Performance: Optimized for reliable daily use')
+    bullets.push('Professional Grade: Designed for discerning customers')
   }
 
-  return bullets
+  return bullets.slice(0, 5)
 }
 
 // ✅ HELPER: Fallback content
