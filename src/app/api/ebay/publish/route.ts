@@ -471,6 +471,10 @@ function isCommonWord(word: string): boolean {
     'Oxford', // Add common shirt types
     'Button',
     'Dress',
+    'Shirt', // ADD THIS - prevents "Shirt" from being a brand
+    'Shirts', // ADD THIS
+    'Blouse', // ADD THIS
+    'Top', // This is already there but make sure
     'Premium',
     'Quality',
     'Professional',
@@ -738,13 +742,31 @@ function parseEnhancedGeneratedContent(content: string) {
         .join('\n')
         .trim()
 
-      const fullDesc = cleanTextContent(rawDesc)
+      // ✅ FINAL AGGRESSIVE CLEAN: Remove any remaining blog content
+      let fullDesc = cleanTextContent(rawDesc)
+
+      // Check if blog content still exists and cut it off
+      const blogMarkers = [
+        'BLOG INTRO:',
+        'Unlock Unmatched Elegance',
+        'In the ever-evolving world',
+        'Must-Have for Every Stylish',
+      ]
+
+      for (const marker of blogMarkers) {
+        const markerIndex = fullDesc.indexOf(marker)
+        if (markerIndex > -1) {
+          fullDesc = fullDesc.substring(0, markerIndex).trim()
+          console.log(`✅ Cut off blog content at: ${marker}`)
+        }
+      }
+
       console.log('✅ Found Section 3 content (cleaned)')
 
       // Split into sentences and use first 2 for highlight
       const sentences = fullDesc
         .split(/[.!?]+/)
-        .filter((s) => s.trim().length > 20)
+        .filter((s) => s.trim().length > 20 && !s.includes('BLOG INTRO'))
       sections.productHighlight = sentences.slice(0, 2).join('. ').trim()
       if (
         sections.productHighlight &&
