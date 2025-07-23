@@ -3,6 +3,7 @@
 // ✅ Universal content extraction + Taxonomy API integration
 // ✅ Smart fallbacks ensure every product publishes successfully
 // ✅ Handles ALL eBay required aspects automatically
+// ✅ FIXED: Social media content cleaning (no more hashtags/emojis)
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 
@@ -608,7 +609,7 @@ function extractBrandDescription(
   }
 }
 
-// ✅ UNIVERSAL CONTENT PARSING - Extract from YOUR Section Structure
+// ✅ UNIVERSAL CONTENT PARSING - Extract from YOUR Section Structure (ENHANCED)
 function parseEnhancedGeneratedContent(content: string) {
   const sections = {
     title: '',
@@ -657,13 +658,36 @@ function parseEnhancedGeneratedContent(content: string) {
       }
     }
 
-    // ✅ EXTRACT DESCRIPTION from Section 3
-    const descMatch = content.match(
-      /\*\*3\.\s*DETAILED\s+PRODUCT\s+DESCRIPTION:\*\*\s*\n([\s\S]*?)(?=\*\*[4-9]\.|$)/i
+    // ✅ ENHANCED: Extract DESCRIPTION from Section 3 (bulletproof social media cleaning)
+    let descMatch = content.match(
+      /\*\*3\.\s*DETAILED\s+PRODUCT\s+DESCRIPTION:\*\*\s*\n([\s\S]*?)(?=\*\*4\.|$)/i
     )
+
+    // Fallback pattern for edge cases
+    if (!descMatch) {
+      descMatch = content.match(
+        /\*\*3\.\s*DETAILED\s+PRODUCT\s+DESCRIPTION:\*\*\s*\n([\s\S]*?)(?=\*\*[4-9]\.|$)/i
+      )
+    }
+
     if (descMatch) {
-      const fullDesc = cleanTextContent(descMatch[1])
-      console.log('✅ Found Section 3 content')
+      let rawDesc = descMatch[1].trim()
+
+      // ✅ CLEAN: Remove any social media content that leaked through
+      rawDesc = rawDesc
+        .replace(/#[\w]+/g, '') // Remove hashtags
+        .replace(/[📱💼🌟✨💰🔗🎨💎🎮🏠📚🚗]/g, '') // Remove emojis
+        .replace(/Tap the link in our bio.*/gi, '') // Remove Instagram CTAs
+        .replace(/Ready to own.*/gi, '') // Remove promotional CTAs
+        .replace(/Visit our.*store.*/gi, '') // Remove store CTAs
+        .split('\n')
+        .filter((line) => !line.toLowerCase().includes('instagram'))
+        .filter((line) => !line.toLowerCase().includes('#'))
+        .join('\n')
+        .trim()
+
+      const fullDesc = cleanTextContent(rawDesc)
+      console.log('✅ Found Section 3 content (cleaned)')
 
       // Split into sentences and use first 2 for highlight
       const sentences = fullDesc
@@ -772,7 +796,7 @@ function createFallbackBullets(content: string): string[] {
   return bullets.slice(0, 5)
 }
 
-// ✅ HELPER: Clean text content
+// ✅ HELPER: Clean text content (enhanced with social media cleaning)
 function cleanTextContent(text: string): string {
   return text
     .replace(/\*\*/g, '') // Remove bold
@@ -780,6 +804,11 @@ function cleanTextContent(text: string): string {
     .replace(/#{1,6}\s*/g, '') // Remove headers
     .replace(/^\s*[-•]\s*/, '') // Remove bullet markers
     .replace(/^\s*\d+[\.\)]\s*/, '') // Remove numbers
+    .replace(/#[\w]+/g, '') // ✅ NEW: Remove hashtags
+    .replace(/[📱💼🌟✨💰🔗🎨💎🎮🏠📚🚗]/g, '') // ✅ NEW: Remove emojis
+    .replace(/Tap the link.*/gi, '') // ✅ NEW: Remove social CTAs
+    .replace(/Ready to own.*/gi, '') // ✅ NEW: Remove promotional CTAs
+    .replace(/Visit our.*/gi, '') // ✅ NEW: Remove store CTAs
     .replace(/\s+/g, ' ') // Normalize spaces
     .replace(/\n+/g, ' ') // Replace newlines with spaces
     .trim()
