@@ -1025,18 +1025,35 @@ function extractSpecifications(content: string): string[] {
   }
 }
 
-// ✅ SMART: Extract brand dynamically from generated content
+// ✅ FIXED: Enhanced brand extraction with Nike priority
 function extractBrandSafe(fullText: string): string {
   try {
     if (!fullText) return 'Unbranded'
 
     const text = fullText.toLowerCase()
 
+    // ✅ PRIORITY BRANDS: Check most common brands first
+    const priorityBrands = [
+      { pattern: 'nike', name: 'Nike' },
+      { pattern: 'adidas', name: 'Adidas' },
+      { pattern: 'apple', name: 'Apple' },
+      { pattern: 'samsung', name: 'Samsung' },
+      { pattern: 'utwood', name: 'UTWOOD' },
+      { pattern: 'north', name: 'NORTH' },
+    ]
+
+    // Check priority brands first
+    for (const brand of priorityBrands) {
+      if (text.includes(brand.pattern)) {
+        console.log(`✅ Brand detected: ${brand.name}`)
+        return brand.name
+      }
+    }
+
     // ✅ METHOD 1: Look for "Brand: [NAME]" patterns in content
     const brandPatterns = [
       /brand[:\s]+([a-zA-Z0-9\s&]+?)(?:\n|,|\.|$)/i,
       /made\s+by\s+([a-zA-Z0-9\s&]+?)(?:\n|,|\.|$)/i,
-      /from\s+([a-zA-Z0-9\s&]+?)[\s]+(brand|company|corporation)/i,
     ]
 
     for (const pattern of brandPatterns) {
@@ -1050,7 +1067,7 @@ function extractBrandSafe(fullText: string): string {
       }
     }
 
-    // ✅ METHOD 2: Look for capitalized brand names in title/content
+    // ✅ METHOD 2: Extract from title (first capitalized word)
     const titleMatch = fullText.match(
       /\*\*1\.\s*PRODUCT\s+TITLE[^:]*:\*\*\s*\n([^\n]+)/i
     )
@@ -1062,7 +1079,7 @@ function extractBrandSafe(fullText: string): string {
       for (const word of words) {
         const cleanWord = word.replace(/[^\w]/g, '')
 
-        // Brand criteria: 2-15 chars, starts with capital, not common words
+        // Enhanced brand criteria
         if (
           cleanWord.length >= 2 &&
           cleanWord.length <= 15 &&
@@ -1076,27 +1093,13 @@ function extractBrandSafe(fullText: string): string {
             'Professional',
             'Advanced',
             'Enhanced',
+            'With',
+            'And',
           ].includes(cleanWord)
         ) {
           console.log(`✅ Brand extracted from title: ${cleanWord}`)
           return cleanWord
         }
-      }
-    }
-
-    // ✅ METHOD 3: Look for distinctive brand patterns in description
-    const brandIndicators = [
-      /([A-Z][a-zA-Z0-9]{2,12})\s+(?:Men's|Women's|Ladies|Watch|Shoes|Phone|Laptop)/i,
-      /(?:the|new|original)\s+([A-Z][a-zA-Z0-9]{2,12})\s+(?:brand|collection|series)/i,
-      /([A-Z]{2,8})\s+(?:brand|logo|branding)/i,
-    ]
-
-    for (const pattern of brandIndicators) {
-      const match = fullText.match(pattern)
-      if (match && match[1]) {
-        const brand = match[1].trim()
-        console.log(`✅ Brand extracted from indicators: ${brand}`)
-        return brand
       }
     }
 
