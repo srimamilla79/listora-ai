@@ -835,57 +835,76 @@ function getFallbackContent() {
   }
 }
 
-// ✅ ENHANCED: Title Extraction - Skip Bullet Points, Find Real Titles
-// ✅ FIXED: Title Extraction - Use Same Pattern as Shopify
+// ✅ ENHANCED: Extract clean product title from generated content
 function extractTitleFromContent(content: string): string | null {
   try {
     if (!content || content.length < 5) return null
 
-    console.log(
-      '🔍 Extracting title from content preview:',
-      content.substring(0, 200)
-    )
+    console.log('🔍 Extracting clean title from content...')
 
-    // ✅ ENHANCED: Multiple title extraction patterns - Same as Shopify
+    // ✅ Extract from Section 1
     const titlePatterns = [
-      // Pattern 1: **1. PRODUCT TITLE/HEADLINE:** Title (without quotes)
       /\*\*1\.\s*PRODUCT\s+TITLE[\/\s]*HEADLINE[:\s]*\*\*\s*\n([^\n\*]+)/i,
-      // Pattern 2: **1. PRODUCT TITLE:** Title
       /\*\*1\.\s*PRODUCT\s+TITLE[:\s]*\*\*\s*\n([^\n\*]+)/i,
-      // Pattern 3: With quotes (your original pattern)
-      /\*\*1\.\s*PRODUCT\s+TITLE\/HEADLINE:\*\*\s*\n\s*"([^"]+)"/i,
-      // Pattern 4: More flexible
-      /(?:\*\*)?1\.?\s*(?:PRODUCT\s+)?TITLE[:\s\/]*(?:HEADLINE)?[:\s]*(?:\*\*)?\s*[\n\r]*([^\n\r\*]+)/i,
     ]
 
-    for (let i = 0; i < titlePatterns.length; i++) {
-      const pattern = titlePatterns[i]
+    for (const pattern of titlePatterns) {
       const match = content.match(pattern)
 
       if (match && match[1]) {
-        let title = match[1].trim()
+        let rawTitle = match[1].trim()
+        console.log('🔍 Raw extracted title:', rawTitle)
 
-        console.log(`🔍 Pattern ${i + 1} matched:`, title)
+        // ✅ SMART TITLE CLEANING: Extract just the core product name
+        let cleanTitle = rawTitle
 
-        // Skip if it's clearly a feature/bullet point (contains colons or feature words)
-        if (title.includes(':') && title.length < 50) {
-          console.log('⚠️ Skipping bullet point title:', title)
-          continue
+        // Remove everything after the first dash, comma, or "with"
+        cleanTitle = cleanTitle.split(' - ')[0].trim()
+        cleanTitle = cleanTitle.split(' with ')[0].trim()
+        cleanTitle = cleanTitle.split(', ')[0].trim()
+
+        // Remove excessive descriptive suffixes
+        cleanTitle = cleanTitle
+          .replace(/\s+(featuring|with|including|equipped).*$/i, '')
+          .replace(/\s+AIR\s+Cushioning.*$/i, '')
+          .replace(/\s+Arch\s+Support.*$/i, '')
+          .trim()
+
+        // Ensure we have the core product name
+        if (cleanTitle.length >= 15 && cleanTitle.length <= 80) {
+          console.log('✅ Extracted clean title:', cleanTitle)
+          return cleanTitle
         }
 
-        // Clean and validate
-        title = cleanAndOptimizeTitle(title)
+        // If clean title is too short, use a bit more
+        if (cleanTitle.length < 15 && rawTitle.length > 15) {
+          // Take first part before descriptive overload
+          const words = rawTitle.split(' ')
+          cleanTitle = ''
 
-        if (title.length >= 15 && title.length <= 80) {
-          console.log('✅ Extracted valid title:', title)
-          return title
-        } else {
-          console.log(`⚠️ Title length invalid: ${title.length} characters`)
+          for (const word of words) {
+            const testTitle = cleanTitle + (cleanTitle ? ' ' : '') + word
+
+            // Stop before we hit descriptive keywords
+            if (
+              testTitle.length > 60 ||
+              /cushioning|perforations|breathability|arch support/i.test(word)
+            ) {
+              break
+            }
+
+            cleanTitle = testTitle
+
+            if (cleanTitle.length >= 15) {
+              console.log('✅ Built clean title:', cleanTitle)
+              return cleanTitle
+            }
+          }
         }
       }
     }
 
-    console.log('⚠️ No valid title found in content')
+    console.log('⚠️ No clean title found in content')
     return null
   } catch (error) {
     console.error('❌ Title extraction error:', error)
