@@ -551,33 +551,6 @@ function formatEbayBestPracticesDescription(productContent: any): string {
       })
     }
 
-    // ✅ UNIVERSAL: Brand Section (only if brand mentioned in YOUR content AND not gender words)
-    const brand = extractBrandSafe(productContent.generated_content || '')
-    if (
-      brand &&
-      brand !== 'Unbranded' &&
-      ![
-        'Men',
-        'Mens',
-        'Women',
-        'Womens',
-        'Ladies',
-        'Unisex',
-        'Kids',
-        'Boys',
-        'Girls',
-      ].includes(brand)
-    ) {
-      const brandDescription = extractBrandDescription(
-        productContent.generated_content,
-        brand
-      )
-      if (brandDescription) {
-        html += `<br><strong>${brand}</strong><br>`
-        html += `${brandDescription}<br>`
-      }
-    }
-
     // ✅ UNIVERSAL: Standard eBay footer
     html += `<br><strong>Condition:</strong> New<br>`
     html += `<strong>Shipping:</strong> Fast shipping available<br>`
@@ -604,35 +577,6 @@ function formatEbayBestPracticesDescription(productContent: any): string {
       <strong>Shipping:</strong> Fast shipping available<br>
       <strong>Returns:</strong> 30-day return policy<br>
       </div>`
-  }
-}
-
-// ✅ HELPER: Extract brand description from YOUR content
-function extractBrandDescription(
-  content: string,
-  brand: string
-): string | null {
-  if (!content || !brand) return null
-
-  try {
-    // Look for sentences about the brand in YOUR content
-    const brandRegex = new RegExp(`([^.!?]*${brand}[^.!?]*[.!?])`, 'gi')
-    const matches = content.match(brandRegex)
-
-    if (matches) {
-      // Find the longest, most descriptive sentence about the brand
-      const descriptions = matches
-        .filter((match) => match.length > 50) // Meaningful descriptions
-        .sort((a, b) => b.length - a.length) // Longest first
-
-      if (descriptions.length > 0) {
-        return descriptions[0].trim()
-      }
-    }
-
-    return null
-  } catch (error) {
-    return null
   }
 }
 
