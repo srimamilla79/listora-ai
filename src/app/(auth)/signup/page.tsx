@@ -15,6 +15,9 @@ import {
   Camera,
   ShoppingCart,
   BarChart3,
+  Languages,
+  Upload,
+  Zap,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -48,8 +51,8 @@ export default function OptimizedSignupPage() {
 
   if (!mounted || !supabase) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
       </div>
     )
   }
@@ -224,7 +227,7 @@ export default function OptimizedSignupPage() {
             <div className="grid md:grid-cols-2 gap-4 mb-8">
               <button
                 onClick={() => window.open('mailto:', '_blank')}
-                className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg transition-colors font-semibold"
               >
                 📬 Open Email App
               </button>
@@ -252,7 +255,7 @@ export default function OptimizedSignupPage() {
                     alert('Error resending email. Please contact support.')
                   }
                 }}
-                className="text-blue-600 hover:text-blue-500 underline font-medium"
+                className="text-indigo-600 hover:text-indigo-500 underline font-medium"
               >
                 Click here to resend verification email
               </button>
@@ -264,14 +267,54 @@ export default function OptimizedSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header with MobileNav Component */}
-      <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
+    <div className="min-h-screen">
+      {/* Stripe-style dark gradient background - same as homepage */}
+      <div
+        className="fixed inset-0 -z-10"
+        style={{
+          background: `
+            linear-gradient(180deg, 
+              #0a2540 0%, 
+              #0a2540 20%, 
+              #0e2a47 40%, 
+              #1a3a5c 60%, 
+              #ffffff 100%
+            )
+          `,
+        }}
+      >
+        {/* Colored accent overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(circle at 20% 30%, rgba(0, 212, 255, 0.15) 0%, transparent 50%),
+              radial-gradient(circle at 80% 40%, rgba(122, 90, 248, 0.15) 0%, transparent 50%),
+              radial-gradient(circle at 50% 60%, rgba(255, 94, 91, 0.1) 0%, transparent 50%)
+            `,
+          }}
+        />
+
+        {/* Grid pattern */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px',
+          }}
+        />
+      </div>
+
+      {/* Header - matching homepage */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Left Side: Mobile Menu + Logo */}
             <div className="flex items-center space-x-3">
-              {/* Mobile Navigation Component - NOW ON LEFT */}
+              {/* Mobile Navigation Component */}
               <MobileNav currentPage="signup" />
 
               {/* Logo */}
@@ -283,35 +326,35 @@ export default function OptimizedSignupPage() {
               </Link>
             </div>
 
-            {/* Unified Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-6">
+            {/* Right Side: Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-8">
               <Link
                 href="/"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Home
               </Link>
-              <button
-                onClick={() => (window.location.href = '/#features-section')}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
+              <Link
+                href="/#features-section"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Features
-              </button>
-              <button
-                onClick={() => (window.location.href = '/#pricing-section')}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
+              </Link>
+              <Link
+                href="/#pricing-section"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Pricing
-              </button>
+              </Link>
               <Link
                 href="/about"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 About
               </Link>
               <Link
                 href="/blog"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Blog
               </Link>
@@ -321,19 +364,19 @@ export default function OptimizedSignupPage() {
 
               <Link
                 href="/login"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Login
               </Link>
               <Link
                 href="/demo"
-                className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+                className="text-form-label border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 shadow-sm"
               >
                 Book Demo
               </Link>
               <Link
                 href="/signup"
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-lg font-medium shadow-lg"
+                className="text-form-label bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-lg transition-all shadow-md"
               >
                 Start Free Trial
               </Link>
@@ -343,103 +386,118 @@ export default function OptimizedSignupPage() {
       </header>
 
       {/* Main Content */}
-      <div className="flex">
+      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-4rem)]">
         {/* Left Side - Rich Content & Social Proof */}
-        <div className="hidden lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:px-8 lg:py-12 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 relative overflow-hidden">
-          <div className="max-w-lg mx-auto relative z-10">
+        <div className="hidden lg:flex lg:flex-1 lg:items-center lg:justify-center lg:px-8 lg:py-12">
+          <div className="max-w-lg relative z-10">
             {/* Hero Content */}
             <div className="text-center mb-12">
-              <div className="inline-flex items-center space-x-2 bg-green-100 border border-green-200 rounded-full px-4 py-2 mb-6">
-                <Award className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-bold text-green-800">
-                  #1 AI Content Tool for E-commerce
+              <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
+                <Award className="h-4 w-4 text-green-400" />
+                <span className="text-sm font-bold text-white">
+                  #1 AI Content Platform for E-commerce
                 </span>
               </div>
 
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">
-                Transform 30 seconds of voice into professional content
+              <h2 className="text-4xl font-bold text-white mb-4">
+                Transform Your Voice into Global Sales
               </h2>
-              <p className="text-gray-600 text-lg leading-relaxed">
-                Transform your voice into professional product content that
-                converts. No writing skills needed. Average user sees 40% sales
-                increase in 30 days.
+              <p className="text-white/90 text-lg leading-relaxed">
+                Join thousands of entrepreneurs who create professional content
+                in 99+ languages. From voice to Amazon optimization, Shopify
+                publishing, and eBay listings—all in under 2 minutes.
               </p>
             </div>
 
             {/* Key Features with Icons */}
             <div className="grid grid-cols-2 gap-4 mb-12">
-              <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center mb-3">
-                  <Mic className="h-5 w-5 text-white" />
+                  <Languages className="h-5 w-5 text-white" />
                 </div>
-                <h4 className="font-bold text-gray-900 text-sm mb-1">
-                  Voice to Content
+                <h4 className="font-bold text-white text-sm mb-1">
+                  99+ Languages
                 </h4>
-                <p className="text-gray-600 text-xs">
-                  30 seconds → professional copy
+                <p className="text-white/70 text-xs">
+                  Speak any language, sell anywhere
                 </p>
               </div>
 
-              <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
                 <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center mb-3">
                   <Camera className="h-5 w-5 text-white" />
                 </div>
-                <h4 className="font-bold text-gray-900 text-sm mb-1">
-                  AI Vision
+                <h4 className="font-bold text-white text-sm mb-1">
+                  AI Vision Analysis
                 </h4>
-                <p className="text-gray-600 text-xs">
-                  OpenAI analyzes your images
+                <p className="text-white/70 text-xs">
+                  OpenAI analyzes product images
                 </p>
               </div>
 
-              <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
                 <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center mb-3">
                   <ShoppingCart className="h-5 w-5 text-white" />
                 </div>
-                <h4 className="font-bold text-gray-900 text-sm mb-1">
-                  Amazon Optimization & Direct Shopify Publishing
+                <h4 className="font-bold text-white text-sm mb-1">
+                  Multi-Platform Ready
                 </h4>
-                <p className="text-gray-600 text-xs">
-                  Professional Amazon instructions
+                <p className="text-white/70 text-xs">
+                  Amazon optimization, Shopify & eBay
                 </p>
               </div>
 
-              <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50 shadow-sm">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
                 <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center mb-3">
-                  <BarChart3 className="h-5 w-5 text-white" />
+                  <Upload className="h-5 w-5 text-white" />
                 </div>
-                <h4 className="font-bold text-gray-900 text-sm mb-1">
+                <h4 className="font-bold text-white text-sm mb-1">
                   Bulk Processing
                 </h4>
-                <p className="text-gray-600 text-xs">
+                <p className="text-white/70 text-xs">
                   500+ products in background
                 </p>
               </div>
             </div>
 
-            {/* Results Stats */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-white/50 shadow-lg">
-              <h3 className="font-bold text-gray-900 mb-4 text-center">
-                Average Results in 30 Days:
+            {/* Why Choose Listora */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+              <h3 className="font-bold text-white mb-4 text-center">
+                Why Entrepreneurs Choose Listora AI
               </h3>
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-green-600 mb-1">
-                    +40%
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-green-400 rounded-full mt-1.5"></div>
+                  <div>
+                    <p className="text-white/90 text-sm font-medium">
+                      Voice-First Design
+                    </p>
+                    <p className="text-white/70 text-xs">
+                      Speak naturally in any language, get professional content
+                    </p>
                   </div>
-                  <div className="text-xs text-gray-600">Sales Increase</div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-blue-600 mb-1">
-                    500%
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full mt-1.5"></div>
+                  <div>
+                    <p className="text-white/90 text-sm font-medium">
+                      AI-Powered Intelligence
+                    </p>
+                    <p className="text-white/70 text-xs">
+                      OpenAI Vision + advanced language models
+                    </p>
                   </div>
-                  <div className="text-xs text-gray-600">Faster Content</div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-purple-600 mb-1">
-                    +65%
+                <div className="flex items-start space-x-3">
+                  <div className="w-2 h-2 bg-purple-400 rounded-full mt-1.5"></div>
+                  <div>
+                    <p className="text-white/90 text-sm font-medium">
+                      Built for Growth
+                    </p>
+                    <p className="text-white/70 text-xs">
+                      From single products to bulk catalog processing
+                    </p>
                   </div>
-                  <div className="text-xs text-gray-600">Conversion Rate</div>
                 </div>
               </div>
             </div>
@@ -447,67 +505,62 @@ export default function OptimizedSignupPage() {
         </div>
 
         {/* Right Side - Signup Form */}
-        <div className="flex-1 flex flex-col pt-2 pb-4 px-4 sm:px-6 lg:px-20 xl:px-24">
-          <div className="mx-auto w-full max-w-lg">
+        <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-20 xl:px-24 py-8">
+          <div className="w-full max-w-lg">
             {/* Value Proposition */}
-            <div className="text-center mb-4 mt-8">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                Start Your Free Trial Today
+            <div className="text-center mb-6">
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+                Start Your Free Trial
               </h1>
-              <p className="text-gray-600 text-lg mb-4">
-                Experience the future of AI-powered content creation
+              <p className="text-white/90 text-lg mb-4">
+                Join the AI content revolution—no credit card required
               </p>
 
               {/* Trust Badge */}
-              <div className="inline-flex items-center space-x-2 bg-green-50 border border-green-200 rounded-full px-4 py-2 mb-4">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-800">
-                  ✨ Free forever plan • No credit card required
+              <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-4">
+                <CheckCircle className="h-4 w-4 text-green-400" />
+                <span className="text-sm font-medium text-white">
+                  10 free AI generations every month • Forever
                 </span>
               </div>
             </div>
 
             {/* Free Plan Benefits */}
-            <div className="mb-4 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center">
-                <Rocket className="h-5 w-5 text-blue-600 mr-2" />
-                🎉 Your Free Plan Includes:
+            <div className="mb-4 p-5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl">
+              <h3 className="font-bold text-white mb-4 flex items-center">
+                <Zap className="h-5 w-5 text-yellow-400 mr-2" />
+                Your Free Forever Plan Includes:
               </h3>
-              <div className="grid md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <span className="text-gray-700 text-sm">
-                    10 AI content generations
+                  <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
+                  <span className="text-white/90 text-sm">
+                    10 AI generations/month
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <span className="text-gray-700 text-sm">
-                    Voice-to-content conversion
+                  <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
+                  <span className="text-white/90 text-sm">
+                    99+ language support
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <span className="text-gray-700 text-sm">
-                    Amazon + Shopify support
+                  <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
+                  <span className="text-white/90 text-sm">
+                    Voice-to-content AI
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  <span className="text-gray-700 text-sm">
-                    Professional templates
+                  <Check className="h-4 w-4 text-green-400 flex-shrink-0" />
+                  <span className="text-white/90 text-sm">
+                    Platform optimization
                   </span>
                 </div>
-              </div>
-              <div className="mt-4 text-center">
-                <span className="text-sm font-medium text-blue-800">
-                  💰 Worth $97/month • Yours free forever
-                </span>
               </div>
             </div>
 
             {/* Signup Form */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-2xl p-6">
               {message && (
                 <div className="mb-4 text-sm text-red-600 bg-red-50 py-3 px-4 rounded-lg border border-red-200">
                   {message}
@@ -530,8 +583,8 @@ export default function OptimizedSignupPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, email: e.target.value })
                     }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    placeholder="your@business.com"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                    placeholder="your@email.com"
                     disabled={loading}
                   />
                 </div>
@@ -552,7 +605,7 @@ export default function OptimizedSignupPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, password: e.target.value })
                       }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 transition-colors"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pr-10 transition-colors"
                       placeholder="Choose a strong password"
                       disabled={loading}
                     />
@@ -609,7 +662,7 @@ export default function OptimizedSignupPage() {
                           confirmPassword: e.target.value,
                         })
                       }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 transition-colors"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pr-10 transition-colors"
                       placeholder="Confirm your password"
                       disabled={loading}
                     />
@@ -631,7 +684,7 @@ export default function OptimizedSignupPage() {
                   {formData.confirmPassword &&
                     formData.password !== formData.confirmPassword && (
                       <p className="mt-1 text-xs text-red-600">
-                        ⚠️ Passwords do not match
+                        Passwords do not match
                       </p>
                     )}
                   {formData.confirmPassword &&
@@ -657,7 +710,7 @@ export default function OptimizedSignupPage() {
                         agreeToTerms: e.target.checked,
                       })
                     }
-                    className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="mt-1 h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                     disabled={loading}
                   />
                   <label
@@ -668,7 +721,7 @@ export default function OptimizedSignupPage() {
                     <Link
                       href="/terms"
                       target="_blank"
-                      className="text-blue-600 hover:text-blue-500 underline font-medium"
+                      className="text-indigo-600 hover:text-indigo-500 underline font-medium"
                     >
                       Terms of Service
                     </Link>{' '}
@@ -676,7 +729,7 @@ export default function OptimizedSignupPage() {
                     <Link
                       href="/privacy"
                       target="_blank"
-                      className="text-blue-600 hover:text-blue-500 underline font-medium"
+                      className="text-indigo-600 hover:text-indigo-500 underline font-medium"
                     >
                       Privacy Policy
                     </Link>
@@ -687,11 +740,11 @@ export default function OptimizedSignupPage() {
                 <button
                   type="submit"
                   disabled={loading || !formData.agreeToTerms}
-                  className={`w-full flex justify-center items-center py-4 px-6 border border-transparent rounded-lg shadow-sm text-lg font-bold text-white transition-all transform ${
+                  className={`w-full flex justify-center items-center py-4 px-6 rounded-lg shadow-sm text-lg font-bold text-white transition-all transform ${
                     loading || !formData.agreeToTerms
                       ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105'
-                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                      : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 hover:scale-105'
+                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
                 >
                   {loading ? (
                     <>
@@ -700,7 +753,7 @@ export default function OptimizedSignupPage() {
                     </>
                   ) : (
                     <>
-                      🚀 Start Free Trial - No Credit Card
+                      Start Free Trial
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </>
                   )}
@@ -727,7 +780,7 @@ export default function OptimizedSignupPage() {
                     googleLoading || loading || !formData.agreeToTerms
                       ? 'opacity-50 cursor-not-allowed'
                       : 'hover:bg-gray-50 hover:scale-105'
-                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
                 >
                   {googleLoading ? (
                     'Setting up your account...'
@@ -758,8 +811,7 @@ export default function OptimizedSignupPage() {
 
                 {!formData.agreeToTerms && (
                   <p className="mt-2 text-xs text-red-600 text-center">
-                    Please agree to the Terms and Privacy Policy above to
-                    continue with Google
+                    Please agree to the Terms and Privacy Policy above
                   </p>
                 )}
               </div>
@@ -770,7 +822,7 @@ export default function OptimizedSignupPage() {
                   Already have an account?{' '}
                   <Link
                     href="/login"
-                    className="text-blue-600 hover:text-blue-500 font-medium"
+                    className="text-indigo-600 hover:text-indigo-500 font-medium"
                   >
                     Sign in here →
                   </Link>
@@ -778,9 +830,27 @@ export default function OptimizedSignupPage() {
               </div>
             </div>
 
-            {/* Footer */}
+            {/* Quick Links - for dark background */}
             <div className="mt-8 text-center">
-              <div className="flex items-center justify-center space-x-6 text-xs text-gray-500"></div>
+              <div className="text-sm text-white/70">
+                <Link href="/terms" className="text-white/90 hover:text-white">
+                  Terms
+                </Link>
+                {' • '}
+                <Link
+                  href="/privacy"
+                  className="text-white/90 hover:text-white"
+                >
+                  Privacy
+                </Link>
+                {' • '}
+                <Link
+                  href="/contact"
+                  className="text-white/90 hover:text-white"
+                >
+                  Support
+                </Link>
+              </div>
             </div>
           </div>
         </div>

@@ -51,7 +51,7 @@ export default function OptimizedLoginPage() {
 
   if (!mounted || !supabase) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
@@ -135,14 +135,54 @@ export default function OptimizedLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Enhanced Header with MobileNav Component */}
-      <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
+    <div className="min-h-screen">
+      {/* Stripe-style dark gradient background - same as homepage */}
+      <div
+        className="fixed inset-0 -z-10"
+        style={{
+          background: `
+            linear-gradient(180deg, 
+              #0a2540 0%, 
+              #0a2540 20%, 
+              #0e2a47 40%, 
+              #1a3a5c 60%, 
+              #ffffff 100%
+            )
+          `,
+        }}
+      >
+        {/* Colored accent overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(circle at 20% 30%, rgba(0, 212, 255, 0.15) 0%, transparent 50%),
+              radial-gradient(circle at 80% 40%, rgba(122, 90, 248, 0.15) 0%, transparent 50%),
+              radial-gradient(circle at 50% 60%, rgba(255, 94, 91, 0.1) 0%, transparent 50%)
+            `,
+          }}
+        />
+
+        {/* Grid pattern */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px',
+          }}
+        />
+      </div>
+
+      {/* Enhanced Header - matching homepage */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Left Side: Mobile Menu + Logo */}
             <div className="flex items-center space-x-3">
-              {/* Mobile Navigation Component - NOW ON LEFT */}
+              {/* Mobile Navigation Component */}
               <MobileNav currentPage="login" />
 
               {/* Logo */}
@@ -154,35 +194,35 @@ export default function OptimizedLoginPage() {
               </Link>
             </div>
 
-            {/* Unified Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-6">
+            {/* Right Side: Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-8">
               <Link
                 href="/"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Home
               </Link>
-              <button
-                onClick={() => (window.location.href = '/#features-section')}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
+              <Link
+                href="/#features-section"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Features
-              </button>
-              <button
-                onClick={() => (window.location.href = '/#pricing-section')}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
+              </Link>
+              <Link
+                href="/#pricing-section"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Pricing
-              </button>
+              </Link>
               <Link
                 href="/about"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 About
               </Link>
               <Link
                 href="/blog"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Blog
               </Link>
@@ -192,19 +232,19 @@ export default function OptimizedLoginPage() {
 
               <Link
                 href="/login"
-                className="text-indigo-600 font-medium border-b-2 border-indigo-600 px-4 py-2"
+                className="text-form-label text-indigo-600 border-b-2 border-indigo-600 px-1 pb-1"
               >
                 Login
               </Link>
               <Link
                 href="/demo"
-                className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+                className="text-form-label border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 shadow-sm"
               >
                 Book Demo
               </Link>
               <Link
                 href="/signup"
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+                className="text-form-label bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 shadow-md"
               >
                 Start Free Trial
               </Link>
@@ -213,46 +253,46 @@ export default function OptimizedLoginPage() {
         </div>
       </header>
 
-      {/* Centered Single Column Layout for Speed */}
+      {/* Main Content */}
       <div className="flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          {/* Trust Indicators for Returning Users */}
+          {/* Trust Indicators - Updated for dark background */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-3">
               {showForgotPassword ? 'Reset Your Password' : 'Welcome Back!'}
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-xl text-white/90 mb-6">
               {showForgotPassword
                 ? 'Enter your email to receive a secure reset link'
                 : 'Continue creating amazing content'}
             </p>
 
             {!showForgotPassword && (
-              <div className="flex items-center justify-center space-x-6 text-sm text-gray-500 mb-4">
+              <div className="flex items-center justify-center space-x-6 text-sm text-white/80 mb-4">
                 <div className="flex items-center space-x-1">
-                  <Shield className="h-4 w-4 text-green-500" />
+                  <Shield className="h-4 w-4 text-green-400" />
                   <span>Secure Login</span>
                 </div>
                 <div className="flex items-center space-x-1">
-                  <Clock className="h-4 w-4 text-blue-500" />
+                  <Clock className="h-4 w-4 text-blue-400" />
                   <span>Quick Access</span>
                 </div>
                 <div className="flex items-center space-x-1">
-                  <Zap className="h-4 w-4 text-purple-500" />
+                  <Zap className="h-4 w-4 text-purple-400" />
                   <span>Always Available</span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Streamlined Form */}
-          <div className="bg-white py-8 px-6 shadow-lg rounded-xl border border-gray-200">
+          {/* Streamlined Form - Better contrast and styling */}
+          <div className="bg-white py-8 px-6 shadow-2xl rounded-2xl">
             {showForgotPassword ? (
               <form onSubmit={handleForgotPassword} className="space-y-6">
                 <div>
                   <label
                     htmlFor="forgot-email"
-                    className="block text-sm font-medium text-gray-700 mb-2"
+                    className="block text-form-label font-medium text-gray-700 mb-2"
                   >
                     Email address
                   </label>
@@ -262,7 +302,7 @@ export default function OptimizedLoginPage() {
                     required
                     value={forgotPasswordEmail}
                     onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                     placeholder="Enter your email address"
                   />
                 </div>
@@ -270,7 +310,7 @@ export default function OptimizedLoginPage() {
                 <button
                   type="submit"
                   disabled={forgotPasswordLoading}
-                  className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                  className="w-full flex justify-center py-3 px-4 rounded-lg shadow-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all transform hover:scale-105"
                 >
                   {forgotPasswordLoading
                     ? 'Sending Reset Link...'
@@ -279,7 +319,7 @@ export default function OptimizedLoginPage() {
 
                 {forgotPasswordMessage && (
                   <div
-                    className={`text-sm p-3 rounded-lg ${
+                    className={`text-body-sm p-3 rounded-lg ${
                       forgotPasswordMessage.includes('✅')
                         ? 'text-green-700 bg-green-50 border border-green-200'
                         : 'text-red-700 bg-red-50 border border-red-200'
@@ -296,7 +336,7 @@ export default function OptimizedLoginPage() {
                     setForgotPasswordEmail('')
                     setForgotPasswordMessage('')
                   }}
-                  className="w-full text-center text-blue-600 hover:text-blue-500 text-sm font-medium"
+                  className="w-full text-center text-indigo-600 hover:text-indigo-500 text-sm font-medium"
                 >
                   ← Back to Sign In
                 </button>
@@ -307,7 +347,7 @@ export default function OptimizedLoginPage() {
                   <div>
                     <label
                       htmlFor="email"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-form-label font-medium text-gray-700 mb-2"
                     >
                       Email address
                     </label>
@@ -319,7 +359,7 @@ export default function OptimizedLoginPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                       placeholder="Enter your email"
                     />
                   </div>
@@ -327,7 +367,7 @@ export default function OptimizedLoginPage() {
                   <div>
                     <label
                       htmlFor="password"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-form-label font-medium text-gray-700 mb-2"
                     >
                       Password
                     </label>
@@ -340,7 +380,7 @@ export default function OptimizedLoginPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, password: e.target.value })
                         }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10 transition-colors"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pr-10 transition-colors"
                         placeholder="Enter your password"
                       />
                       <button
@@ -362,11 +402,11 @@ export default function OptimizedLoginPage() {
                       <input
                         id="remember-me"
                         type="checkbox"
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                       />
                       <label
                         htmlFor="remember-me"
-                        className="ml-2 block text-sm text-gray-700"
+                        className="ml-2 block text-body-sm text-gray-700"
                       >
                         Keep me signed in
                       </label>
@@ -374,7 +414,7 @@ export default function OptimizedLoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowForgotPassword(true)}
-                      className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+                      className="text-body-sm text-indigo-600 hover:text-indigo-500 font-medium"
                     >
                       Forgot password?
                     </button>
@@ -383,7 +423,7 @@ export default function OptimizedLoginPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                    className="w-full flex justify-center items-center py-3 px-4 rounded-lg shadow-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all transform hover:scale-105"
                   >
                     {loading ? (
                       <>
@@ -405,7 +445,7 @@ export default function OptimizedLoginPage() {
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-gray-300" />
                     </div>
-                    <div className="relative flex justify-center text-sm">
+                    <div className="relative flex justify-center text-body-sm">
                       <span className="px-2 bg-white text-gray-500">Or</span>
                     </div>
                   </div>
@@ -413,7 +453,7 @@ export default function OptimizedLoginPage() {
                   <button
                     onClick={handleGoogleSignIn}
                     disabled={googleLoading}
-                    className="mt-6 w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                    className="mt-6 w-full flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
                   >
                     {googleLoading ? (
                       'Signing in...'
@@ -458,7 +498,7 @@ export default function OptimizedLoginPage() {
                   New to Listora AI?{' '}
                   <Link
                     href="/signup"
-                    className="text-blue-600 hover:text-blue-500 font-medium"
+                    className="text-indigo-600 hover:text-indigo-500 font-medium"
                   >
                     Create your free account →
                   </Link>
@@ -467,41 +507,35 @@ export default function OptimizedLoginPage() {
             )}
           </div>
 
-          {/* Quick Links for Returning Users */}
+          {/* Quick Links - Updated for dark background */}
           <div className="mt-8 text-center space-y-4">
             <Link
               href="/"
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 text-sm"
+              className="inline-flex items-center text-white hover:text-white/90 text-sm bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/20 transition-all hover:bg-white/20"
             >
               <Home className="h-4 w-4 mr-1" />
               Back to homepage
             </Link>
 
-            <div className="text-xs text-gray-500">
-              <Link href="/terms" className="text-blue-600 hover:text-blue-500">
+            <div className="text-sm text-white/70">
+              <Link href="/terms" className="text-white/90 hover:text-white">
                 Terms
               </Link>
               {' • '}
-              <Link
-                href="/privacy"
-                className="text-blue-600 hover:text-blue-500"
-              >
+              <Link href="/privacy" className="text-white/90 hover:text-white">
                 Privacy
               </Link>
               {' • '}
-              <Link
-                href="/contact"
-                className="text-blue-600 hover:text-blue-500"
-              >
+              <Link href="/contact" className="text-white/90 hover:text-white">
                 Support
               </Link>
             </div>
           </div>
 
           {/* Quick Status for Confidence */}
-          <div className="mt-8 flex items-center justify-center space-x-6 text-xs text-gray-500">
+          <div className="mt-8 flex items-center justify-center space-x-6 text-xs text-white/70">
             <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
               <span>All systems operational</span>
             </div>
           </div>

@@ -251,3 +251,97 @@ input:disabled {
     /* This is equivalent to: from-white via-gray-50 to-slate-50 */
   }
 }
+
+/* Professional Typography Classes */
+.text-display-title {
+  font-family: var(--font-geist-sans);
+  font-size: 3rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.text-section-title {
+  font-family: var(--font-geist-sans);
+  font-size: 2.25rem;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.text-card-title {
+  font-family: var(--font-geist-sans);
+  font-size: 1.5rem;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.text-body-comfortable {
+  font-family: var(--font-geist-sans);
+  font-size: 1.125rem;
+  line-height: 1.65;
+  font-weight: 400;
+}
+
+.text-form-label {
+  font-family: var(--font-geist-sans);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+/* ===== STRIPE-STYLE BACKGROUND ANIMATIONS ===== */
+@keyframes slideX {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(50px);
+    opacity: 0;
+  }
+}
+
+/* Animation classes */
+.animate-slideX {
+  animation: slideX 15s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+.animate-float-up {
+  animation: float-up 15s ease-in-out infinite;
+}

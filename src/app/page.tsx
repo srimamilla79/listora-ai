@@ -36,6 +36,7 @@ import {
   Store,
   Package,
   Languages,
+  X,
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 import Link from 'next/link'
@@ -68,7 +69,7 @@ export default function HomePage() {
     { flag: '🇯🇵', name: 'Japanese', text: 'プレミアムワイヤレスヘッドホン...' },
   ]
 
-  // ✅ UPDATED: Platform showcase with eBay
+  // Platform showcase with eBay
   const platforms = [
     {
       name: 'Amazon',
@@ -109,11 +110,11 @@ export default function HomePage() {
     }
   }, [activeFeature, typingIndex])
 
-  // ✅ UPDATED: Auto-rotate platform showcase (3 platforms now)
+  // Auto-rotate platform showcase
   useEffect(() => {
     const timer = setInterval(() => {
-      setActivePlatform((prev) => (prev + 1) % 3) // Changed from % 2 to % 3
-    }, 3000) // Faster rotation for 3 platforms
+      setActivePlatform((prev) => (prev + 1) % 3)
+    }, 3000)
     return () => clearInterval(timer)
   }, [])
 
@@ -146,7 +147,7 @@ export default function HomePage() {
                   <span className="text-lg">
                     {languageExamples[activeLanguage].flag}
                   </span>
-                  <span className="text-sm font-semibold text-blue-700">
+                  <span className="text-form-label text-blue-700">
                     🎯 Detected: {languageExamples[activeLanguage].name}
                   </span>
                 </div>
@@ -161,25 +162,25 @@ export default function HomePage() {
                     />
                   ))}
                 </div>
-                <p className="text-sm text-blue-700 font-medium">
+                <p className="text-body-md text-blue-700 font-medium">
                   "{languageExamples[activeLanguage].text}"
                 </p>
                 <div className="flex items-center space-x-2 mt-2">
-                  <span className="text-xs text-gray-600">
+                  <span className="text-caption text-gray-600">
                     🔄 Auto-translating to:
                   </span>
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                  <span className="text-caption bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
                     🇺🇸 English
                   </span>
                 </div>
               </div>
             </div>
             <div className="bg-white rounded-lg p-4 border border-blue-200">
-              <div className="text-xs text-green-600 font-semibold mb-2 flex items-center">
+              <div className="text-caption text-green-600 font-semibold mb-2 flex items-center">
                 <Sparkles className="h-3 w-3 mr-1" />
                 🌍 AI Generated English Content:
               </div>
-              <div className="text-sm text-gray-800 leading-relaxed">
+              <div className="text-body-md text-gray-800 leading-relaxed">
                 {contentPreview}
                 <span className="animate-pulse text-blue-500">|</span>
               </div>
@@ -202,7 +203,7 @@ export default function HomePage() {
             <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl mx-auto flex items-center justify-center mb-2">
               <Camera className="h-6 w-6 text-white" />
             </div>
-            <p className="text-sm text-purple-700 font-medium">
+            <p className="text-form-label text-purple-700">
               AI Vision Analysis → Multi-Platform Optimization
             </p>
           </div>
@@ -212,11 +213,11 @@ export default function HomePage() {
               <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-xs">👁️</span>
               </div>
-              <span className="text-sm font-semibold text-gray-800">
+              <span className="text-form-label text-gray-800">
                 OpenAI Vision Analysis
               </span>
             </div>
-            <div className="text-xs text-gray-600 space-y-1">
+            <div className="text-caption text-gray-600 space-y-1">
               <p>✓ Detects: Wireless headphones, over-ear design</p>
               <p>✓ Colors: Matte black with metallic accents</p>
               <p>✓ Features: Cushioned ear cups, adjustable headband</p>
@@ -251,7 +252,9 @@ export default function HomePage() {
                 style={{ animationDelay: `${i * 200}ms` }}
               >
                 <div className="text-lg mb-1">{platform.emoji}</div>
-                <div className="text-xs font-semibold">{platform.name}</div>
+                <div className="text-caption font-semibold">
+                  {platform.name}
+                </div>
                 <div className="w-full h-1 bg-white/30 rounded-full mt-2">
                   <div
                     className="h-full bg-white rounded-full transition-all duration-1000"
@@ -288,7 +291,7 @@ export default function HomePage() {
                   <span className="text-white text-lg">🏪</span>
                 </div>
               </div>
-              <p className="text-sm text-gray-700 font-medium">
+              <p className="text-form-label text-gray-700">
                 Voice → AI Content → Amazon + Shopify + eBay Live
               </p>
             </div>
@@ -322,11 +325,11 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">
+                      <span className="text-form-label text-gray-700">
                         {item.step}
                       </span>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        className={`text-caption px-2 py-1 rounded-full font-medium ${
                           item.status === 'complete'
                             ? 'bg-green-100 text-green-700'
                             : 'bg-blue-100 text-blue-700'
@@ -342,26 +345,26 @@ export default function HomePage() {
 
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
-                <div className="text-sm font-semibold text-orange-800">
+                <div className="text-form-label text-orange-800">
                   📦 Amazon Optimized!
                 </div>
-                <div className="text-xs text-orange-600 mt-1">
+                <div className="text-caption text-orange-600 mt-1">
                   Ready to list
                 </div>
               </div>
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                <div className="text-sm font-semibold text-green-800">
+                <div className="text-form-label text-green-800">
                   🛍️ Shopify Live!
                 </div>
-                <div className="text-xs text-green-600 mt-1">
+                <div className="text-caption text-green-600 mt-1">
                   Product ID: 789456
                 </div>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                <div className="text-sm font-semibold text-blue-800">
+                <div className="text-form-label text-blue-800">
                   🏪 eBay Live!
                 </div>
-                <div className="text-xs text-blue-600 mt-1">
+                <div className="text-caption text-blue-600 mt-1">
                   Item ID: 306375092611
                 </div>
               </div>
@@ -385,7 +388,7 @@ export default function HomePage() {
               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl mx-auto flex items-center justify-center mb-2">
                 <span className="text-white text-lg">🏪</span>
               </div>
-              <p className="text-sm text-blue-700 font-medium">
+              <p className="text-form-label text-blue-700">
                 AI-Powered eBay Category Detection + Live Publishing
               </p>
             </div>
@@ -418,10 +421,10 @@ export default function HomePage() {
                     <span className="text-sm">{item.icon}</span>
                   </div>
                   <div className="flex-1">
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-form-label text-gray-700">
                       {item.step}
                     </span>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium ml-2">
+                    <span className="text-caption bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium ml-2">
                       ✓
                     </span>
                   </div>
@@ -430,10 +433,10 @@ export default function HomePage() {
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-sm font-semibold text-blue-800 mb-2">
+              <div className="text-form-label text-blue-800 mb-2">
                 🏪 Live on eBay!
               </div>
-              <div className="text-xs text-blue-600 space-y-1">
+              <div className="text-caption text-blue-600 space-y-1">
                 <div>Item ID: 306375092611</div>
                 <div>Category: 112529 (Headphones) - AI Detected!</div>
                 <div>Brand: Bose • Color: Beige • Type: Over-Ear</div>
@@ -444,11 +447,11 @@ export default function HomePage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
               <div className="flex items-center space-x-2 mb-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm font-semibold text-green-800">
+                <span className="text-form-label text-green-800">
                   🌟 eBay AI Integration Features
                 </span>
               </div>
-              <div className="text-xs text-green-700 space-y-1">
+              <div className="text-caption text-green-700 space-y-1">
                 <p>✓ Real eBay Taxonomy API integration</p>
                 <p>✓ Dual-token authentication system</p>
                 <p>✓ Auto category detection (27 aspects)</p>
@@ -474,7 +477,7 @@ export default function HomePage() {
               <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl mx-auto flex items-center justify-center mb-2">
                 <Upload className="h-6 w-6 text-white" />
               </div>
-              <p className="text-sm text-indigo-700 font-medium">
+              <p className="text-form-label text-indigo-700">
                 CSV Upload → Background Processing → All Content Ready
               </p>
             </div>
@@ -483,20 +486,20 @@ export default function HomePage() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
                   <FileText className="h-4 w-4 text-indigo-600" />
-                  <span className="text-sm font-semibold text-gray-800">
+                  <span className="text-form-label text-gray-800">
                     products_batch_247.csv
                   </span>
                 </div>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                <span className="text-caption bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
                   ⚡ Processing
                 </span>
               </div>
-              <div className="text-xs text-gray-600 mb-3">
+              <div className="text-caption text-gray-600 mb-3">
                 📊 247 products • Uploaded 3 minutes ago
               </div>
 
               <div className="space-y-2">
-                <div className="flex justify-between text-xs">
+                <div className="flex justify-between text-caption">
                   <span className="text-gray-600">
                     Content Generation Progress
                   </span>
@@ -516,11 +519,11 @@ export default function HomePage() {
             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
               <div className="flex items-center space-x-2 mb-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm font-semibold text-green-800">
+                <span className="text-form-label text-green-800">
                   🌟 Background Processing Active
                 </span>
               </div>
-              <div className="text-xs text-green-700 space-y-1">
+              <div className="text-caption text-green-700 space-y-1">
                 <p>✓ Job continues even if you close browser</p>
                 <p>✓ Navigate freely - processing never stops</p>
                 <p>✓ Email notification when complete</p>
@@ -570,13 +573,15 @@ export default function HomePage() {
               <div key={item.task} className="space-y-2">
                 <div className="flex justify-between items-center">
                   <div>
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-form-label text-gray-700">
                       {item.task}
                     </span>
-                    <div className="text-xs text-gray-500">{item.detail}</div>
+                    <div className="text-caption text-gray-500">
+                      {item.detail}
+                    </div>
                   </div>
                   <span
-                    className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    className={`text-caption px-2 py-1 rounded-full font-medium ${
                       item.status === 'complete'
                         ? 'bg-green-100 text-green-700'
                         : item.status === 'processing'
@@ -621,17 +626,19 @@ export default function HomePage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <Cloud className="h-5 w-5 text-cyan-600" />
-              <span className="font-semibold text-gray-800">Cloud Storage</span>
+              <span className="text-card-title text-gray-800">
+                Cloud Storage
+              </span>
             </div>
             <div className="flex items-center space-x-1 text-green-600">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-xs font-medium">Live & Synced</span>
+              <span className="text-caption font-medium">Live & Synced</span>
             </div>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Product Images</span>
-              <span className="text-sm font-medium text-gray-800">2.4 GB</span>
+              <span className="text-body-md text-gray-600">Product Images</span>
+              <span className="text-form-label text-gray-800">2.4 GB</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
@@ -640,8 +647,10 @@ export default function HomePage() {
               />
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Generated Content</span>
-              <span className="text-sm font-medium text-gray-800">847 MB</span>
+              <span className="text-body-md text-gray-600">
+                Generated Content
+              </span>
+              <span className="text-form-label text-gray-800">847 MB</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
@@ -650,7 +659,7 @@ export default function HomePage() {
               />
             </div>
             <div className="text-center pt-2">
-              <span className="text-xs text-green-600 font-medium">
+              <span className="text-caption text-green-600 font-medium">
                 ✓ Auto-backup every 30 seconds
               </span>
             </div>
@@ -684,9 +693,62 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Enhanced Header with Left-Side Mobile Menu */}
-      <header className="bg-white/90 backdrop-blur-xl border-b border-gray-200/50 shadow-lg sticky top-0 z-50">
+    <div className="min-h-screen">
+      {/* Stripe-style dark gradient background - simplified approach */}
+      <div
+        className="fixed inset-0 -z-10"
+        style={{
+          background: `
+            linear-gradient(180deg, 
+              #0a2540 0%, 
+              #0a2540 20%, 
+              #0e2a47 40%, 
+              #1a3a5c 60%, 
+              #ffffff 100%
+            )
+          `,
+        }}
+      >
+        {/* Colored accent overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(circle at 20% 30%, rgba(0, 212, 255, 0.15) 0%, transparent 50%),
+              radial-gradient(circle at 80% 40%, rgba(122, 90, 248, 0.15) 0%, transparent 50%),
+              radial-gradient(circle at 50% 60%, rgba(255, 94, 91, 0.1) 0%, transparent 50%)
+            `,
+          }}
+        />
+
+        {/* Grid pattern */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px',
+          }}
+        />
+      </div>
+      {/* Inline keyframes */}
+      <style jsx global>{`
+        @keyframes slideX {
+          0% {
+            transform: translateX(-100%);
+          }
+          50% {
+            transform: translateX(100%);
+          }
+          100% {
+            transform: translateX(-100%);
+          }
+        }
+      `}</style>
+      {/* Enhanced Header with Professional Typography */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Left Side: Mobile Menu + Logo */}
@@ -704,34 +766,34 @@ export default function HomePage() {
             </div>
 
             {/* Right Side: Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-6">
+            <nav className="hidden md:flex items-center space-x-8">
               <Link
                 href="/"
-                className="text-indigo-600 font-medium border-b-2 border-indigo-600 px-4 py-2"
+                className="text-form-label text-indigo-600 border-b-2 border-indigo-600 px-1 pb-1"
               >
                 Home
               </Link>
               <button
                 onClick={() => scrollToSection('features-section')}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer"
               >
                 Features
               </button>
               <button
                 onClick={() => scrollToSection('pricing-section')}
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium cursor-pointer"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors cursor-pointer"
               >
                 Pricing
               </button>
               <Link
                 href="/about"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 About
               </Link>
               <Link
                 href="/blog"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Blog
               </Link>
@@ -741,19 +803,19 @@ export default function HomePage() {
 
               <Link
                 href="/login"
-                className="text-gray-600 hover:text-indigo-600 transition-colors font-medium"
+                className="text-form-label text-gray-600 hover:text-indigo-600 transition-colors"
               >
                 Login
               </Link>
               <Link
                 href="/demo"
-                className="border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+                className="text-form-label border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-lg transition-all transform hover:scale-105 shadow-sm"
               >
                 Book Demo
               </Link>
               <Link
                 href="/signup"
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
+                className="text-form-label bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all transform hover:scale-105 shadow-md"
               >
                 Start Free Trial
               </Link>
@@ -761,338 +823,287 @@ export default function HomePage() {
           </div>
         </div>
       </header>
+      {/* Enhanced Hero Section with Stripe-style Background */}
+      <section className="relative pt-24 pb-32 overflow-hidden">
+        {/* Hero gradient overlay */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-50/10 to-transparent" />
+        </div>
 
-      {/* Enhanced Hero Section */}
-      <section className="relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 via-purple-600/5 to-pink-600/5" />
-        <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
-        <div className="absolute top-0 right-0 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-32">
-          <div className="text-center mb-16">
-            {/* Enhanced Badge */}
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-4 py-2 mb-8">
-              <Languages className="h-4 w-4 text-indigo-600" />
-              <span className="text-sm font-medium text-indigo-800">
-                🌍 Revolutionary AI platform: Voice (99+ Languages) + Vision +
-                Bulk Processing + Triple Platform Publishing
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            {/* Enhanced Badge with better styling */}
+            <div className="inline-flex items-center bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 mb-8">
+              <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse mr-2" />
+              <span className="text-form-label text-white">
+                Revolutionary AI platform with 99+ languages
               </span>
-              <Star className="h-4 w-4 text-yellow-500 fill-current" />
             </div>
 
-            {/* Enhanced Title */}
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-8 leading-tight">
+            {/* Enhanced Title with Professional Typography */}
+            <h1 className="text-display-title mb-8 leading-tight">
               <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                 Multilingual Content Automation Platform
               </span>
               <br />
-              <span className="text-2xl md:text-3xl lg:text-4xl text-gray-700">
+              <span
+                className="text-section-title text-white drop-shadow-lg"
+                style={{ textShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+              >
                 🌍 Speak in 99+ Languages → Get Professional Content
               </span>
             </h1>
 
-            {/* ✅ UPDATED: Enhanced Subtitle with eBay */}
-            <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed">
+            {/* Enhanced Subtitle */}
+            <p
+              className="text-body-comfortable text-white/90 mb-12 max-w-4xl mx-auto leading-relaxed drop-shadow-lg"
+              style={{ textShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+            >
               The world's first AI that combines
-              <span className="font-semibold text-blue-600">
+              <span className="font-semibold text-blue-200">
                 {' '}
                 multilingual voice recognition (99+ languages)
               </span>
               , OpenAI Vision analysis, bulk CSV processing, and
-              <span className="font-semibold text-orange-600">
+              <span className="font-semibold text-orange-200">
                 {' '}
                 Amazon optimization
               </span>
               ,
-              <span className="font-semibold text-green-600">
+              <span className="font-semibold text-green-200">
                 {' '}
                 direct Shopify publishing
               </span>
               , and
-              <span className="font-semibold text-blue-600">
+              <span className="font-semibold text-blue-200">
                 {' '}
                 revolutionary eBay direct listing
               </span>
               . Scale from 1 product to 500+ with background automation.
-              <span className="font-semibold text-gray-800">
+              <span className="font-semibold text-white">
                 {' '}
                 No technical skills required.
               </span>
             </p>
 
-            {/* Multilingual Language Showcase */}
-            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 max-w-5xl mx-auto mb-8 border border-white/50 shadow-2xl">
-              <div className="text-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  🌍 Speak in ANY Language - Get Professional Content
+            {/* Multilingual Language Showcase - Updated for dark background */}
+            <div className="relative bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-5xl mx-auto mb-12 border border-white/20">
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+
+              <div className="text-center mb-8">
+                <h3 className="text-card-title text-white mb-2">
+                  Speak in ANY Language
                 </h3>
-                <p className="text-sm text-gray-600">
-                  Our AI automatically detects and processes 99+ languages
+                <p className="text-body-md text-white">
+                  Auto-detects and processes 99+ languages instantly
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                 {languageExamples.map((lang, index) => (
                   <div
                     key={lang.name}
-                    className={`text-center p-3 rounded-lg transition-all duration-300 ${
+                    className={`relative p-4 rounded-xl border transition-all duration-300 cursor-pointer ${
                       activeLanguage === index
-                        ? 'bg-gradient-to-br from-blue-50 to-indigo-100 border-2 border-blue-300 transform scale-105'
-                        : 'bg-gray-50 border border-gray-200 hover:bg-blue-50'
+                        ? 'bg-white/20 border-white/40 shadow-lg transform scale-105'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                     }`}
                   >
-                    <div className="text-2xl mb-1">{lang.flag}</div>
-                    <div className="text-xs font-semibold text-gray-700">
+                    <div className="text-2xl mb-1 text-center">{lang.flag}</div>
+                    <div className="text-caption font-medium text-white text-center">
                       {lang.name}
                     </div>
                     {activeLanguage === index && (
-                      <div className="text-xs text-blue-600 mt-1 font-medium">
-                        ✓ Active
-                      </div>
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
                     )}
                   </div>
                 ))}
               </div>
 
-              <div className="mt-4 text-center">
-                <p className="text-xs text-gray-500">
-                  + 93 more languages including Arabic, Russian, Korean,
-                  Portuguese, Italian, Dutch, and many others
+              <div className="mt-6 text-center">
+                <p className="text-caption text-white">
+                  + 93 more languages supported
                 </p>
               </div>
             </div>
 
-            {/* ✅ UPDATED: Platform Showcase with eBay */}
-            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-8 max-w-6xl mx-auto mb-12 border border-white/50 shadow-2xl">
-              <div className="grid md:grid-cols-3 gap-8 items-center">
+            {/* Platform Showcase - Updated for dark background */}
+            <div className="relative bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-6xl mx-auto mb-12 border border-white/20">
+              <div className="grid md:grid-cols-3 gap-8">
                 {/* Voice Input */}
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-full flex items-center justify-center animate-pulse">
-                      <Languages className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        🌍 You Speak (Any Language)
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        99+ languages automatically detected
-                      </p>
-                    </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/20">
+                    <Mic className="h-8 w-8 text-purple-400" />
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span className="text-lg">
-                        {languageExamples[activeLanguage].flag}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        🎯 {languageExamples[activeLanguage].name} Detected
-                      </span>
-                    </div>
-                    <p className="text-gray-700 italic text-sm">
-                      "{languageExamples[activeLanguage].text}"
-                    </p>
-                    <div className="mt-2 text-xs text-blue-600">
-                      🔄 Auto-translating to English...
-                    </div>
+                  <h3 className="text-card-title text-white mb-2">
+                    Speak Any Language
+                  </h3>
+                  <p className="text-body-md text-white mb-4">
+                    Voice input in 99+ languages with automatic detection
+                  </p>
+                  <div className="inline-flex items-center bg-purple-500/20 border border-purple-400/30 rounded-lg px-3 py-1.5">
+                    <span className="text-lg mr-2">
+                      {languageExamples[activeLanguage].flag}
+                    </span>
+                    <span className="text-form-label text-white">
+                      {languageExamples[activeLanguage].name} detected
+                    </span>
                   </div>
                 </div>
 
                 {/* AI Processing */}
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                      <Sparkles className="h-6 w-6 text-white animate-spin" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        AI Creates Content
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Platform-optimized copy ready to sell
-                      </p>
-                    </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/20">
+                    <Sparkles className="h-8 w-8 text-blue-400" />
                   </div>
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Check className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm text-blue-600 font-medium">
-                        Generated & Optimized!
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-800">
-                      <strong>Premium Wireless Headphones</strong> - Experience
-                      studio-quality audio with advanced noise cancellation...
-                    </div>
+                  <h3 className="text-card-title text-white mb-2">
+                    AI Creates Content
+                  </h3>
+                  <p className="text-body-md text-gray-300 mb-4">
+                    Professional copy optimized for each platform
+                  </p>
+                  <div className="inline-flex items-center bg-blue-500/20 border border-blue-400/30 rounded-lg px-3 py-1.5">
+                    <Check className="h-4 w-4 text-blue-400 mr-2" />
+                    <span className="text-form-label text-white">
+                      Content generated
+                    </span>
                   </div>
                 </div>
 
-                {/* ✅ UPDATED: Platform Publishing with eBay */}
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex -space-x-2">
-                      <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full flex items-center justify-center border-2 border-white">
-                        <span className="text-white text-xs">📦</span>
-                      </div>
-                      <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center border-2 border-white">
-                        <span className="text-white text-xs">🛍️</span>
-                      </div>
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-white">
-                        <span className="text-white text-xs">🏪</span>
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        Optimize & Publish
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Amazon + Shopify + eBay go live
-                      </p>
-                    </div>
+                {/* Platform Publishing */}
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/20">
+                    <Store className="h-8 w-8 text-green-400" />
                   </div>
-                  <div
-                    className={`rounded-lg p-4 border transition-all duration-1000 ${platforms[activePlatform].color}`}
-                  >
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span className="text-lg">
-                        {platforms[activePlatform].emoji}
-                      </span>
-                      <span
-                        className={`text-sm font-medium ${platforms[activePlatform].textColor}`}
-                      >
-                        {platforms[activePlatform].text}
-                      </span>
-                    </div>
-                    <div
-                      className={`text-xs ${platforms[activePlatform].idColor}`}
-                    >
-                      {platforms[activePlatform].id}
-                    </div>
+                  <h3 className="text-card-title text-white mb-2">
+                    Publish Everywhere
+                  </h3>
+                  <p className="text-body-md text-gray-300 mb-4">
+                    Amazon Optimization, Direct publishing to Shopify & eBay
+                  </p>
+                  <div className="inline-flex items-center bg-green-500/20 border border-green-400/30 rounded-lg px-3 py-1.5">
+                    <span className="text-form-label text-white">
+                      {platforms[activePlatform].name} ready
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Enhanced CTAs */}
-            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
+            {/* Enhanced CTAs - Updated for dark background */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
               <button
                 onClick={handleSignup}
-                className="group bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all transform hover:scale-105 shadow-2xl flex items-center cursor-pointer"
+                className="bg-white hover:bg-gray-100 text-gray-900 px-8 py-3 rounded-lg text-form-label font-medium transition-all transform hover:scale-105 shadow-lg flex items-center"
               >
-                <Languages className="mr-2 h-5 w-5 group-hover:animate-pulse" />
-                Start Creating in ANY Language
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                Start Free Trial
+                <ArrowRight className="ml-2 h-4 w-4" />
               </button>
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
-                className="group flex items-center space-x-3 text-indigo-600 hover:text-indigo-700 font-semibold px-6 py-4 rounded-xl hover:bg-indigo-50 transition-all cursor-pointer"
+                className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-8 py-3 rounded-lg text-form-label font-medium transition-all border border-white/30 flex items-center"
               >
-                <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                  {isPlaying ? (
-                    <Pause className="h-5 w-5" />
-                  ) : (
-                    <Play className="h-5 w-5 ml-0.5" />
-                  )}
-                </div>
-                <span>Watch Multilingual Demo</span>
+                {isPlaying ? (
+                  <Pause className="h-4 w-4 mr-2" />
+                ) : (
+                  <Play className="h-4 w-4 mr-2" />
+                )}
+                Watch Demo
               </button>
             </div>
 
-            {/* Trust Indicators */}
-            <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-500">
+            {/* Trust Indicators - Updated for dark background */}
+            <div className="flex flex-wrap justify-center items-center gap-8 text-body-md text-white">
               <div className="flex items-center space-x-2">
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-400" />
                 <span>Free 14-day trial</span>
               </div>
               <div className="flex items-center space-x-2">
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-400" />
                 <span>99+ languages supported</span>
               </div>
               <div className="flex items-center space-x-2">
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-400" />
                 <span>No credit card required</span>
               </div>
               <div className="flex items-center space-x-2">
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-green-400" />
                 <span>Setup in 60 seconds</span>
               </div>
             </div>
           </div>
 
-          {/* ✅ UPDATED: Enhanced Stats Cards with eBay */}
+          {/* Enhanced Stats Cards - Updated for transition area */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
               {
                 number: '99+',
-                label: 'Languages Supported Automatically',
+                label: 'Languages',
+                sublabel: 'Auto-detected',
                 icon: Languages,
-                color: 'from-blue-500 to-cyan-500',
               },
               {
-                number: 'AI Vision',
-                label: 'OpenAI Image Analysis',
+                number: 'Vision AI',
+                label: 'Image Analysis',
+                sublabel: 'OpenAI powered',
                 icon: Camera,
-                color: 'from-green-500 to-emerald-500',
               },
               {
                 number: '500+',
-                label: 'Bulk CSV Processing',
+                label: 'Bulk Processing',
+                sublabel: 'CSV support',
                 icon: Upload,
-                color: 'from-purple-500 to-indigo-500',
               },
               {
                 number: 'Multi-Platforms',
-                label: 'Amazon Optimization + Shopify & eBay Direct Publishing',
+                label: 'Amazon Optimization +',
+                sublabel: 'Direct publishing to eBay & Shopify',
                 icon: Store,
-                color: 'from-orange-500 to-red-500',
               },
             ].map((stat, index) => {
               const Icon = stat.icon
               return (
                 <div
                   key={index}
-                  className="bg-white/80 backdrop-blur-lg rounded-xl p-6 text-center shadow-lg border border-white/50 hover:shadow-xl transition-all hover:scale-105"
+                  className="bg-white/80 backdrop-blur-sm rounded-xl p-6 text-center border border-gray-200/50 hover:border-gray-300 transition-all hover:shadow-lg"
                 >
-                  <div
-                    className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-xl mx-auto mb-3 flex items-center justify-center`}
-                  >
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <Icon className="h-8 w-8 text-gray-600 mx-auto mb-3" />
+                  <div className="text-heading-md font-semibold text-gray-900">
                     {stat.number}
                   </div>
-                  <div className="text-sm text-gray-600">{stat.label}</div>
+                  <div className="text-body-sm text-gray-700">{stat.label}</div>
+                  <div className="text-caption text-gray-800 mt-1">
+                    {stat.sublabel}
+                  </div>
                 </div>
               )
             })}
           </div>
         </div>
       </section>
-
-      {/* Enhanced Features Section */}
-      <section id="features-section" className="py-24 bg-white">
+      {/* Enhanced Features Section - Subtle Background */}
+      <section
+        id="features-section"
+        className="relative py-24 bg-gradient-to-b from-gray-50/50 to-white"
+      >
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-50/30 to-transparent" />
+        </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-20">
-            <div className="inline-flex items-center space-x-2 bg-indigo-50 border border-indigo-200 rounded-full px-4 py-2 mb-6">
-              <Languages className="h-4 w-4 text-indigo-600" />
-              <span className="text-sm font-medium text-indigo-800">
-                🌍 Multilingual Powerful Features
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center bg-purple-100 rounded-full px-4 py-1.5 mb-6">
+              <Sparkles className="h-4 w-4 text-purple-600 mr-2" />
+              <span className="text-form-label text-purple-900">
+                Powerful Features
               </span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Everything you need to create
-              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                {' '}
-                global content that converts
-              </span>
+            <h2 className="text-section-title font-semibold text-gray-900 mb-4">
+              Everything you need to scale globally
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Our revolutionary AI platform combines multilingual voice
-              recognition (99+ languages), OpenAI Vision analysis, bulk CSV
-              processing with background jobs, and direct Amazon, Shopify & eBay
-              integration to scale your business globally faster than ever.
+            <p className="text-body-comfortable text-gray-600 max-w-3xl mx-auto">
+              From voice input in any language to direct marketplace publishing,
+              our platform handles the entire content creation workflow.
             </p>
           </div>
 
@@ -1109,38 +1120,33 @@ export default function HomePage() {
                       setTypingIndex(0)
                       setContentPreview('')
                     }}
-                    className={`group p-6 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-lg ${
+                    className={`p-6 rounded-xl border cursor-pointer transition-all ${
                       activeFeature === index
-                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-xl scale-[1.02]'
-                        : 'border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md'
+                        ? 'bg-white border-gray-300 shadow-lg'
+                        : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-md'
                     }`}
                   >
                     <div className="flex items-start space-x-4">
                       <div
-                        className={`p-3 rounded-xl transition-all ${
+                        className={`p-3 rounded-lg transition-all ${
                           activeFeature === index
-                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
-                            : 'bg-gray-100 text-gray-600 group-hover:bg-indigo-100 group-hover:text-indigo-600'
+                            ? 'bg-gray-900 text-white'
+                            : 'bg-gray-100 text-gray-600'
                         }`}
                       >
                         <Icon className="h-6 w-6" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
+                        <h3 className="text-card-title text-gray-900 mb-2">
                           {feature.title}
                         </h3>
-                        <p className="text-gray-600 mb-4 leading-relaxed">
+                        <p className="text-body-md text-gray-600 mb-4 leading-relaxed">
                           {feature.description}
                         </p>
-                        <div className="flex items-center justify-between">
-                          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                            <p className="text-sm text-green-800 font-semibold">
-                              {feature.benefit}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold text-indigo-600"></div>
-                          </div>
+                        <div className="bg-gray-50 rounded-lg px-3 py-1.5 inline-block">
+                          <p className="text-form-label text-gray-700">
+                            {feature.benefit}
+                          </p>
                         </div>
                       </div>
                       <ChevronRight
@@ -1156,28 +1162,26 @@ export default function HomePage() {
               })}
             </div>
 
-            {/* Feature Demo */}
+            {/* Feature Demo - Clean Card */}
             <div className="lg:sticky lg:top-24">
-              <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-2xl p-8 border border-gray-200">
+              <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-200">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">
-                    {features[activeFeature].title} - Live Demo
-                  </h3>
+                  <h3 className="text-card-title text-gray-900">Live Demo</h3>
                   <div className="flex space-x-1">
                     {features.map((_, index) => (
                       <button
                         key={index}
                         onClick={() => setActiveFeature(index)}
-                        className={`w-3 h-3 rounded-full cursor-pointer transition-all ${
+                        className={`w-2 h-2 rounded-full cursor-pointer transition-all ${
                           activeFeature === index
-                            ? 'bg-indigo-600'
+                            ? 'bg-gray-900 w-6'
                             : 'bg-gray-300 hover:bg-gray-400'
                         }`}
                       />
                     ))}
                   </div>
                 </div>
-                <div className="min-h-[200px]">
+                <div className="min-h-[400px]">
                   {features[activeFeature].demo}
                 </div>
               </div>
@@ -1185,32 +1189,30 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* Enhanced Pricing Section */}
+      {/* Enhanced Pricing Section - Premium Background */}
       <section
         id="pricing-section"
-        className="py-24 bg-gradient-to-br from-gray-50 to-indigo-50"
+        className="relative py-24 bg-gradient-to-b from-white via-purple-50/20 to-gray-50/50"
       >
+        {/* Decorative elements */}
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute -top-40 right-0 w-80 h-80 bg-gradient-to-br from-purple-100/40 to-pink-100/40 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 left-0 w-80 h-80 bg-gradient-to-tr from-blue-100/40 to-cyan-100/40 rounded-full blur-3xl" />
+        </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center space-x-2 bg-purple-50 border border-purple-200 rounded-full px-4 py-2 mb-6">
-              <DollarSign className="h-4 w-4 text-purple-600" />
-              <span className="text-sm font-medium text-purple-800">
-                🌍 Simple, Global Pricing
+            <div className="inline-flex items-center bg-green-100 rounded-full px-4 py-1.5 mb-6">
+              <DollarSign className="h-4 w-4 text-green-600 mr-2" />
+              <span className="text-form-label text-green-900">
+                Simple, transparent pricing
               </span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              Choose the perfect plan for your
-              <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                {' '}
-                global business growth
-              </span>
+            <h2 className="text-section-title font-semibold text-gray-900 mb-4">
+              Choose your plan
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Start with our generous free plan (includes multilingual support)
-              and scale as your business grows globally. All plans include
-              enterprise-grade security, 99+ language support, and our complete
-              feature set with Amazon, Shopify & eBay integration.
+            <p className="text-body-comfortable text-gray-600 max-w-3xl mx-auto">
+              Start free and scale as you grow. All plans include 99+ language
+              support and our complete feature set.
             </p>
           </div>
 
@@ -1223,7 +1225,7 @@ export default function HomePage() {
                 description: 'Perfect for testing our multilingual AI platform',
                 limit: '10 content generations/month',
                 badge: null,
-                topBorderColor: 'bg-gray-300',
+                topBorderColor: '',
                 features: [
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Manual content generation (text input)',
@@ -1242,7 +1244,7 @@ export default function HomePage() {
                 popular: false,
                 borderColor: 'border-gray-300',
                 buttonStyle:
-                  'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white',
+                  'bg-white hover:bg-gray-50 text-gray-900 border border-gray-300',
               },
               {
                 name: 'Business',
@@ -1252,8 +1254,7 @@ export default function HomePage() {
                   'Scale your multilingual content creation with bulk processing',
                 limit: '250 content generations/month',
                 badge: 'Most Popular',
-                topBorderColor:
-                  'bg-gradient-to-r from-indigo-400 to-purple-500',
+                topBorderColor: '',
                 features: [
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Starter plan',
@@ -1271,8 +1272,7 @@ export default function HomePage() {
                 cta: '🎯 Start Free Trial',
                 popular: true,
                 borderColor: 'border-indigo-500',
-                buttonStyle:
-                  'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white',
+                buttonStyle: 'bg-gray-900 hover:bg-gray-800 text-white',
               },
               {
                 name: 'Premium',
@@ -1282,8 +1282,7 @@ export default function HomePage() {
                   'Professional global scale with marketplace integration',
                 limit: '1,000 content generations/month',
                 badge: null,
-                topBorderColor:
-                  'bg-gradient-to-r from-green-400 to-emerald-500',
+                topBorderColor: '',
                 features: [
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Business plan',
@@ -1306,8 +1305,7 @@ export default function HomePage() {
                 cta: '💎 Start Free Trial',
                 popular: false,
                 borderColor: 'border-purple-500',
-                buttonStyle:
-                  'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white',
+                buttonStyle: 'bg-gray-900 hover:bg-gray-800 text-white',
               },
               {
                 name: 'Enterprise',
@@ -1316,7 +1314,7 @@ export default function HomePage() {
                 description: 'Unlimited global scale for enterprise needs',
                 limit: 'Unlimited content generations',
                 badge: null,
-                topBorderColor: 'bg-gradient-to-r from-gray-600 to-gray-800',
+                topBorderColor: '',
                 features: [
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Premium plan',
@@ -1334,325 +1332,107 @@ export default function HomePage() {
                 cta: '🚀 Start Free Trial',
                 popular: false,
                 borderColor: 'border-gray-300',
-                buttonStyle:
-                  'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-black text-white',
+                buttonStyle: 'bg-gray-900 hover:bg-gray-800 text-white',
               },
             ].map((plan, index) => (
               <div
                 key={index}
-                className={`border-2 ${plan.borderColor} bg-white relative overflow-hidden ${
-                  plan.popular ? 'transform scale-105' : ''
-                } h-full flex flex-col`}
+                className={`bg-white rounded-xl border ${plan.borderColor} relative ${
+                  plan.popular ? 'shadow-xl' : 'shadow-sm'
+                } hover:shadow-lg transition-shadow h-full flex flex-col`}
               >
-                {/* Top colored border */}
-                <div className={`h-2 ${plan.topBorderColor}`}></div>
-
                 {/* Most Popular Badge */}
                 {plan.badge && (
-                  <div className="px-4 py-2 text-center text-white text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600">
-                    {plan.badge}
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-gray-900 text-white px-4 py-1 rounded-full text-form-label">
+                      {plan.badge}
+                    </div>
                   </div>
                 )}
 
                 <div className="p-6 flex-1 flex flex-col">
                   {/* Plan name and description */}
                   <div className="text-center mb-4">
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    <h3 className="text-heading-md text-gray-900 font-bold mb-1 text-2xl md:text-3xl">
                       {plan.name}
                     </h3>
-                    <p className="text-sm text-gray-600">{plan.description}</p>
+                    <p className="text-body-md text-gray-600">
+                      {plan.description}
+                    </p>
                   </div>
 
                   {/* Price */}
                   <div className="text-center mb-6">
-                    <div className="mb-1">
-                      <span className="text-3xl font-bold text-gray-900">
+                    <div className="flex items-baseline justify-center">
+                      <span className="text-display-lg font-bold text-gray-900 text-3xl md:text-4xl">
                         {plan.price}
                       </span>
-                      {plan.period && (
-                        <span className="text-gray-600 ml-1">
-                          /{' '}
-                          {plan.period === 'per month' ? 'month' : plan.period}
+                      {plan.period !== 'forever' && (
+                        <span className="text-body-md text-gray-500 ml-2 text-lg md:text-xl">
+                          /{plan.period}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">
-                      billed annually
-                    </p>
-                    <p className="text-sm font-medium text-gray-800">
+                    <div className="text-form-label text-gray-600 mt-2">
                       {plan.limit}
-                    </p>
-                  </div>
-
-                  {/* CTA Button */}
-                  <div className="mb-6">
-                    <button
-                      onClick={handleSignup}
-                      className={`w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer ${plan.buttonStyle}`}
-                    >
-                      {plan.cta}
-                    </button>
-                  </div>
-
-                  {/* Features */}
-                  <div className="flex-1">
-                    <div className="space-y-4">
-                      <div>
-                        <ul className="space-y-2">
-                          {plan.features.map((feature, idx) => (
-                            <li
-                              key={idx}
-                              className="flex items-start space-x-2"
-                            >
-                              <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                              <span
-                                className={`text-sm ${
-                                  feature.includes('99+ languages')
-                                    ? 'text-blue-700 font-semibold'
-                                    : 'text-gray-700'
-                                }`}
-                              >
-                                {feature}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {plan.limitations && (
-                        <div>
-                          <ul className="space-y-2">
-                            {plan.limitations.map((limitation, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start space-x-2"
-                              >
-                                <span className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
-                                  ❌
-                                </span>
-                                <span className="text-sm text-gray-600">
-                                  {limitation}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {plan.newCapabilities && (
-                        <div>
-                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                            🚀 New Capabilities:
-                          </h4>
-                          <ul className="space-y-2">
-                            {plan.newCapabilities.map((capability, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start space-x-2"
-                              >
-                                <Star className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                                <span className="text-sm text-blue-700 font-medium">
-                                  {capability}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {plan.futureFeatures && (
-                        <div>
-                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                            🔮 Future Features:
-                          </h4>
-                          <ul className="space-y-2">
-                            {plan.futureFeatures.map((feature, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start space-x-2"
-                              >
-                                <span className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5">
-                                  🏢
-                                </span>
-                                <span className="text-sm text-purple-700">
-                                  {feature}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  {/* Money back guarantee */}
-                  <div className="mt-6 text-center text-xs text-gray-500">
-                    {plan.name === 'Starter (Free)'
-                      ? '✓ No credit card required • ✓ Forever free • 🌍 99+ languages'
-                      : '30-Day Money Back Guarantee • 🌍 99+ languages included'}
+                  {/* Features */}
+                  <div className="space-y-3 mb-6 flex-1">
+                    {plan.features.map((feature, i) => (
+                      <div key={i} className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <span className="text-body-sm text-gray-700 leading-relaxed">
+                          {feature}
+                        </span>
+                      </div>
+                    ))}
+
+                    {plan.limitations && (
+                      <div className="pt-3 border-t border-gray-200">
+                        {plan.limitations.map((limitation, i) => (
+                          <div key={i} className="flex items-start">
+                            <X className="h-5 w-5 text-gray-400 mr-2 flex-shrink-0 mt-0.5" />
+                            <span className="text-body-sm text-gray-500">
+                              {limitation}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {/* CTA Button */}
+                  <button
+                    onClick={handleSignup}
+                    className={`w-full py-3 px-4 rounded-lg text-form-label font-semibold transition-all transform hover:scale-105 shadow-md ${plan.buttonStyle}`}
+                  >
+                    {plan.cta}
+                  </button>
                 </div>
               </div>
             ))}
           </div>
-
-          <div className="mt-16 text-center">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 max-w-4xl mx-auto mb-8 border border-blue-200">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">
-                🌍 Global Language Support Included in ALL Plans
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div className="space-y-2">
-                  <div className="font-semibold text-blue-700">
-                    European Languages
-                  </div>
-                  <div className="text-gray-600">
-                    🇪🇸 Spanish • 🇫🇷 French
-                    <br />
-                    🇩🇪 German • 🇮🇹 Italian
-                    <br />
-                    🇳🇱 Dutch • 🇵🇹 Portuguese
-                    <br />
-                    🇷🇺 Russian • 🇵🇱 Polish
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="font-semibold text-blue-700">
-                    Asian Languages
-                  </div>
-                  <div className="text-gray-600">
-                    🇨🇳 Chinese • 🇯🇵 Japanese
-                    <br />
-                    🇰🇷 Korean • 🇮🇳 Hindi
-                    <br />
-                    🇮🇳 Tamil • 🇮🇳 Bengali
-                    <br />
-                    🇹🇭 Thai • 🇻🇳 Vietnamese
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="font-semibold text-blue-700">
-                    Middle Eastern
-                  </div>
-                  <div className="text-gray-600">
-                    🇸🇦 Arabic • 🇮🇷 Persian
-                    <br />
-                    🇹🇷 Turkish • 🇮🇱 Hebrew
-                    <br />
-                    🇵🇰 Urdu • 🇦🇫 Pashto
-                    <br />
-                    🇮🇶 Kurdish • + more
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="font-semibold text-blue-700">
-                    African & Others
-                  </div>
-                  <div className="text-gray-600">
-                    🇿🇦 Afrikaans • 🇳🇬 Yoruba
-                    <br />
-                    🇪🇹 Amharic • 🇰🇪 Swahili
-                    <br />
-                    🇫🇮 Finnish • 🇸🇪 Swedish
-                    <br />
-                    🇳🇴 Norwegian • + 70 more
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 text-center">
-                <p className="text-sm text-gray-600">
-                  <strong>Auto-Detection:</strong> Just speak naturally - our AI
-                  automatically detects your language and processes accordingly
-                </p>
-              </div>
-            </div>
-
-            <p className="text-gray-600 mb-6">
-              Need a custom solution for your enterprise or additional language
-              support?
-            </p>
-            <button
-              onClick={handleContact}
-              className="inline-flex items-center space-x-2 text-indigo-600 hover:text-indigo-700 font-semibold"
-            >
-              <MessageCircle className="h-5 w-5" />
-              <span>Contact our sales team</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
         </div>
       </section>
-
-      {/* Enhanced Final CTA */}
-      <section className="relative py-24 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600" />
-        <div className="absolute inset-0 bg-black/20" />
-
-        <div className="relative max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Ready to 10X your global content creation speed?
-          </h2>
-          <p className="text-xl text-indigo-100 mb-12 max-w-3xl mx-auto">
-            Experience the power of multilingual voice-driven content creation
-            with Amazon optimization, direct Shopify publishing, and
-            revolutionary eBay direct listing. Speak in ANY of 99+ languages and
-            get professional content for global markets. Start your free trial
-            today and transform your business forever.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
-            <button
-              onClick={handleSignup}
-              className="group bg-white hover:bg-gray-100 text-indigo-600 px-8 py-4 rounded-xl text-lg font-bold transition-all transform hover:scale-105 shadow-2xl flex items-center cursor-pointer"
-            >
-              <Languages className="mr-2 h-5 w-5 group-hover:animate-pulse" />
-              Start Your Free Multilingual Trial
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button
-              onClick={handleContact}
-              className="border-2 border-white hover:bg-white hover:text-indigo-600 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all flex items-center cursor-pointer"
-            >
-              <MessageCircle className="mr-2 h-5 w-5" />
-              Contact Our Team
-            </button>
-          </div>
-
-          <div className="flex flex-wrap justify-center items-center gap-8 text-indigo-100">
-            <div className="flex items-center space-x-2">
-              <Check className="h-5 w-5 text-green-400" />
-              <span>No credit card required</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Check className="h-5 w-5 text-green-400" />
-              <span>99+ languages supported</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Check className="h-5 w-5 text-green-400" />
-              <span>14-day free trial</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Check className="h-5 w-5 text-green-400" />
-              <span>Setup in under 60 seconds</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Enhanced Footer */}
-      <footer className="bg-gray-900 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+      {/* Enhanced Footer - Premium Dark Style */}
+      <footer className="relative bg-gradient-to-b from-gray-900 to-black text-white">
+        {/* Subtle gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-transparent to-blue-900/10" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+            {/* Company Info */}
             <div>
               <div className="flex items-center space-x-3 mb-6">
                 <ListoraAILogo size="md" showText={false} />
-                <span className="text-xl font-bold">Listora AI</span>
+                <span className="text-xl font-bold text-white">Listora AI</span>
               </div>
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 Revolutionizing global product marketing with advanced
                 multilingual AI technology. Transform your voice in 99+
                 languages into professional content and optimize images for
-                Amazon, Shopify, and eBay platforms worldwide.
+                various e-commerce platforms worldwide.
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
@@ -1666,7 +1446,7 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
-
+            {/* Product Links */}
             <div>
               <h3 className="font-bold text-white mb-6">Product</h3>
               <ul className="space-y-3 text-sm text-gray-400">
@@ -1692,45 +1472,49 @@ export default function HomePage() {
                 <li>
                   <span className="text-gray-500">Platform Integrations</span>
                 </li>
-                <li>
-                  <span className="text-gray-500">eBay Direct Listing</span>
-                </li>
               </ul>
             </div>
-
+            {/* Company Links */}
             <div>
-              <h3 className="font-bold text-white mb-6">Company</h3>
-              <ul className="space-y-3 text-sm text-gray-400">
+              <h4 className="text-form-label font-medium text-white mb-4">
+                Company
+              </h4>
+              <ul className="space-y-2">
                 <li>
-                  <button
-                    onClick={handleAbout}
-                    className="hover:text-white transition-colors cursor-pointer"
+                  <Link
+                    href="/about"
+                    className="text-body-sm text-gray-400 hover:text-white transition-colors"
                   >
-                    About Us
-                  </button>
+                    About
+                  </Link>
                 </li>
                 <li>
                   <Link
                     href="/blog"
-                    className="hover:text-white transition-colors cursor-pointer"
+                    className="text-body-sm text-gray-400 hover:text-white transition-colors"
                   >
                     Blog
                   </Link>
                 </li>
                 <li>
-                  <span className="text-gray-500">Careers</span>
+                  <Link
+                    href="/careers"
+                    className="text-body-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Careers
+                  </Link>
                 </li>
                 <li>
-                  <button
-                    onClick={handleContact}
-                    className="hover:text-white transition-colors cursor-pointer"
+                  <Link
+                    href="/contact"
+                    className="text-body-sm text-gray-400 hover:text-white transition-colors"
                   >
                     Contact
-                  </button>
+                  </Link>
                 </li>
               </ul>
             </div>
-
+            {/* Support Links */}
             <div>
               <h3 className="font-bold text-white mb-6">Support</h3>
               <ul className="space-y-3 text-sm text-gray-400">
@@ -1746,71 +1530,38 @@ export default function HomePage() {
                   </button>
                 </li>
                 <li>
-                  <a
+                  <Link
                     href="/privacy"
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     Privacy Policy
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a
+                  <Link
                     href="/terms"
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     Terms of Service
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a
+                  <Link
                     href="/dmca"
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     DMCA Policy
-                  </a>
+                  </Link>
                 </li>
               </ul>
-            </div>
-          </div>
-
+            </div>{' '}
+          </div>{' '}
+          {/* Bottom Bar */}
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-            <p>
-              &copy; 2025 Listora AI. All rights reserved. Built with ❤️ for
-              global entrepreneurs worldwide. 🌍 Supporting 99+ languages with
-              Amazon, Shopify & eBay integration.
-            </p>
+            <p>&copy; 2025 Listora AI. All rights reserved.</p>
           </div>
-        </div>
-      </footer>
-
-      <style jsx>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            color: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-        .hover\\:scale-102:hover {
-          transform: scale(1.02);
-        }
-      `}</style>
+        </div>{' '}
+      </footer>{' '}
     </div>
   )
 }
