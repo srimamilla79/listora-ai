@@ -42,21 +42,42 @@ export default function MarketplaceConnections({
   userId,
   onConnectionChange,
 }: MarketplaceConnectionsProps) {
-  // 🔧 ALWAYS visible - never disappears
-  const [connections, setConnections] = useState<Connection[]>([
-    {
-      platform: 'amazon',
-      connected: false,
-    },
-    {
-      platform: 'shopify',
-      connected: false,
-    },
-    {
-      platform: 'ebay',
-      connected: false,
-    },
-  ])
+  // 🔧 PERSISTENT connection state that survives page changes
+  const [connections, setConnections] = useState<Connection[]>(() => {
+    // Initialize with cached state if available
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('marketplace_connections')
+      if (cached) {
+        try {
+          const parsedCache = JSON.parse(cached)
+          console.log('🔄 Restored connections from cache:', parsedCache)
+          return parsedCache
+        } catch (err) {
+          console.log('⚠️ Failed to parse cached connections, using defaults')
+        }
+      }
+    }
+
+    return [
+      { platform: 'amazon', connected: false },
+      { platform: 'shopify', connected: false },
+      { platform: 'ebay', connected: false },
+    ]
+  })
+
+  // 🔧 Cache connections whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(
+        'marketplace_connections',
+        JSON.stringify(connections)
+      )
+      console.log(
+        '💾 Cached connection state:',
+        connections.map((c) => `${c.platform}: ${c.connected}`)
+      )
+    }
+  }, [connections])
 
   // 🔧 MINIMAL loading - max 3 seconds, then always show interface
   const [loading, setLoading] = useState(true)
@@ -117,7 +138,7 @@ export default function MarketplaceConnections({
     }
   }, [currentUserId])
 
-  // 🔧 ROBUST connection loading with better error handling
+  // 🔧 ROBUST connection loading with persistent caching
   const loadConnections = async () => {
     if (!currentUserId) {
       setLoading(false)
@@ -125,6 +146,41 @@ export default function MarketplaceConnections({
     }
 
     console.log('🔗 Loading marketplace connections for user:', currentUserId)
+
+    // 🔧 FIRST: Check if we have recent cached connections (less than 5 minutes old)
+    if (typeof window !== 'undefined') {
+      const cacheKey = `connections_${currentUserId}`
+      const cacheTimestampKey = `connections_timestamp_${currentUserId}`
+      const cachedConnections = localStorage.getItem(cacheKey)
+      const cacheTimestamp = localStorage.getItem(cacheTimestampKey)
+
+      if (cachedConnections && cacheTimestamp) {
+        const now = Date.now()
+        const cached = parseInt(cacheTimestamp)
+        const fiveMinutes = 5 * 60 * 1000
+
+        if (now - cached < fiveMinutes) {
+          try {
+            const parsedConnections = JSON.parse(cachedConnections)
+            console.log(
+              '⚡ Using recent cached connections (less than 5min old)'
+            )
+            setConnections(parsedConnections)
+            setLoading(false)
+
+            // Still notify callbacks
+            if (onConnectionChange) {
+              parsedConnections.forEach((conn: Connection) => {
+                onConnectionChange(conn.platform, conn.connected)
+              })
+            }
+            return
+          } catch (err) {
+            console.log('⚠️ Failed to parse cached connections, will refresh')
+          }
+        }
+      }
+    }
 
     try {
       const supabase = createClient()
@@ -140,8 +196,52 @@ export default function MarketplaceConnections({
           .select('count', { count: 'exact', head: true })
         console.log('✅ Database connectivity test passed')
       } catch (testError) {
-        console.log('⚠️ Database connectivity test failed, using fallback mode')
-        throw new Error('Database not accessible')
+        console.log(
+          '⚠️ Database connectivity test failed, using cached/fallback mode'
+        )
+
+        // 🔧 SMART FALLBACK: Check URL for recent OAuth completion
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search)
+          const shopifyConnected = urlParams.get('shopify') === 'connected'
+          const amazonConnected = urlParams.get('amazon') === 'connected'
+          const ebayConnected = urlParams.get('ebay') === 'connected'
+
+          if (shopifyConnected || amazonConnected || ebayConnected) {
+            console.log('🔄 OAuth detected in URL, updating connections')
+
+            const updatedConnections = connections.map((conn) => ({
+              ...conn,
+              connected:
+                (conn.platform === 'amazon' && amazonConnected) ||
+                (conn.platform === 'shopify' && shopifyConnected) ||
+                (conn.platform === 'ebay' && ebayConnected) ||
+                conn.connected, // Keep existing state for other platforms
+            }))
+
+            setConnections(updatedConnections)
+
+            // Cache the updated connections
+            const cacheKey = `connections_${currentUserId}`
+            const cacheTimestampKey = `connections_timestamp_${currentUserId}`
+            localStorage.setItem(cacheKey, JSON.stringify(updatedConnections))
+            localStorage.setItem(cacheTimestampKey, Date.now().toString())
+
+            if (onConnectionChange) {
+              updatedConnections.forEach((conn) => {
+                onConnectionChange(conn.platform, conn.connected)
+              })
+            }
+
+            setLoading(false)
+            return
+          }
+        }
+
+        // If no OAuth detected, keep current cached state
+        console.log('💾 Using existing cached connection state')
+        setLoading(false)
+        return
       }
 
       console.log('🔍 MarketplaceConnections: Running database queries...')
@@ -272,7 +372,16 @@ export default function MarketplaceConnections({
       ]
 
       setConnections(updatedConnections)
-      console.log('✅ Marketplace connections loaded successfully')
+
+      // 🔧 CACHE the fresh connections for 5 minutes
+      if (typeof window !== 'undefined') {
+        const cacheKey = `connections_${currentUserId}`
+        const cacheTimestampKey = `connections_timestamp_${currentUserId}`
+        localStorage.setItem(cacheKey, JSON.stringify(updatedConnections))
+        localStorage.setItem(cacheTimestampKey, Date.now().toString())
+      }
+
+      console.log('✅ Marketplace connections loaded and cached successfully')
 
       // 🔧 PRESERVE callback functionality
       if (onConnectionChange) {
@@ -315,18 +424,8 @@ export default function MarketplaceConnections({
         }
       }
 
-      // Final fallback - all disconnected
-      setConnections([
-        { platform: 'amazon', connected: false },
-        { platform: 'shopify', connected: false },
-        { platform: 'ebay', connected: false },
-      ])
-
-      if (onConnectionChange) {
-        onConnectionChange('amazon', false)
-        onConnectionChange('shopify', false)
-        onConnectionChange('ebay', false)
-      }
+      // Keep existing cached state instead of resetting to disconnected
+      console.log('💾 Keeping existing connection state due to error')
     } finally {
       setLoading(false)
       console.log('✅ MarketplaceConnections loading completed')
