@@ -4,6 +4,8 @@
 // ✅ Smart fallbacks ensure every product publishes successfully
 // ✅ Handles ALL eBay required aspects automatically
 // ✅ FIXED: Social media content cleaning (no more hashtags/emojis)
+// ✅ FIXED: iPhone model and storage extraction
+// ✅ FIXED: Detailed error messages
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 
@@ -32,6 +34,7 @@ interface EbayApiResult {
   Warnings: any[]
   Ack: string
   RawResponse: string
+  missingFields?: string[]
 }
 
 interface CategoryResult {
@@ -324,12 +327,43 @@ export async function POST(request: NextRequest) {
     const err = error as Error
     console.error('❌ eBay publish error:', err)
 
+    // ✅ ENHANCED: Parse eBay-specific errors for better user feedback
+    let userMessage = 'Failed to publish to eBay'
+    let missingFields: string[] = []
+
+    // Check if error message contains specific eBay requirements
+    if (err.message.includes('eBay listing requirements not met')) {
+      userMessage = 'eBay listing requirements not met'
+
+      // Try to extract missing fields from the error
+      if ((err as any).missingFields) {
+        missingFields = (err as any).missingFields
+      }
+    }
+
+    // Build detailed error message
+    if (missingFields.length > 0) {
+      userMessage = `eBay requires the following information that could not be found in your product description:\n\n${missingFields.map((field) => `• ${field}`).join('\n')}\n\nPlease update your product description to include these details and try again.`
+    } else if (err.message) {
+      userMessage = err.message
+    }
+
     return NextResponse.json(
       {
-        error: err.message || 'Failed to publish to eBay',
+        error: userMessage,
         platform: 'ebay',
+        missingFields: missingFields.length > 0 ? missingFields : undefined,
+        details:
+          missingFields.length > 0
+            ? {
+                message: 'Required information missing',
+                fields: missingFields,
+                suggestion:
+                  'Update your product description to include the missing information',
+              }
+            : undefined,
       },
-      { status: 500 }
+      { status: 400 }
     )
   }
 }
@@ -991,7 +1025,7 @@ async function generateBulletproofItemSpecifics(
   }
 }
 
-// ✅ SMART VALUE EXTRACTION - Enhanced for all aspects
+// ✅ SMART VALUE EXTRACTION - Universal for ANY aspect (FIXED FOR iPHONE)
 function extractSmartValueForAspect(
   fullText: string,
   generatedContent: string,
@@ -1005,34 +1039,206 @@ function extractSmartValueForAspect(
 
     console.log(`🔍 Smart extraction for aspect: ${aspectName}`)
 
-    // ✅ DEPARTMENT - Critical for clothing
-    if (aspect.includes('department')) {
-      // Check for gender indicators in content
-      if (/\b(men'?s?|male|gentleman|man\b)/i.test(generatedContent)) {
-        return 'Men'
-      } else if (
-        /\b(women'?s?|female|ladies?|woman\b)/i.test(generatedContent)
-      ) {
-        return 'Women'
-      } else if (/\b(unisex|both|everyone)\b/i.test(generatedContent)) {
-        return 'Unisex Adult'
-      } else if (
-        /\b(kids?|children|youth|boy|girl)\b/i.test(generatedContent)
-      ) {
-        return 'Kids'
+    // ✅ UNIVERSAL PATTERN MATCHING - Works for ANY aspect
+    // Pattern 1: "Aspect: Value" or "Aspect - Value"
+    const patterns = [
+      new RegExp(`${aspect}[:\\s-]+([^,\\.\\n]+)`, 'i'),
+      new RegExp(`${aspectName}[:\\s-]+([^,\\.\\n]+)`, 'i'),
+    ]
+
+    for (const pattern of patterns) {
+      const match = generatedContent.match(pattern)
+      if (match && match[1]) {
+        const value = match[1].trim()
+        if (value.length > 0 && value.length < 50) {
+          console.log(`✅ Found ${aspectName} from pattern: ${value}`)
+          return value
+        }
       }
-      return 'Unisex Adult' // Safe default
     }
 
-    // ✅ BRAND - Extract from content
+    // ✅ ENHANCED EXTRACTION FROM TITLE - Check title first for common values
+    const titleMatch = generatedContent.match(
+      /\*\*1\.\s*PRODUCT\s+TITLE[^:]*:\*\*\s*\n([^\n]+)/i
+    )
+    if (titleMatch) {
+      const title = titleMatch[1]
+
+      // For model - Enhanced iPhone and other product detection
+      if (aspect.includes('model')) {
+        // Enhanced iPhone model detection
+        const iphoneMatch = title.match(/iphone\s*(\d+(?:\s*pro)?(?:\s*max)?)/i)
+        if (iphoneMatch) {
+          const modelNumber = iphoneMatch[1].trim().replace(/\s+/g, ' ')
+          return `iPhone ${modelNumber}`
+        }
+
+        // Extract everything between brand and first dash/comma
+        const modelMatch = title.match(/^([^-,]+)/i)
+        if (modelMatch) {
+          const potentialModel = modelMatch[1].trim()
+          // Remove brand name if present
+          const cleanModel = potentialModel
+            .replace(/^(Apple|Samsung|Google|Sony|LG)\s*/i, '')
+            .trim()
+          if (cleanModel.length > 0) {
+            console.log(`✅ Model extracted from title: ${cleanModel}`)
+            return cleanModel
+          }
+        }
+      }
+
+      // For storage/capacity - more flexible extraction
+      if (aspect.includes('storage') || aspect.includes('capacity')) {
+        const storageMatch = title.match(/(\d+)\s*(?:GB|TB)/i)
+        if (storageMatch) {
+          const size = storageMatch[1]
+          const unit = title.match(/\d+\s*(GB|TB)/i)?.[1] || 'GB'
+          return `${size} ${unit.toUpperCase()}`
+        }
+      }
+    }
+
+    // ✅ SMART CONTENT SEARCH - Look for aspect mentions in sentences
+    const sentences = generatedContent.split(/[.!?]+/)
+    for (const sentence of sentences) {
+      const lowerSentence = sentence.toLowerCase()
+
+      // Check if sentence contains the aspect name
+      if (
+        lowerSentence.includes(aspect) ||
+        lowerSentence.includes(aspectName.toLowerCase())
+      ) {
+        // Extract potential values from the sentence
+
+        // For numeric values (storage, size, etc.)
+        const numericMatch = sentence.match(/(\d+(?:\.\d+)?)\s*([A-Za-z]+)?/)
+        if (
+          numericMatch &&
+          (aspect.includes('storage') ||
+            aspect.includes('capacity') ||
+            aspect.includes('size'))
+        ) {
+          const number = numericMatch[1]
+          const unit = numericMatch[2] || ''
+
+          // Special handling for storage to ensure space
+          if (aspect.includes('storage') || aspect.includes('capacity')) {
+            if (unit.toUpperCase() === 'GB' || unit.toUpperCase() === 'TB') {
+              return `${number} ${unit.toUpperCase()}`
+            }
+          }
+          return `${number} ${unit}`.trim()
+        }
+
+        // For color mentions
+        if (aspect.includes('color') || aspect.includes('colour')) {
+          const colors = [
+            'black',
+            'white',
+            'red',
+            'blue',
+            'green',
+            'yellow',
+            'gold',
+            'silver',
+            'gray',
+            'grey',
+            'pink',
+            'purple',
+            'orange',
+            'brown',
+          ]
+          for (const color of colors) {
+            if (lowerSentence.includes(color)) {
+              return color.charAt(0).toUpperCase() + color.slice(1)
+            }
+          }
+        }
+
+        // For model/type - extract capitalized words after aspect mention
+        if (aspect.includes('model') || aspect.includes('type')) {
+          const words = sentence.split(/\s+/)
+          const aspectIndex = words.findIndex((w) =>
+            w.toLowerCase().includes(aspect)
+          )
+          if (aspectIndex >= 0 && aspectIndex < words.length - 1) {
+            // Get the next 1-3 words as potential model
+            const modelWords = words
+              .slice(aspectIndex + 1, aspectIndex + 4)
+              .filter((w) => /^[A-Z0-9]/.test(w))
+              .join(' ')
+            if (modelWords.length > 0) {
+              return modelWords
+            }
+          }
+        }
+      }
+    }
+
+    // ✅ Additional storage/capacity check in all content
+    if (aspect.includes('storage') || aspect.includes('capacity')) {
+      const storagePatterns = [
+        /(\d+)\s*GB/i,
+        /(\d+)\s*TB/i,
+        /(\d+)GB/i, // No space version
+        /(\d+)TB/i, // No space version
+      ]
+
+      for (const pattern of storagePatterns) {
+        const match = generatedContent.match(pattern)
+        if (match && match[1]) {
+          const size = match[1]
+          // Always return with space for eBay
+          if (pattern.toString().includes('TB')) {
+            return `${size} TB`
+          }
+          return `${size} GB`
+        }
+      }
+    }
+
+    // ✅ CONTEXTUAL EXTRACTION - Use surrounding context
+    const contextPatterns = [
+      new RegExp(`([^\\s]+)\\s+${aspect}`, 'i'), // word before aspect
+      new RegExp(`${aspect}\\s+([^\\s]+)`, 'i'), // word after aspect
+      new RegExp(`([^,]+?)\\s+${aspect}`, 'i'), // phrase before aspect
+      new RegExp(`${aspect}\\s+([^,]+)`, 'i'), // phrase after aspect
+    ]
+
+    for (const pattern of contextPatterns) {
+      const match = generatedContent.match(pattern)
+      if (match && match[1]) {
+        const value = match[1].trim()
+        if (value.length > 1 && value.length < 30 && !isCommonWord(value)) {
+          return value
+        }
+      }
+    }
+
+    // ✅ SPECIAL HANDLERS for common aspects
+
+    // DEPARTMENT - Critical for clothing
+    if (aspect.includes('department')) {
+      if (/\b(men'?s?|male|gentleman|man\b)/i.test(generatedContent))
+        return 'Men'
+      if (/\b(women'?s?|female|ladies?|woman\b)/i.test(generatedContent))
+        return 'Women'
+      if (/\b(unisex|both|everyone)\b/i.test(generatedContent))
+        return 'Unisex Adult'
+      if (/\b(kids?|children|youth|boy|girl)\b/i.test(generatedContent))
+        return 'Kids'
+      return 'Unisex Adult'
+    }
+
+    // BRAND - Extract from content
     if (aspect.includes('brand')) {
       const brand = extractBrandSafe(generatedContent)
       return brand !== 'Unbranded' ? brand : 'Generic'
     }
 
-    // ✅ SIZE - Multiple patterns
+    // SIZE - Multiple patterns
     if (aspect.includes('size') && !aspect.includes('type')) {
-      // Look for size mentions in content
       const sizePatterns = [
         /sizes?\s+([a-z0-9\s,\-]+?)(?:\n|,|\.|$)/i,
         /available\s+in\s+([a-z0-9\s,\-]+?)(?:\n|,|\.|$)/i,
@@ -1044,54 +1250,42 @@ function extractSmartValueForAspect(
         const match = generatedContent.match(pattern)
         if (match && match[1]) {
           const sizeText = match[1].trim()
-          // Extract first valid size
           const validSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
           for (const size of validSizes) {
             if (sizeText.toUpperCase().includes(size)) {
               return size
             }
           }
-          return 'M' // Safe default
+          return 'M'
         }
       }
-      return 'M' // Safe default
+      return 'M'
     }
 
-    // ✅ SIZE TYPE
+    // SIZE TYPE
     if (aspect.includes('size') && aspect.includes('type')) {
-      if (content.includes('regular') || content.includes('standard')) {
+      if (content.includes('regular') || content.includes('standard'))
         return 'Regular'
-      } else if (content.includes('big') || content.includes('tall')) {
+      if (content.includes('big') || content.includes('tall'))
         return 'Big & Tall'
-      } else if (content.includes('petite')) {
-        return 'Petite'
-      }
-      return 'Regular' // Safe default
+      if (content.includes('petite')) return 'Petite'
+      return 'Regular'
     }
 
-    // ✅ SLEEVE LENGTH - For shirts
+    // SLEEVE LENGTH - For shirts
     if (aspect.includes('sleeve') && aspect.includes('length')) {
-      if (
-        content.includes('short sleeve') ||
-        content.includes('short-sleeve')
-      ) {
+      if (content.includes('short sleeve') || content.includes('short-sleeve'))
         return 'Short Sleeve'
-      } else if (
-        content.includes('long sleeve') ||
-        content.includes('long-sleeve')
-      ) {
+      if (content.includes('long sleeve') || content.includes('long-sleeve'))
         return 'Long Sleeve'
-      } else if (content.includes('sleeveless') || content.includes('tank')) {
+      if (content.includes('sleeveless') || content.includes('tank'))
         return 'Sleeveless'
-      }
-      // Smart guess based on product type
-      if (content.includes('t-shirt') || content.includes('polo')) {
+      if (content.includes('t-shirt') || content.includes('polo'))
         return 'Short Sleeve'
-      }
-      return 'Long Sleeve' // Safe default for dress shirts
+      return 'Long Sleeve'
     }
 
-    // ✅ COLOR - Enhanced detection
+    // COLOR - Enhanced detection
     if (aspect.includes('color') || aspect.includes('colour')) {
       const colors = [
         'black',
@@ -1109,7 +1303,6 @@ function extractSmartValueForAspect(
         'gold',
         'silver',
       ]
-
       for (const color of colors) {
         if (content.includes(color)) {
           return color.charAt(0).toUpperCase() + color.slice(1)
@@ -1118,7 +1311,7 @@ function extractSmartValueForAspect(
       return 'Multicolor'
     }
 
-    // ✅ MATERIAL - Enhanced detection
+    // MATERIAL - Enhanced detection
     if (aspect.includes('material') || aspect.includes('fabric')) {
       const materials = [
         'cotton',
@@ -1134,7 +1327,6 @@ function extractSmartValueForAspect(
         'nylon',
         'spandex',
       ]
-
       for (const material of materials) {
         if (content.includes(material)) {
           return material.charAt(0).toUpperCase() + material.slice(1)
@@ -1143,7 +1335,7 @@ function extractSmartValueForAspect(
       return 'Mixed Materials'
     }
 
-    // ✅ STYLE - General style detection
+    // STYLE - General style detection
     if (aspect.includes('style')) {
       if (content.includes('casual')) return 'Casual'
       if (content.includes('formal')) return 'Formal'
@@ -1170,46 +1362,87 @@ function getSmartDefault(
   const aspect = aspectName.toLowerCase()
 
   try {
-    // ✅ Critical defaults that prevent listing failures
+    // ✅ INTELLIGENT DEFAULTS based on content analysis
+
+    // Analyze product type from content
+    const contentLower = generatedContent.toLowerCase()
+    const isPhone =
+      contentLower.includes('phone') || contentLower.includes('smartphone')
+    const isClothing =
+      contentLower.includes('shirt') ||
+      contentLower.includes('dress') ||
+      contentLower.includes('pants')
+    const isElectronics =
+      contentLower.includes('laptop') ||
+      contentLower.includes('computer') ||
+      isPhone
+
+    // Department
     if (aspect.includes('department')) {
-      // Analyze content for gender clues
-      if (generatedContent.toLowerCase().includes('men')) return 'Men'
-      if (
-        generatedContent.toLowerCase().includes('women') ||
-        generatedContent.toLowerCase().includes('ladies')
-      )
+      if (contentLower.includes('men')) return 'Men'
+      if (contentLower.includes('women') || contentLower.includes('ladies'))
         return 'Women'
       return 'Unisex Adult'
     }
 
+    // Brand
     if (aspect.includes('brand')) {
       const brand = extractBrandSafe(generatedContent)
       return brand !== 'Unbranded' ? brand : 'Generic'
     }
 
+    // Size
     if (aspect.includes('size') && !aspect.includes('type')) {
-      return 'M'
+      if (isClothing) return 'M'
+      if (isPhone) return '6 inches'
+      return 'Standard'
     }
 
-    if (aspect.includes('size') && aspect.includes('type')) {
-      return 'Regular'
+    // Storage
+    if (aspect.includes('storage') || aspect.includes('capacity')) {
+      if (isPhone) return '128 GB'
+      if (isElectronics) return '512 GB'
+      return 'Standard'
     }
 
-    if (aspect.includes('sleeve') && aspect.includes('length')) {
-      return 'Long Sleeve'
+    // Model
+    if (aspect.includes('model')) {
+      // Try to extract from title or content
+      const titleMatch = generatedContent.match(
+        /\*\*1\.\s*PRODUCT\s+TITLE[^:]*:\*\*\s*\n([^\n]+)/i
+      )
+      if (titleMatch) {
+        const words = titleMatch[1].split(/\s+/).slice(1, 4) // Skip first word (likely brand)
+        return (
+          words
+            .join(' ')
+            .replace(/[-,].*$/, '')
+            .trim() || 'Standard Model'
+        )
+      }
+      return 'Standard Model'
     }
 
+    // Color
     if (aspect.includes('color')) {
+      // Try one more time to find color in content
+      const colorMatch = contentLower.match(
+        /\b(black|white|blue|red|gold|silver|gray|grey)\b/
+      )
+      if (colorMatch) {
+        return colorMatch[1].charAt(0).toUpperCase() + colorMatch[1].slice(1)
+      }
       return 'Multicolor'
     }
 
-    if (aspect.includes('material') || aspect.includes('fabric')) {
-      return 'Mixed Materials'
-    }
-
-    if (aspect.includes('style')) {
-      return 'Casual'
-    }
+    // Generic defaults for common aspects
+    if (aspect.includes('material')) return 'Mixed Materials'
+    if (aspect.includes('style')) return 'Modern'
+    if (aspect.includes('condition')) return 'New'
+    if (aspect.includes('type')) return 'Standard'
+    if (aspect.includes('size') && aspect.includes('type')) return 'Regular'
+    if (aspect.includes('sleeve') && aspect.includes('length'))
+      return 'Long Sleeve'
 
     return null
   } catch (error) {
@@ -1819,7 +2052,7 @@ function detectVerifiedCategory(fullText: string): string {
   }
 }
 
-// ✅ eBay API FUNCTIONS
+// ✅ eBay API FUNCTIONS (ENHANCED ERROR HANDLING)
 async function createEbayListing(
   listingData: EbayListingData,
   userAccessToken: string
@@ -1952,17 +2185,69 @@ async function createEbayListing(
   let userFriendlyError = ''
 
   if (errorsMatch) {
+    const missingSpecifics: string[] = []
+    let detailedError = ''
+
     errorsMatch.forEach((error, index) => {
       console.log(`Error/Warning ${index + 1}:`, error)
+
+      // Parse specific error types
       if (error.includes('<SeverityCode>Error</SeverityCode>')) {
         hasRealErrors = true
-        userFriendlyError =
-          'eBay listing requirements not met. Please check your product details and try again.'
+
+        // Extract missing item specifics
+        const shortMessageMatch = error.match(
+          /<ShortMessage>([^<]+)<\/ShortMessage>/
+        )
+
+        if (
+          shortMessageMatch &&
+          shortMessageMatch[1].includes('item specific')
+        ) {
+          // Extract the specific field name
+          const fieldMatch = shortMessageMatch[1].match(
+            /The item specific ([^.]+) is missing/
+          )
+          if (fieldMatch && fieldMatch[1]) {
+            missingSpecifics.push(fieldMatch[1])
+          }
+        }
+
+        // Capture other specific errors
+        const longMessageMatch = error.match(
+          /<LongMessage>([^<]+)<\/LongMessage>/
+        )
+        if (longMessageMatch) {
+          const errorMsg = longMessageMatch[1]
+          if (errorMsg.includes('at least 1 picture')) {
+            detailedError =
+              'At least one product image is required for eBay listings.'
+          } else if (errorMsg.includes('Title is missing')) {
+            detailedError =
+              'Product title is missing or too short. Titles must be at least 15 characters.'
+          } else if (errorMsg.includes('Description is missing')) {
+            detailedError = 'Product description is required for eBay listings.'
+          }
+        }
       }
     })
 
+    // Build comprehensive error message
+    if (missingSpecifics.length > 0) {
+      userFriendlyError = `eBay requires the following item specifics: ${missingSpecifics.join(', ')}. Please ensure your product description includes: ${missingSpecifics.map((field) => `\n• ${field}`).join('')}`
+    } else if (detailedError) {
+      userFriendlyError = detailedError
+    } else if (hasRealErrors) {
+      userFriendlyError =
+        'eBay listing requirements not met. Please check your product details and try again.'
+    }
+
     if (hasRealErrors && ack !== 'Success' && ack !== 'Warning') {
-      throw new Error(userFriendlyError || 'Failed to create eBay listing.')
+      const error = new Error(userFriendlyError)
+      // Attach additional details to the error object
+      ;(error as any).missingFields = missingSpecifics
+      ;(error as any).ebayErrors = errorsMatch
+      throw error
     }
   }
 
