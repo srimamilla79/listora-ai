@@ -102,7 +102,16 @@ async function processWebhookInBackground(event: any, stripe: any) {
     const processingTime = Date.now() - processingStart
     console.log(`✅ Background processing completed in ${processingTime}ms`)
   } catch (error) {
-    console.error('❌ Error in background processing:', error)
+    console.error('❌ CRITICAL: Background processing failed:', {
+      eventType: event.type,
+      eventId: event.id,
+      error: (error as Error).message,
+      stack: (error as Error).stack,
+      timestamp: new Date().toISOString(),
+    })
+
+    // 🚨 ADD ALERT MECHANISM - uncomment and configure for your monitoring service
+    // await sendAlertToMonitoring(error, event)
   }
 }
 
@@ -117,20 +126,19 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
     userId,
     planName,
     customer: session.customer,
+    sessionId: session.id,
   })
 
   if (!userId) {
-    console.log('❌ No userId in session metadata')
-    return
+    throw new Error(`No userId in session metadata for session: ${session.id}`)
   }
 
   if (!session.subscription) {
-    console.log('❌ No subscription in checkout session')
-    return
+    throw new Error(`No subscription in checkout session: ${session.id}`)
   }
 
   try {
-    // Get subscription details (optimized - only get what we need)
+    // Get subscription details
     const subscription = await stripe.subscriptions.retrieve(
       session.subscription,
       {
@@ -144,6 +152,36 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       planName: planName,
     })
 
+    // Check if user has existing subscription and handle it
+    const { data: existingSubscription } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (existingSubscription) {
+      console.log('🔄 Updating existing subscription for user:', userId)
+
+      // Cancel old subscription in Stripe if different
+      if (existingSubscription.stripe_subscription_id !== subscription.id) {
+        console.log(
+          '🗑️ Canceling old subscription:',
+          existingSubscription.stripe_subscription_id
+        )
+        try {
+          await stripe.subscriptions.cancel(
+            existingSubscription.stripe_subscription_id
+          )
+        } catch (cancelError) {
+          console.warn(
+            '⚠️ Could not cancel old subscription:',
+            (cancelError as Error).message
+          )
+          // Don't fail the entire process for this
+        }
+      }
+    }
+
     // Get current usage before updating plan (PRESERVATION LOGIC)
     const currentMonth = new Date().toISOString().slice(0, 7)
     const { data: currentUsage } = await supabase
@@ -153,10 +191,8 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       .eq('month_year', currentMonth)
       .single()
 
-    console.log(
-      '📊 Current usage before plan change:',
-      currentUsage?.usage_count || 0
-    )
+    const preservedUsage = currentUsage?.usage_count || 0
+    console.log('📊 Preserving usage:', preservedUsage)
 
     // Save subscription to user_subscriptions table
     const subscriptionData = {
@@ -178,9 +214,9 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       updated_at: new Date().toISOString(),
     }
 
-    console.log('💾 Saving subscription data for user:', userId)
+    console.log('💾 Saving subscription data:', subscriptionData)
 
-    // Optimized: Single upsert operation
+    // Use upsert with the unique constraint now in place
     const { error: subscriptionError } = await supabase
       .from('user_subscriptions')
       .upsert(subscriptionData, {
@@ -189,48 +225,50 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       })
 
     if (subscriptionError) {
-      console.log('❌ Error saving subscription:', subscriptionError)
-      return
+      throw new Error(
+        `Failed to save subscription: ${subscriptionError.message}`
+      )
     }
 
     console.log('✅ Subscription saved successfully')
 
-    // Optimized: Single transaction for plan update
-    const { error: planError } = await supabase.rpc('update_user_plan_atomic', {
-      p_user_id: userId,
-      p_plan_type: planName === 'pro' ? 'business' : planName,
-      p_expires_at: subscription.current_period_end
+    // Update user plan using transaction approach
+    // First deactivate old plans
+    const { error: deactivateError } = await supabase
+      .from('user_plans')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('is_active', true)
+
+    if (deactivateError) {
+      throw new Error(
+        `Failed to deactivate old plans: ${deactivateError.message}`
+      )
+    }
+
+    // Then create new active plan
+    const userPlanData = {
+      user_id: userId,
+      plan_type: planName === 'pro' ? 'business' : planName,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      expires_at: subscription.current_period_end
         ? new Date(subscription.current_period_end * 1000).toISOString()
         : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    })
+    }
+
+    const { error: planError } = await supabase
+      .from('user_plans')
+      .insert(userPlanData)
 
     if (planError) {
-      // Fallback to manual operations if RPC doesn't exist
-      await supabase
-        .from('user_plans')
-        .delete()
-        .eq('user_id', userId)
-        .eq('is_active', true)
-
-      const userPlanData = {
-        user_id: userId,
-        plan_type: planName === 'pro' ? 'business' : planName,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        expires_at: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      }
-
-      await supabase.from('user_plans').insert(userPlanData)
+      throw new Error(`Failed to create user plan: ${planError.message}`)
     }
 
     console.log('✅ User plan updated successfully')
 
     // PRESERVE USAGE: Update usage tracking with preserved usage
-    const preservedUsage = currentUsage?.usage_count || 0
-
     const usageTrackingData = {
       user_id: userId,
       month_year: currentMonth,
@@ -244,12 +282,12 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       .upsert(usageTrackingData, { onConflict: 'user_id,month_year' })
 
     if (usageTrackingError) {
-      console.log('❌ Error updating usage tracking:', usageTrackingError)
-    } else {
-      console.log(
-        `✅ Usage tracking updated - preserved ${preservedUsage} generations`
+      throw new Error(
+        `Failed to update usage tracking: ${usageTrackingError.message}`
       )
     }
+
+    console.log(`✅ Usage tracking preserved: ${preservedUsage} generations`)
 
     // Update legacy user_usage table (if still needed)
     const limits = {
@@ -274,12 +312,27 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       .upsert(usageData, { onConflict: 'user_id,month_year' })
 
     if (usageError) {
-      console.log('❌ Error updating usage:', usageError)
-    } else {
-      console.log('✅ Legacy usage limits updated')
+      throw new Error(`Failed to update legacy usage: ${usageError.message}`)
     }
+
+    console.log('✅ Legacy usage limits updated')
+    console.log(
+      '🎉 Checkout completed successfully for user:',
+      userId,
+      'plan:',
+      planName
+    )
   } catch (error) {
-    console.error('❌ Error in checkout completed handler:', error)
+    console.error('❌ CRITICAL ERROR in checkout completed handler:', {
+      userId,
+      sessionId: session.id,
+      planName,
+      error: (error as Error).message,
+      stack: (error as Error).stack,
+    })
+
+    // Re-throw to trigger monitoring alerts
+    throw error
   }
 }
 
@@ -307,8 +360,9 @@ async function handleSubscriptionCreated(
     }
 
     if (!customerEmail) {
-      console.log('❌ No customer email found')
-      return
+      throw new Error(
+        'No customer email found for subscription: ' + subscription.id
+      )
     }
 
     console.log('🔍 Looking up user by email:', customerEmail)
@@ -320,15 +374,13 @@ async function handleSubscriptionCreated(
     } = await supabase.auth.admin.listUsers()
 
     if (error) {
-      console.log('❌ Error listing users:', error)
-      return
+      throw new Error(`Error listing users: ${error.message}`)
     }
 
     const user = users.find((u: any) => u.email === customerEmail)
 
-    if (error || !user) {
-      console.log('❌ No user found with email:', customerEmail)
-      return
+    if (!user) {
+      throw new Error(`No user found with email: ${customerEmail}`)
     }
 
     console.log('✅ Found user:', user.id)
@@ -401,8 +453,7 @@ async function handleSubscriptionCreated(
       })
 
     if (subError) {
-      console.error('❌ Error creating subscription:', subError)
-      return
+      throw new Error(`Failed to create subscription: ${subError.message}`)
     }
 
     console.log('✅ Subscription created successfully')
@@ -430,10 +481,12 @@ async function handleSubscriptionCreated(
       .insert(userPlanData)
 
     if (planError) {
-      console.log('❌ Error updating user_plans from subscription:', planError)
-    } else {
-      console.log('✅ User plan created from subscription')
+      throw new Error(
+        `Failed to update user_plans from subscription: ${planError.message}`
+      )
     }
+
+    console.log('✅ User plan created from subscription')
 
     // Preserve usage
     const usageTrackingData = {
@@ -450,7 +503,12 @@ async function handleSubscriptionCreated(
 
     console.log(`✅ Usage preserved: ${preservedUsage} generations`)
   } catch (error) {
-    console.error('❌ Error in subscription created handler:', error)
+    console.error('❌ CRITICAL ERROR in subscription created handler:', {
+      subscriptionId: subscription.id,
+      error: (error as Error).message,
+      stack: (error as Error).stack,
+    })
+    throw error
   }
 }
 
@@ -477,8 +535,7 @@ async function handleSubscriptionUpdated(event: any, supabase: any) {
       .eq('stripe_subscription_id', subscription.id)
 
     if (error) {
-      console.log('❌ Error updating subscription:', error)
-      return
+      throw new Error(`Failed to update subscription: ${error.message}`)
     }
 
     console.log('✅ Subscription updated successfully')
@@ -505,7 +562,12 @@ async function handleSubscriptionUpdated(event: any, supabase: any) {
       console.log('✅ User plan expires_at updated')
     }
   } catch (error) {
-    console.error('❌ Error in subscription updated handler:', error)
+    console.error('❌ CRITICAL ERROR in subscription updated handler:', {
+      subscriptionId: subscription.id,
+      error: (error as Error).message,
+      stack: (error as Error).stack,
+    })
+    throw error
   }
 }
 
@@ -523,8 +585,7 @@ async function handleSubscriptionDeleted(event: any, supabase: any) {
       .single()
 
     if (!subData) {
-      console.log('❌ No subscription found for deletion')
-      return
+      throw new Error('No subscription found for deletion: ' + subscription.id)
     }
 
     // Get current usage for preservation
@@ -548,8 +609,7 @@ async function handleSubscriptionDeleted(event: any, supabase: any) {
       .eq('stripe_subscription_id', subscription.id)
 
     if (error) {
-      console.log('❌ Error canceling subscription:', error)
-      return
+      throw new Error(`Failed to cancel subscription: ${error.message}`)
     }
 
     console.log('✅ Subscription canceled successfully')
@@ -571,10 +631,12 @@ async function handleSubscriptionDeleted(event: any, supabase: any) {
       .insert(starterPlanData)
 
     if (starterError) {
-      console.log('❌ Error reverting to starter plan:', starterError)
-    } else {
-      console.log('✅ User reverted to starter plan')
+      throw new Error(
+        `Failed to revert to starter plan: ${starterError.message}`
+      )
     }
+
+    console.log('✅ User reverted to starter plan')
 
     // Preserve usage when reverting to starter
     const usageTrackingData = {
@@ -593,7 +655,12 @@ async function handleSubscriptionDeleted(event: any, supabase: any) {
       `✅ Usage preserved during cancellation: ${preservedUsage} generations`
     )
   } catch (error) {
-    console.error('❌ Error in subscription deleted handler:', error)
+    console.error('❌ CRITICAL ERROR in subscription deleted handler:', {
+      subscriptionId: subscription.id,
+      error: (error as Error).message,
+      stack: (error as Error).stack,
+    })
+    throw error
   }
 }
 
@@ -614,8 +681,7 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         .eq('stripe_subscription_id', invoice.subscription)
 
       if (error) {
-        console.error('❌ Error updating payment status:', error)
-        return
+        throw new Error(`Failed to update payment status: ${error.message}`)
       }
 
       console.log('✅ Payment status updated successfully')
@@ -640,7 +706,30 @@ async function handlePaymentSucceeded(event: any, supabase: any) {
         console.log('✅ User plan activated')
       }
     } catch (error) {
-      console.error('❌ Error in payment succeeded handler:', error)
+      console.error('❌ CRITICAL ERROR in payment succeeded handler:', {
+        invoiceId: invoice.id,
+        subscriptionId: invoice.subscription,
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+      })
+      throw error
     }
   }
 }
+
+// 🚨 ADD MONITORING AND ALERTING (uncomment and configure for your monitoring service)
+/*
+async function sendAlertToMonitoring(error: Error, event: any) {
+  console.error('🚨 WEBHOOK FAILURE ALERT:', {
+    error: error.message,
+    eventType: event.type,
+    eventId: event.id,
+    timestamp: new Date().toISOString()
+  })
+  
+  // Add your monitoring service here:
+  // await Sentry.captureException(error)
+  // await sendEmailAlert(error, event)
+  // await sendSlackAlert(error, event)
+}
+*/
