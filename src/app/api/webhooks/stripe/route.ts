@@ -235,68 +235,67 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       `📊 Usage check: ${preservedUsage}/${newLimit}, over limit: ${isOverLimit}`
     )
 
-    // Execute all updates in parallel
-    console.log('💾 Updating all tables...')
-
-    const updates = await Promise.all([
-      // Update subscription
-      supabase.from('user_subscriptions').upsert(subscriptionData, {
+    // Execute updates sequentially for reliability
+    console.log('💾 Updating subscription...')
+    const { error: subError } = await supabase
+      .from('user_subscriptions')
+      .upsert(subscriptionData, {
         onConflict: 'user_id',
         ignoreDuplicates: false,
-      }),
+      })
 
-      // Deactivate old plans
-      supabase
-        .from('user_plans')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .eq('is_active', true),
-
-      // Update usage tracking
-      supabase.from('user_usage_tracking').upsert(
-        {
-          user_id: userId,
-          month_year: currentMonth,
-          usage_count: preservedUsage,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,month_year' }
-      ),
-
-      // Update legacy usage
-      supabase.from('user_usage').upsert(
-        {
-          user_id: userId,
-          month_year: currentMonth,
-          generations_limit: newLimit,
-          generations_used: preservedUsage,
-          plan_name: planName,
-          is_over_limit: isOverLimit,
-          over_limit_since: isOverLimit ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,month_year' }
-      ),
-    ])
-
-    // Check for errors
-    const errors = updates
-      .filter((result) => result.error)
-      .map((result) => result.error)
-    if (errors.length > 0) {
-      throw new Error(
-        `Database updates failed: ${errors.map((e) => e.message).join(', ')}`
-      )
+    if (subError) {
+      console.error('❌ Subscription update failed:', subError)
+      throw new Error(`Failed to update subscription: ${subError.message}`)
     }
+    console.log('✅ Subscription updated')
 
-    // Insert new plan (separate because it's an insert, not update)
+    console.log('💾 Updating user plan...')
+    // Deactivate old plans
+    await supabase
+      .from('user_plans')
+      .update({ is_active: false })
+      .eq('user_id', userId)
+      .eq('is_active', true)
+
+    // Insert new plan
     const { error: planError } = await supabase
       .from('user_plans')
       .insert(userPlanData)
 
     if (planError) {
+      console.error('❌ Plan update failed:', planError)
       throw new Error(`Failed to create user plan: ${planError.message}`)
     }
+    console.log('✅ User plan updated')
+
+    console.log('💾 Updating usage limits...')
+    const { error: usageError } = await supabase.from('user_usage').upsert(
+      {
+        user_id: userId,
+        month_year: currentMonth,
+        generations_limit: newLimit,
+        generations_used: preservedUsage,
+        plan_name: planName,
+        is_over_limit: isOverLimit,
+        over_limit_since: isOverLimit ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,month_year' }
+    )
+
+    if (usageError) {
+      console.error('❌ Usage update failed:', usageError)
+      throw new Error(`Failed to update usage: ${usageError.message}`)
+    }
+    console.log('✅ Usage limits updated')
+
+    console.log(
+      '🎉 Checkout completed successfully for user:',
+      userId,
+      'plan:',
+      planName
+    )
 
     console.log('✅ All updates completed successfully')
 
