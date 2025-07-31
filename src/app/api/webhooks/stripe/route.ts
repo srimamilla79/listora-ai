@@ -157,6 +157,16 @@ async function processWebhookInBackground(event: any, stripe: any) {
 
 async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
   console.log('💳 Processing checkout session completed')
+  // Check if service role key exists
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('❌ CRITICAL: SUPABASE_SERVICE_ROLE_KEY is not set!')
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable')
+  }
+
+  console.log('✅ Service role key exists:', {
+    length: process.env.SUPABASE_SERVICE_ROLE_KEY.length,
+    starts: process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 10),
+  })
 
   const session = event.data.object
   const userId = session.metadata?.userId
