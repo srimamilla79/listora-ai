@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import DashboardPageWrapper from '@/components/layout/DashboardPageWrapper'
 import {
   Upload,
   FileText,
@@ -442,9 +443,6 @@ export default function EnhancedBulkCSVUploadPage() {
           return
         }
 
-        // 🔧 REMOVED THE PROBLEMATIC isPolling CHECK
-        // The React state was causing immediate stops due to timing issues
-
         try {
           const {
             data: { session },
@@ -477,6 +475,19 @@ export default function EnhancedBulkCSVUploadPage() {
 
           const result = await response.json()
           console.log(`📊 Poll ${pollAttempt} result:`, result)
+
+          // Debug log to check the structure
+          if (
+            result.job &&
+            result.job.products &&
+            result.job.products.length > 0
+          ) {
+            console.log('📝 Sample product data:', result.job.products[0])
+            console.log(
+              '📝 Generated content exists:',
+              !!result.job.products[0].generated_content
+            )
+          }
 
           if (!result.job || !result.job.status) {
             console.log('🛑 Job not found, stopping polling')
@@ -1245,7 +1256,8 @@ export default function EnhancedBulkCSVUploadPage() {
     setProcessingJobs(jobs)
 
     try {
-      const batchSize = 3
+      // Increased batch size for faster processing
+      const batchSize = 5
       for (let i = 0; i < jobs.length; i += batchSize) {
         const batch = jobs.slice(i, i + batchSize)
 
@@ -1334,8 +1346,9 @@ export default function EnhancedBulkCSVUploadPage() {
           })
         )
 
+        // Reduced delay between batches for faster processing
         if (i + batchSize < jobs.length) {
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+          await new Promise((resolve) => setTimeout(resolve, 500))
         }
       }
     } catch (error) {
@@ -1440,10 +1453,18 @@ export default function EnhancedBulkCSVUploadPage() {
       completedProducts = (currentJob.products || []).filter(
         (product) => product.status === 'completed'
       )
+      console.log(
+        '📥 Background job completed products:',
+        completedProducts.length
+      )
+      if (completedProducts.length > 0) {
+        console.log('📥 Sample product:', completedProducts[0])
+      }
     } else {
       completedProducts = processingJobs.filter(
         (job) => job.status === 'completed'
       )
+      console.log('📥 Frontend completed products:', completedProducts.length)
     }
 
     if (completedProducts.length === 0) {
@@ -1451,23 +1472,35 @@ export default function EnhancedBulkCSVUploadPage() {
       return
     }
 
+    // Updated CSV header without Quality Score and Processing Time
     const csvContent = [
-      'Product Name,Original Features,Platform,Generated Content,Quality Score,Processing Time (s),Status',
+      'Product Name,Original Features,Platform,Generated Content,Status',
       ...completedProducts.map((item) => {
+        // Extract generated content properly
+        let generatedContent = ''
+
+        if (useBackgroundProcessing) {
+          // For background processing, the field is 'generated_content'
+          generatedContent = (item.generated_content || '')
+            .replace(/\n/g, ' ')
+            .replace(/"/g, '""')
+        } else {
+          // For frontend processing, the field is 'content'
+          generatedContent = (item.content || '')
+            .replace(/\n/g, ' ')
+            .replace(/"/g, '""')
+        }
+
+        // Debug log to check content
+        if (!generatedContent) {
+          console.warn('⚠️ No content found for product:', item)
+        }
+
         const row = [
           useBackgroundProcessing ? item.product_name : item.productName || '',
           item.features || '',
           item.platform || 'amazon',
-          useBackgroundProcessing
-            ? item.generated_content?.replace(/\n/g, ' ').replace(/"/g, '""') ||
-              ''
-            : item.content?.replace(/\n/g, ' ').replace(/"/g, '""') || '',
-          useBackgroundProcessing
-            ? item.quality_score?.toFixed(1) || ''
-            : item.qualityScore?.toFixed(1) || '',
-          useBackgroundProcessing
-            ? item.processing_time || ''
-            : item.processingTime || '',
+          generatedContent, // The properly extracted content
           'Completed',
         ]
         return row.map((cell) => `"${cell}"`).join(',')
@@ -1684,843 +1717,1038 @@ export default function EnhancedBulkCSVUploadPage() {
   }
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
-        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
-      </div>
-
-      <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-4 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div
-                className={`w-8 h-8 bg-gradient-to-r ${currentPlanLimits.color} rounded-lg flex items-center justify-center`}
-              >
-                <PlanIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <div className="font-bold text-lg">
-                  {currentPlanLimits.name} Plan
-                </div>
-                <div className="text-indigo-100 text-sm">
-                  {currentPlanLimits.maxBulkProducts > 0
-                    ? `Up to ${currentPlanLimits.maxBulkProducts} products per upload`
-                    : 'Bulk upload not available'}{' '}
-                  • {monthlyLimit - monthlyUsage} generations left this month
-                </div>
-              </div>
-            </div>
-            {userPlan !== 'enterprise' && (
-              <button
-                onClick={handleUpgrade}
-                className="group bg-white/20 hover:bg-white/30 text-white px-6 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center space-x-2"
-              >
-                <Crown className="h-4 w-4" />
-                <span>Upgrade Plan</span>
-                <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {process.env.NODE_ENV === 'development' && (
-          <>
-            <div className="mb-8 bg-white/80 backdrop-blur-xl rounded-xl p-4 shadow-lg border border-white/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Settings className="h-5 w-5 text-gray-600" />
-                    <span className="font-semibold text-gray-900">
-                      Processing Mode:
-                    </span>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setUseBackgroundProcessing(!useBackgroundProcessing)
-                    }
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all cursor-pointer flex items-center space-x-2 ${
-                      useBackgroundProcessing
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white'
-                        : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-                    }`}
-                  >
-                    {useBackgroundProcessing ? (
-                      <Database className="h-4 w-4" />
-                    ) : (
-                      <Cpu className="h-4 w-4" />
-                    )}
-                    <span>
-                      {useBackgroundProcessing ? 'Background' : 'Frontend'}
-                    </span>
-                    <span className="text-xs opacity-75">
-                      (Click to toggle)
-                    </span>
-                  </button>
-                </div>
-                <div className="text-right text-sm text-gray-600">
-                  <div>
-                    <strong>Step:</strong> {currentStep} |{' '}
-                    <strong>Processing:</strong> {isProcessing ? 'Yes' : 'No'}
-                  </div>
-                  <div>
-                    <strong>Jobs:</strong> {processingJobs.length} |
-                    {useBackgroundProcessing && (
-                      <>
-                        <strong>Active Job:</strong>{' '}
-                        {currentJob ? currentJob.id.slice(-8) : 'None'}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 🚀 BULLETPROOF POLLING DEBUG */}
-            <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-2 rounded text-xs z-50">
-              Polling: {isPolling ? 'ON' : 'OFF'} | Count: {pollCount}
-            </div>
-          </>
-        )}
-
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-6 py-3 mb-8">
-            <Upload className="h-5 w-5 text-indigo-600" />
-            <span className="text-sm font-medium text-indigo-800">
-              Bulk Content Generation • Scale your business effortlessly
-            </span>
-            <Sparkles className="h-4 w-4 text-purple-600" />
-          </div>
-
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            {useBackgroundProcessing ? (
-              <>
-                Background Bulk
-                <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
-                  Content Generator
-                </span>
-              </>
-            ) : (
-              <>
-                Bulk Content
-                <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
-                  Generator
-                </span>
-              </>
-            )}
-          </h1>
-
-          <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
-            {useBackgroundProcessing
-              ? 'Upload your CSV and let our servers process everything in the background. Navigate freely - your job keeps running!'
-              : 'Upload your product CSV and generate content for multiple products at once with our advanced AI engine.'}
-          </p>
-
-          {useBackgroundProcessing && (
-            <div className="mt-6">
-              <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200">
-                <Globe className="h-4 w-4 mr-2" />✨ Background Processing:
-                Never stops when you navigate away!
-              </span>
-            </div>
-          )}
+    <DashboardPageWrapper title="Bulk Upload">
+      <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-full">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+          <div className="absolute top-0 right-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+          <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
         </div>
 
-        <div className="mb-12">
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 shadow-xl border border-white/50">
+        <div className="relative max-w-7xl mx-auto px-4 py-6">
+          {/* Compact Plan Header */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-xl p-4 mb-6 shadow-lg border border-white/50">
             <div className="flex items-center justify-between">
-              {[
-                {
-                  key: 'upload',
-                  label: 'Upload CSV',
-                  icon: Upload,
-                  desc: 'Upload your product data',
-                },
-                {
-                  key: 'mapping',
-                  label: 'Smart Mapping',
-                  icon: Zap,
-                  desc: 'AI-powered column detection',
-                },
-                {
-                  key: 'processing',
-                  label: useBackgroundProcessing
-                    ? 'Background Processing'
-                    : 'AI Processing',
-                  icon: useBackgroundProcessing ? PlayCircle : RefreshCw,
-                  desc: useBackgroundProcessing
-                    ? 'Server-side processing'
-                    : 'Real-time generation',
-                },
-                {
-                  key: 'results',
-                  label: 'Download Results',
-                  icon: Download,
-                  desc: 'Export your content',
-                },
-              ].map((step, index) => {
-                const Icon = step.icon
-                const isActive = currentStep === step.key
-                const isCompleted =
-                  ['upload', 'mapping', 'processing', 'results'].indexOf(
-                    currentStep
-                  ) > index
-
-                return (
-                  <div key={step.key} className="flex items-center">
-                    <div className="text-center">
-                      <div
-                        className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 mb-3 ${
-                          isCompleted
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg'
-                            : isActive
-                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-110'
-                              : 'bg-gray-200 text-gray-500'
-                        }`}
-                      >
-                        {isCompleted ? (
-                          <CheckCircle className="h-7 w-7" />
-                        ) : (
-                          <Icon
-                            className={`h-7 w-7 ${isActive ? 'animate-pulse' : ''}`}
-                          />
-                        )}
-                      </div>
-                      <div className="text-center">
-                        <div
-                          className={`font-semibold transition-colors ${
-                            isActive
-                              ? 'text-indigo-600'
-                              : isCompleted
-                                ? 'text-green-600'
-                                : 'text-gray-500'
-                          }`}
-                        >
-                          {step.label}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {step.desc}
-                        </div>
-                      </div>
-                    </div>
-                    {index < 3 && (
-                      <div className="flex-1 mx-6">
-                        <div
-                          className={`h-1 rounded-full transition-all duration-500 ${
-                            isCompleted
-                              ? 'bg-gradient-to-r from-green-500 to-emerald-600'
-                              : 'bg-gray-300'
-                          }`}
-                        />
-                      </div>
-                    )}
+              <div className="flex items-center space-x-4">
+                <div
+                  className={`w-10 h-10 bg-gradient-to-r ${currentPlanLimits.color} rounded-lg flex items-center justify-center`}
+                >
+                  <PlanIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <div className="font-bold text-lg text-gray-900">
+                    {currentPlanLimits.name} Plan
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        {currentStep === 'upload' && (
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-xl">
-                <Upload className="h-10 w-10 text-white" />
+                  <div className="text-gray-600 text-sm">
+                    {currentPlanLimits.maxBulkProducts > 0
+                      ? `Up to ${currentPlanLimits.maxBulkProducts} products`
+                      : 'Bulk upload not available'}{' '}
+                    • {monthlyLimit - monthlyUsage} generations left
+                  </div>
+                </div>
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Upload Your Product CSV
-              </h2>
-              <p className="text-gray-600 mb-6 max-w-3xl mx-auto text-lg">
-                Upload your CSV file with product data. Your{' '}
-                <span className="font-semibold text-indigo-600">
-                  {currentPlanLimits.name}
-                </span>{' '}
-                plan supports
-                {currentPlanLimits.maxBulkProducts > 0
-                  ? ` up to ${currentPlanLimits.maxBulkProducts} products per upload.`
-                  : ' single product generation only.'}{' '}
-                You have{' '}
-                <span className="font-semibold text-green-600">
-                  {monthlyLimit - monthlyUsage}
-                </span>{' '}
-                generations remaining this month.
-              </p>
-
-              {planLoaded && currentPlanLimits.maxBulkProducts === 0 ? (
-                <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-dashed border-red-300 rounded-2xl p-12 max-w-2xl mx-auto">
-                  <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <Lock className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-red-900 mb-3">
-                    Bulk Upload Not Available
-                  </h3>
-                  <p className="text-red-700 mb-6">
-                    Bulk CSV upload requires a paid plan. Upgrade to unlock
-                    batch processing and scale your content creation.
-                  </p>
-                  <button
-                    onClick={handleUpgrade}
-                    className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-8 py-3 rounded-xl font-semibold transition-all cursor-pointer shadow-lg"
-                  >
-                    Upgrade to Business Plan
-                  </button>
-                </div>
-              ) : (
-                <div className="max-w-2xl mx-auto">
-                  <div className="border-2 border-dashed border-gray-300 hover:border-indigo-400 rounded-2xl p-12 transition-all duration-300 hover:bg-indigo-50/50">
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="csv-upload"
-                      disabled={isAnalyzing}
-                    />
-                    <label htmlFor="csv-upload" className="cursor-pointer">
-                      <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                        <FileText className="h-8 w-8 text-white" />
-                      </div>
-                      <h3 className="text-xl font-bold text-gray-900 mb-3">
-                        {isAnalyzing
-                          ? 'Analyzing your CSV...'
-                          : 'Click to upload your CSV file'}
-                      </h3>
-                      <p className="text-gray-600 mb-4">
-                        Enhanced CSV parsing with intelligent platform detection
-                      </p>
-                      {isAnalyzing && (
-                        <div className="mt-6">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
-                          <p className="text-indigo-600 font-medium">
-                            Processing your data...
-                          </p>
-                        </div>
-                      )}
-                    </label>
-                  </div>
-
-                  {csvFile && csvFile.name && !isAnalyzing && (
-                    <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
-                      <div className="flex items-center space-x-4">
-                        <CheckCircle className="h-8 w-8 text-green-600" />
-                        <div>
-                          <h4 className="font-bold text-green-900">
-                            Upload Successful!
-                          </h4>
-                          <p className="text-green-700">
-                            <strong>{csvFile.name}</strong> - Found{' '}
-                            {csvData.length} products ready for processing.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              {userPlan !== 'enterprise' && (
+                <button
+                  onClick={handleUpgrade}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer flex items-center space-x-2"
+                >
+                  <Crown className="h-4 w-4" />
+                  <span>Upgrade</span>
+                </button>
               )}
             </div>
           </div>
-        )}
 
-        {currentStep === 'mapping' && (
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center">
-                  <Zap className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Smart Column Mapping
-                  </h2>
-                  <p className="text-gray-600">
-                    AI has analyzed your CSV and suggested optimal mappings
-                  </p>
+          {process.env.NODE_ENV === 'development' && (
+            <>
+              <div className="mb-6 bg-white/80 backdrop-blur-xl rounded-xl p-3 shadow-lg border border-white/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm font-semibold text-gray-900">
+                      Processing Mode:
+                    </span>
+                    <button
+                      onClick={() =>
+                        setUseBackgroundProcessing(!useBackgroundProcessing)
+                      }
+                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all cursor-pointer flex items-center space-x-2 ${
+                        useBackgroundProcessing
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white'
+                          : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                      }`}
+                    >
+                      {useBackgroundProcessing ? (
+                        <Database className="h-4 w-4" />
+                      ) : (
+                        <Cpu className="h-4 w-4" />
+                      )}
+                      <span>
+                        {useBackgroundProcessing ? 'Background' : 'Frontend'}
+                      </span>
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    Step: {currentStep} | Jobs: {processingJobs.length}
+                  </div>
                 </div>
               </div>
-              <button
-                onClick={resetWorkflow}
-                className="text-gray-600 hover:text-gray-800 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-              >
-                Upload Different File
-              </button>
-            </div>
 
-            <div className="space-y-4 mb-8">
-              {columnMappings.map((mapping, index) => (
-                <div
-                  key={index}
-                  className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                    <div>
-                      <div className="font-semibold text-gray-900 text-lg mb-2">
-                        {mapping.csvColumn}
-                      </div>
-                      <div className="flex items-center space-x-2">
+              {/* 🚀 BULLETPROOF POLLING DEBUG */}
+              <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-2 rounded text-xs z-50">
+                Polling: {isPolling ? 'ON' : 'OFF'} | Count: {pollCount}
+              </div>
+            </>
+          )}
+
+          <div className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+              {useBackgroundProcessing ? 'Background' : ''} Bulk Content
+              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
+                Generator
+              </span>
+            </h1>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              {useBackgroundProcessing
+                ? 'Upload your CSV and let our servers process everything in the background'
+                : 'Upload your product CSV and generate content for multiple products at once'}
+            </p>
+          </div>
+
+          <div className="mb-8">
+            <div className="bg-white/80 backdrop-blur-xl rounded-xl p-6 shadow-lg border border-white/50">
+              <div className="flex items-center justify-between">
+                {[
+                  {
+                    key: 'upload',
+                    label: 'Upload',
+                    icon: Upload,
+                    desc: 'Upload CSV',
+                  },
+                  {
+                    key: 'mapping',
+                    label: 'Map Columns',
+                    icon: Zap,
+                    desc: 'AI mapping',
+                  },
+                  {
+                    key: 'processing',
+                    label: 'Process',
+                    icon: useBackgroundProcessing ? PlayCircle : RefreshCw,
+                    desc: useBackgroundProcessing ? 'Background' : 'Real-time',
+                  },
+                  {
+                    key: 'results',
+                    label: 'Download',
+                    icon: Download,
+                    desc: 'Export',
+                  },
+                ].map((step, index) => {
+                  const Icon = step.icon
+                  const isActive = currentStep === step.key
+                  const isCompleted =
+                    ['upload', 'mapping', 'processing', 'results'].indexOf(
+                      currentStep
+                    ) > index
+
+                  return (
+                    <div key={step.key} className="flex items-center">
+                      <div className="text-center">
                         <div
-                          className={`w-3 h-3 rounded-full ${
-                            mapping.confidence > 0.8
-                              ? 'bg-green-500'
-                              : mapping.confidence > 0.6
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500'
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 mb-2 ${
+                            isCompleted
+                              ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg'
+                              : isActive
+                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-110'
+                                : 'bg-gray-200 text-gray-500'
                           }`}
-                        />
-                        <span className="text-sm font-medium text-gray-600">
-                          AI Confidence: {(mapping.confidence * 100).toFixed(0)}
-                          %
-                        </span>
+                        >
+                          {isCompleted ? (
+                            <CheckCircle className="h-6 w-6" />
+                          ) : (
+                            <Icon
+                              className={`h-6 w-6 ${isActive ? 'animate-pulse' : ''}`}
+                            />
+                          )}
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className={`font-semibold transition-colors text-sm ${
+                              isActive
+                                ? 'text-indigo-600'
+                                : isCompleted
+                                  ? 'text-green-600'
+                                  : 'text-gray-500'
+                            }`}
+                          >
+                            {step.label}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {step.desc}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Map to Field
-                      </label>
-                      <select
-                        value={mapping.mappedTo}
-                        onChange={(e) =>
-                          updateColumnMapping(index, e.target.value as any)
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white shadow-sm cursor-pointer"
-                      >
-                        <option value="ignore">🚫 Ignore</option>
-                        <option value="product_name">📦 Product Name</option>
-                        <option value="features">✨ Features & Benefits</option>
-                        <option value="platform">🛒 Target Platform</option>
-                      </select>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-gray-700 mb-2">
-                        Sample Data
-                      </div>
-                      {csvData[0] && (
-                        <div className="text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded-lg max-w-xs truncate ml-auto">
-                          "{csvData[0][mapping.csvColumn] || 'Empty'}"
+                      {index < 3 && (
+                        <div className="flex-1 mx-4">
+                          <div
+                            className={`h-1 rounded-full transition-all duration-500 ${
+                              isCompleted
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                                : 'bg-gray-300'
+                            }`}
+                          />
                         </div>
                       )}
                     </div>
-                  </div>
-                </div>
-              ))}
+                  )
+                })}
+              </div>
             </div>
+          </div>
 
-            <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                    <FileText className="h-4 w-4 text-white" />
+          {currentStep === 'upload' && (
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-xl">
+                  <Upload className="h-10 w-10 text-white" />
+                </div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  Upload Your Product CSV
+                </h2>
+                <p className="text-gray-600 mb-6 max-w-3xl mx-auto text-lg">
+                  Upload your CSV file with product data. Your{' '}
+                  <span className="font-semibold text-indigo-600">
+                    {currentPlanLimits.name}
+                  </span>{' '}
+                  plan supports
+                  {currentPlanLimits.maxBulkProducts > 0
+                    ? ` up to ${currentPlanLimits.maxBulkProducts} products per upload.`
+                    : ' single product generation only.'}{' '}
+                  You have{' '}
+                  <span className="font-semibold text-green-600">
+                    {monthlyLimit - monthlyUsage}
+                  </span>{' '}
+                  generations remaining this month.
+                </p>
+
+                {planLoaded && currentPlanLimits.maxBulkProducts === 0 ? (
+                  <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-dashed border-red-300 rounded-2xl p-12 max-w-2xl mx-auto">
+                    <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <Lock className="h-8 w-8 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-red-900 mb-3">
+                      Bulk Upload Not Available
+                    </h3>
+                    <p className="text-red-700 mb-6">
+                      Bulk CSV upload requires a paid plan. Upgrade to unlock
+                      batch processing and scale your content creation.
+                    </p>
+                    <button
+                      onClick={handleUpgrade}
+                      className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-8 py-3 rounded-xl font-semibold transition-all cursor-pointer shadow-lg"
+                    >
+                      Upgrade to Business Plan
+                    </button>
+                  </div>
+                ) : (
+                  <div className="max-w-2xl mx-auto">
+                    <div className="border-2 border-dashed border-gray-300 hover:border-indigo-400 rounded-2xl p-12 transition-all duration-300 hover:bg-indigo-50/50">
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        id="csv-upload"
+                        disabled={isAnalyzing}
+                      />
+                      <label htmlFor="csv-upload" className="cursor-pointer">
+                        <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                          <FileText className="h-8 w-8 text-white" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-3">
+                          {isAnalyzing
+                            ? 'Analyzing your CSV...'
+                            : 'Click to upload your CSV file'}
+                        </h3>
+                        <p className="text-gray-600 mb-4">
+                          Enhanced CSV parsing with intelligent platform
+                          detection
+                        </p>
+                        {isAnalyzing && (
+                          <div className="mt-6">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+                            <p className="text-indigo-600 font-medium">
+                              Processing your data...
+                            </p>
+                          </div>
+                        )}
+                      </label>
+                    </div>
+
+                    {csvFile && csvFile.name && !isAnalyzing && (
+                      <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+                        <div className="flex items-center space-x-4">
+                          <CheckCircle className="h-8 w-8 text-green-600" />
+                          <div>
+                            <h4 className="font-bold text-green-900">
+                              Upload Successful!
+                            </h4>
+                            <p className="text-green-700">
+                              <strong>{csvFile.name}</strong> - Found{' '}
+                              {csvData.length} products ready for processing.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {currentStep === 'mapping' && (
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center">
+                    <Zap className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      📝 Content Sections for Bulk Generation
-                    </h3>
-                    <p className="text-gray-600 text-sm">
-                      Choose which content sections to generate for all{' '}
-                      {csvData.length} products
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Smart Column Mapping
+                    </h2>
+                    <p className="text-gray-600">
+                      AI has analyzed your CSV and suggested optimal mappings
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowContentSections(!showContentSections)}
-                  className="flex items-center space-x-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                  onClick={resetWorkflow}
+                  className="text-gray-600 hover:text-gray-800 font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                 >
-                  <Settings className="h-4 w-4" />
-                  <span>{showContentSections ? 'Hide' : 'Customize'}</span>
+                  Upload Different File
                 </button>
               </div>
 
-              <div className="mb-4 p-4 bg-white rounded-xl border border-indigo-200">
-                <div className="flex items-center justify-between">
+              <div className="space-y-4 mb-8">
+                {columnMappings.map((mapping, index) => (
+                  <div
+                    key={index}
+                    className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                      <div>
+                        <div className="font-semibold text-gray-900 text-lg mb-2">
+                          {mapping.csvColumn}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`w-3 h-3 rounded-full ${
+                              mapping.confidence > 0.8
+                                ? 'bg-green-500'
+                                : mapping.confidence > 0.6
+                                  ? 'bg-yellow-500'
+                                  : 'bg-red-500'
+                            }`}
+                          />
+                          <span className="text-sm font-medium text-gray-600">
+                            AI Confidence:{' '}
+                            {(mapping.confidence * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Map to Field
+                        </label>
+                        <select
+                          value={mapping.mappedTo}
+                          onChange={(e) =>
+                            updateColumnMapping(index, e.target.value as any)
+                          }
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-white shadow-sm cursor-pointer"
+                        >
+                          <option value="ignore">🚫 Ignore</option>
+                          <option value="product_name">📦 Product Name</option>
+                          <option value="features">
+                            ✨ Features & Benefits
+                          </option>
+                          <option value="platform">🛒 Target Platform</option>
+                        </select>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-gray-700 mb-2">
+                          Sample Data
+                        </div>
+                        {csvData[0] && (
+                          <div className="text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded-lg max-w-xs truncate ml-auto">
+                            "{csvData[0][mapping.csvColumn] || 'Empty'}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                      <CheckCircle className="h-3 w-3 text-white" />
+                    <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                      <FileText className="h-4 w-4 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 text-sm">
-                        {getSelectedSectionCount() === 6
-                          ? `Complete Content Package for ${csvData.length} Products`
-                          : `${getSelectedSectionCount()} Content Sections for ${csvData.length} Products`}
-                      </h4>
-                      <p className="text-xs text-gray-600">
-                        {getSelectedSectionCount() === 6
-                          ? 'Full package generation for maximum efficiency'
-                          : `Custom ${getSelectedSectionCount()}-section generation`}
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        📝 Content Sections for Bulk Generation
+                      </h3>
+                      <p className="text-gray-600 text-sm">
+                        Choose which content sections to generate for all{' '}
+                        {csvData.length} products
                       </p>
                     </div>
                   </div>
                   <button
-                    onClick={toggleAllSections}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                    onClick={() => setShowContentSections(!showContentSections)}
+                    className="flex items-center space-x-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                   >
-                    {Object.values(selectedSections).every(Boolean)
-                      ? 'Deselect All'
-                      : 'Select All'}
+                    <Settings className="h-4 w-4" />
+                    <span>{showContentSections ? 'Hide' : 'Customize'}</span>
                   </button>
                 </div>
+
+                <div className="mb-4 p-4 bg-white rounded-xl border border-indigo-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                        <CheckCircle className="h-3 w-3 text-white" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">
+                          {getSelectedSectionCount() === 6
+                            ? `Complete Content Package for ${csvData.length} Products`
+                            : `${getSelectedSectionCount()} Content Sections for ${csvData.length} Products`}
+                        </h4>
+                        <p className="text-xs text-gray-600">
+                          {getSelectedSectionCount() === 6
+                            ? 'Full package generation for maximum efficiency'
+                            : `Custom ${getSelectedSectionCount()}-section generation`}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={toggleAllSections}
+                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      {Object.values(selectedSections).every(Boolean)
+                        ? 'Deselect All'
+                        : 'Select All'}
+                    </button>
+                  </div>
+                </div>
+
+                {showContentSections && (
+                  <div className="space-y-3 bg-white rounded-xl border border-gray-200 p-4">
+                    <h5 className="font-semibold text-gray-900 mb-3 text-sm">
+                      Bulk Content Sections:
+                    </h5>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {[
+                        {
+                          key: 'title' as keyof ContentSections,
+                          label: 'Product Title',
+                          description: 'SEO-optimized titles',
+                          icon: Target,
+                          color: 'from-blue-500 to-blue-600',
+                        },
+                        {
+                          key: 'sellingPoints' as keyof ContentSections,
+                          label: 'Key Selling Points',
+                          description: '5-7 bullet points per product',
+                          icon: Sparkles,
+                          color: 'from-green-500 to-green-600',
+                        },
+                        {
+                          key: 'description' as keyof ContentSections,
+                          label: 'Product Description',
+                          description: 'Comprehensive descriptions',
+                          icon: FileText,
+                          color: 'from-purple-500 to-purple-600',
+                        },
+                        {
+                          key: 'instagramCaption' as keyof ContentSections,
+                          label: 'Instagram Caption',
+                          description: 'Social media content + hashtags',
+                          icon: Share2,
+                          color: 'from-pink-500 to-pink-600',
+                        },
+                        {
+                          key: 'blogIntro' as keyof ContentSections,
+                          label: 'Blog Introduction',
+                          description: 'Blog post introductions',
+                          icon: MessageSquare,
+                          color: 'from-orange-500 to-orange-600',
+                        },
+                        {
+                          key: 'callToAction' as keyof ContentSections,
+                          label: 'Call-to-Action',
+                          description: 'Conversion-focused CTAs',
+                          icon: Target,
+                          color: 'from-red-500 to-red-600',
+                        },
+                      ].map((section) => {
+                        const Icon = section.icon
+                        return (
+                          <div
+                            key={section.key}
+                            className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center space-x-2 flex-1">
+                              <div
+                                className={`w-6 h-6 bg-gradient-to-r ${section.color} rounded-lg flex items-center justify-center`}
+                              >
+                                <Icon className="h-3 w-3 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900 text-sm">
+                                  {section.label}
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {section.description}
+                                </div>
+                              </div>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedSections[section.key]}
+                                onChange={() => toggleSection(section.key)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {getSelectedSectionCount() === 0 && (
+                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-amber-800 text-sm">
+                          ⚠️ Please select at least one content section for bulk
+                          generation.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Zap className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-semibold text-blue-900">
+                          Bulk Processing Efficiency
+                        </span>
+                      </div>
+                      <div className="text-xs text-blue-700 space-y-1">
+                        <div>
+                          • Selected sections: {getSelectedSectionCount()}/6
+                        </div>
+                        <div>
+                          • Estimated time per product: ~
+                          {getSelectedSectionCount() * 3}-
+                          {getSelectedSectionCount() * 8} seconds
+                        </div>
+                        <div>
+                          • Total estimated time: ~
+                          {Math.ceil(
+                            (csvData.length * getSelectedSectionCount() * 5) /
+                              60
+                          )}{' '}
+                          minutes
+                        </div>
+                        <div className="text-green-700 font-medium">
+                          •{' '}
+                          {getSelectedSectionCount() < 6
+                            ? `${Math.round(((6 - getSelectedSectionCount()) / 6) * 100)}% faster than full package`
+                            : 'Complete package selected'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {showContentSections && (
-                <div className="space-y-3 bg-white rounded-xl border border-gray-200 p-4">
-                  <h5 className="font-semibold text-gray-900 mb-3 text-sm">
-                    Bulk Content Sections:
-                  </h5>
+              <div className="flex justify-center space-x-6 mt-8">
+                <button
+                  onClick={() => setCurrentStep('upload')}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer flex items-center space-x-2"
+                >
+                  <ArrowRight className="h-4 w-4 rotate-180" />
+                  <span>Back to Upload</span>
+                </button>
+                <button
+                  onClick={startBulkProcessing}
+                  disabled={
+                    !columnMappings.some(
+                      (m) => m.mappedTo === 'product_name'
+                    ) ||
+                    isSubmittingJob ||
+                    getSelectedSectionCount() === 0
+                  }
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  {isSubmittingJob ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : useBackgroundProcessing ? (
+                    <PlayCircle className="h-5 w-5" />
+                  ) : (
+                    <Sparkles className="h-5 w-5" />
+                  )}
+                  <span>
+                    {isSubmittingJob
+                      ? 'Starting Job...'
+                      : getSelectedSectionCount() === 0
+                        ? 'Select Content Sections First'
+                        : getSelectedSectionCount() === 6
+                          ? `Start ${useBackgroundProcessing ? 'Background' : 'Bulk'} Processing (${csvData.length} complete packages)`
+                          : `Start ${useBackgroundProcessing ? 'Background' : 'Bulk'} Processing (${csvData.length} products, ${getSelectedSectionCount()} sections)`}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {currentStep === 'processing' && (
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
+              {useBackgroundProcessing && currentJob ? (
+                <>
+                  <div className="text-center mb-10">
+                    <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+                      <PlayCircle
+                        className={`h-10 w-10 text-white ${
+                          currentJob.status === 'processing'
+                            ? 'animate-pulse'
+                            : ''
+                        }`}
+                      />
+                    </div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                      🚀 Background Processing Active
+                    </h2>
+                    <div className="max-w-2xl mx-auto">
+                      <p className="text-gray-600 mb-3 text-lg">
+                        Your job is running on our servers! Navigate freely -
+                        processing continues in background.
+                      </p>
+                      <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 rounded-full text-sm font-semibold">
+                        <Globe className="h-4 w-4 mr-2" />✨ This job will keep
+                        running even if you close this page!
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-10 grid grid-cols-2 md:grid-cols-5 gap-6">
                     {[
                       {
-                        key: 'title' as keyof ContentSections,
-                        label: 'Product Title',
-                        description: 'SEO-optimized titles',
-                        icon: Target,
+                        label: 'Total Products',
+                        value: getJobStats(currentJob).total,
                         color: 'from-blue-500 to-blue-600',
+                        icon: Database,
                       },
                       {
-                        key: 'sellingPoints' as keyof ContentSections,
-                        label: 'Key Selling Points',
-                        description: '5-7 bullet points per product',
-                        icon: Sparkles,
-                        color: 'from-green-500 to-green-600',
+                        label: 'Pending',
+                        value: getJobStats(currentJob).pending,
+                        color: 'from-yellow-500 to-orange-500',
+                        icon: Clock,
                       },
                       {
-                        key: 'description' as keyof ContentSections,
-                        label: 'Product Description',
-                        description: 'Comprehensive descriptions',
-                        icon: FileText,
-                        color: 'from-purple-500 to-purple-600',
+                        label: 'Processing',
+                        value: getJobStats(currentJob).processing,
+                        color: 'from-indigo-500 to-purple-600',
+                        icon: Cpu,
                       },
                       {
-                        key: 'instagramCaption' as keyof ContentSections,
-                        label: 'Instagram Caption',
-                        description: 'Social media content + hashtags',
-                        icon: Share2,
-                        color: 'from-pink-500 to-pink-600',
+                        label: 'Completed',
+                        value: getJobStats(currentJob).completed,
+                        color: 'from-green-500 to-emerald-600',
+                        icon: CheckCircle,
                       },
                       {
-                        key: 'blogIntro' as keyof ContentSections,
-                        label: 'Blog Introduction',
-                        description: 'Blog post introductions',
-                        icon: MessageSquare,
-                        color: 'from-orange-500 to-orange-600',
-                      },
-                      {
-                        key: 'callToAction' as keyof ContentSections,
-                        label: 'Call-to-Action',
-                        description: 'Conversion-focused CTAs',
-                        icon: Target,
+                        label: 'Failed',
+                        value: getJobStats(currentJob).failed,
                         color: 'from-red-500 to-red-600',
+                        icon: XCircle,
                       },
-                    ].map((section) => {
-                      const Icon = section.icon
+                    ].map((stat, index) => {
+                      const Icon = stat.icon
                       return (
                         <div
-                          key={section.key}
-                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                          key={index}
+                          className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-all"
                         >
-                          <div className="flex items-center space-x-2 flex-1">
+                          <div className="flex items-center justify-between mb-4">
                             <div
-                              className={`w-6 h-6 bg-gradient-to-r ${section.color} rounded-lg flex items-center justify-center`}
+                              className={`w-10 h-10 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
                             >
-                              <Icon className="h-3 w-3 text-white" />
+                              <Icon className="h-5 w-5 text-white" />
                             </div>
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900 text-sm">
-                                {section.label}
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                {section.description}
-                              </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {stat.value}
                             </div>
                           </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedSections[section.key]}
-                              onChange={() => toggleSection(section.key)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                          </label>
+                          <div className="text-sm font-medium text-gray-600">
+                            {stat.label}
+                          </div>
                         </div>
                       )
                     })}
                   </div>
 
-                  {getSelectedSectionCount() === 0 && (
-                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <p className="text-amber-800 text-sm">
-                        ⚠️ Please select at least one content section for bulk
-                        generation.
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Zap className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm font-semibold text-blue-900">
-                        Bulk Processing Efficiency
+                  <div className="mb-10">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Overall Progress
+                      </h3>
+                      <span className="text-lg font-bold text-indigo-600">
+                        {currentJob && currentJob.progress
+                          ? currentJob.progress.toFixed(1)
+                          : '0.0'}
+                        %
                       </span>
                     </div>
-                    <div className="text-xs text-blue-700 space-y-1">
-                      <div>
-                        • Selected sections: {getSelectedSectionCount()}/6
-                      </div>
-                      <div>
-                        • Estimated time per product: ~
-                        {getSelectedSectionCount() * 3}-
-                        {getSelectedSectionCount() * 8} seconds
-                      </div>
-                      <div>
-                        • Total estimated time: ~
-                        {Math.ceil(
-                          (csvData.length * getSelectedSectionCount() * 5) / 60
-                        )}{' '}
-                        minutes
-                      </div>
-                      <div className="text-green-700 font-medium">
-                        •{' '}
-                        {getSelectedSectionCount() < 6
-                          ? `${Math.round(((6 - getSelectedSectionCount()) / 6) * 100)}% faster than full package`
-                          : 'Complete package selected'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-center space-x-6 mt-8">
-              <button
-                onClick={() => setCurrentStep('upload')}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer flex items-center space-x-2"
-              >
-                <ArrowRight className="h-4 w-4 rotate-180" />
-                <span>Back to Upload</span>
-              </button>
-              <button
-                onClick={startBulkProcessing}
-                disabled={
-                  !columnMappings.some((m) => m.mappedTo === 'product_name') ||
-                  isSubmittingJob ||
-                  getSelectedSectionCount() === 0
-                }
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                {isSubmittingJob ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : useBackgroundProcessing ? (
-                  <PlayCircle className="h-5 w-5" />
-                ) : (
-                  <Sparkles className="h-5 w-5" />
-                )}
-                <span>
-                  {isSubmittingJob
-                    ? 'Starting Job...'
-                    : getSelectedSectionCount() === 0
-                      ? 'Select Content Sections First'
-                      : getSelectedSectionCount() === 6
-                        ? `Start ${useBackgroundProcessing ? 'Background' : 'Bulk'} Processing (${csvData.length} complete packages)`
-                        : `Start ${useBackgroundProcessing ? 'Background' : 'Bulk'} Processing (${csvData.length} products, ${getSelectedSectionCount()} sections)`}
-                </span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {currentStep === 'processing' && (
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
-            {useBackgroundProcessing && currentJob ? (
-              <>
-                <div className="text-center mb-10">
-                  <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-                    <PlayCircle
-                      className={`h-10 w-10 text-white ${
-                        currentJob.status === 'processing'
-                          ? 'animate-pulse'
-                          : ''
-                      }`}
-                    />
-                  </div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                    🚀 Background Processing Active
-                  </h2>
-                  <div className="max-w-2xl mx-auto">
-                    <p className="text-gray-600 mb-3 text-lg">
-                      Your job is running on our servers! Navigate freely -
-                      processing continues in background.
-                    </p>
-                    <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 rounded-full text-sm font-semibold">
-                      <Globe className="h-4 w-4 mr-2" />✨ This job will keep
-                      running even if you close this page!
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-10 grid grid-cols-2 md:grid-cols-5 gap-6">
-                  {[
-                    {
-                      label: 'Total Products',
-                      value: getJobStats(currentJob).total,
-                      color: 'from-blue-500 to-blue-600',
-                      icon: Database,
-                    },
-                    {
-                      label: 'Pending',
-                      value: getJobStats(currentJob).pending,
-                      color: 'from-yellow-500 to-orange-500',
-                      icon: Clock,
-                    },
-                    {
-                      label: 'Processing',
-                      value: getJobStats(currentJob).processing,
-                      color: 'from-indigo-500 to-purple-600',
-                      icon: Cpu,
-                    },
-                    {
-                      label: 'Completed',
-                      value: getJobStats(currentJob).completed,
-                      color: 'from-green-500 to-emerald-600',
-                      icon: CheckCircle,
-                    },
-                    {
-                      label: 'Failed',
-                      value: getJobStats(currentJob).failed,
-                      color: 'from-red-500 to-red-600',
-                      icon: XCircle,
-                    },
-                  ].map((stat, index) => {
-                    const Icon = stat.icon
-                    return (
+                    <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
                       <div
-                        key={index}
-                        className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-all"
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <div
-                            className={`w-10 h-10 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
-                          >
-                            <Icon className="h-5 w-5 text-white" />
+                        className="bg-gradient-to-r from-green-500 to-emerald-600 h-4 rounded-full transition-all duration-500 ease-out shadow-lg"
+                        style={{
+                          width: `${currentJob && currentJob.progress ? currentJob.progress : 0}%`,
+                        }}
+                      />
+                    </div>
+                    {currentJob &&
+                      currentJob.status === 'processing' &&
+                      currentJob.estimatedTimeRemaining &&
+                      currentJob.estimatedTimeRemaining > 0 && (
+                        <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
+                          <div className="flex items-center space-x-2">
+                            <Timer className="h-4 w-4" />
+                            <span>
+                              ETA:{' '}
+                              {formatTime(
+                                currentJob.estimatedTimeRemaining || 0
+                              )}
+                            </span>
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {stat.value}
-                          </div>
+                          {currentJob &&
+                            currentJob.avgProcessingTime &&
+                            currentJob.avgProcessingTime > 0 && (
+                              <div className="flex items-center space-x-2">
+                                <Activity className="h-4 w-4" />
+                                <span>
+                                  Avg:{' '}
+                                  {formatTime(
+                                    currentJob.avgProcessingTime || 0
+                                  )}
+                                  /product
+                                </span>
+                              </div>
+                            )}
                         </div>
-                        <div className="text-sm font-medium text-gray-600">
-                          {stat.label}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )}
+                  </div>
 
-                <div className="mb-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Overall Progress
-                    </h3>
-                    <span className="text-lg font-bold text-indigo-600">
-                      {currentJob && currentJob.progress
-                        ? currentJob.progress.toFixed(1)
-                        : '0.0'}
-                      %
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
-                    <div
-                      className="bg-gradient-to-r from-green-500 to-emerald-600 h-4 rounded-full transition-all duration-500 ease-out shadow-lg"
-                      style={{
-                        width: `${currentJob && currentJob.progress ? currentJob.progress : 0}%`,
-                      }}
-                    />
-                  </div>
-                  {currentJob &&
-                    currentJob.status === 'processing' &&
-                    currentJob.estimatedTimeRemaining &&
-                    currentJob.estimatedTimeRemaining > 0 && (
-                      <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
-                        <div className="flex items-center space-x-2">
-                          <Timer className="h-4 w-4" />
-                          <span>
-                            ETA:{' '}
-                            {formatTime(currentJob.estimatedTimeRemaining || 0)}
-                          </span>
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {(currentJob.products || []).map((product, index) => (
+                      <div
+                        key={product.id || index}
+                        className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                          product.status === 'completed'
+                            ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50'
+                            : product.status === 'failed'
+                              ? 'border-red-200 bg-gradient-to-r from-red-50 to-red-100'
+                              : product.status === 'processing'
+                                ? 'border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50'
+                                : 'border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-4">
+                              <div className="flex-shrink-0">
+                                {product.status === 'pending' && (
+                                  <Clock className="h-6 w-6 text-gray-400" />
+                                )}
+                                {product.status === 'processing' && (
+                                  <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
+                                )}
+                                {product.status === 'completed' && (
+                                  <CheckCircle className="h-6 w-6 text-green-600" />
+                                )}
+                                {product.status === 'failed' && (
+                                  <XCircle className="h-6 w-6 text-red-600" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-gray-900 truncate">
+                                  {product.product_name || 'Unknown Product'}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  Platform: {product.platform || 'amazon'}
+                                  {product.features && (
+                                    <span className="ml-2">
+                                      • Features:{' '}
+                                      {product.features.substring(0, 60)}
+                                      {product.features.length > 60 && '...'}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-4">
+                            {product.status === 'completed' &&
+                              product.quality_score && (
+                                <div className="text-center">
+                                  <div className="text-lg font-bold text-green-600">
+                                    {product.quality_score.toFixed(0)}%
+                                  </div>
+                                  <div className="text-xs text-green-500">
+                                    Quality
+                                  </div>
+                                </div>
+                              )}
+
+                            <div className="text-right">
+                              <span
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                                  product.status === 'completed'
+                                    ? 'bg-green-100 text-green-800'
+                                    : product.status === 'failed'
+                                      ? 'bg-red-100 text-red-800'
+                                      : product.status === 'processing'
+                                        ? 'bg-indigo-100 text-indigo-800'
+                                        : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {product.status === 'pending' && '⏳ Waiting'}
+                                {product.status === 'processing' &&
+                                  '⚡ Processing'}
+                                {product.status === 'completed' &&
+                                  '✅ Complete'}
+                                {product.status === 'failed' && '❌ Failed'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        {currentJob &&
-                          currentJob.avgProcessingTime &&
-                          currentJob.avgProcessingTime > 0 && (
+
+                        {product.error_message && (
+                          <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-sm text-red-700">
+                            <strong>Error:</strong> {product.error_message}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {currentJob && currentJob.status === 'completed' && (
+                    <div className="mt-10 flex justify-center space-x-6">
+                      <button
+                        onClick={resetWorkflow}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
+                      >
+                        Start New Job
+                      </button>
+                      <button
+                        onClick={() => setCurrentStep('results')}
+                        className="bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
+                      >
+                        <Download className="h-5 w-5" />
+                        <span>
+                          View Results (
+                          {currentJob && getJobStats(currentJob).completed}{' '}
+                          completed)
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="text-center mb-10">
+                    <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+                      <RefreshCw
+                        className={`h-10 w-10 text-white ${isProcessing ? 'animate-spin' : ''}`}
+                      />
+                    </div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                      AI Processing in Progress
+                    </h2>
+                    <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+                      {isProcessing
+                        ? 'Our advanced AI is generating high-quality content for your products...'
+                        : 'Processing complete! Review your results below.'}
+                    </p>
+                  </div>
+
+                  <div className="mb-10 grid grid-cols-2 md:grid-cols-5 gap-6">
+                    {[
+                      {
+                        label: 'Total Products',
+                        value: currentProcessingStats.total,
+                        color: 'from-blue-500 to-blue-600',
+                        icon: Database,
+                      },
+                      {
+                        label: 'Pending',
+                        value: currentProcessingStats.pending,
+                        color: 'from-yellow-500 to-orange-500',
+                        icon: Clock,
+                      },
+                      {
+                        label: 'Processing',
+                        value: currentProcessingStats.processing,
+                        color: 'from-indigo-500 to-purple-600',
+                        icon: Cpu,
+                      },
+                      {
+                        label: 'Completed',
+                        value: currentProcessingStats.completed,
+                        color: 'from-green-500 to-emerald-600',
+                        icon: CheckCircle,
+                      },
+                      {
+                        label: 'Failed',
+                        value: currentProcessingStats.failed,
+                        color: 'from-red-500 to-red-600',
+                        icon: XCircle,
+                      },
+                    ].map((stat, index) => {
+                      const Icon = stat.icon
+                      return (
+                        <div
+                          key={index}
+                          className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-all"
+                        >
+                          <div className="flex items-center justify-between mb-4">
+                            <div
+                              className={`w-10 h-10 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
+                            >
+                              <Icon className="h-5 w-5 text-white" />
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {stat.value}
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium text-gray-600">
+                            {stat.label}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="mb-10">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Overall Progress
+                      </h3>
+                      <span className="text-lg font-bold text-indigo-600">
+                        {Math.round(processingProgress)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
+                      <div
+                        className="bg-gradient-to-r from-indigo-500 to-purple-600 h-4 rounded-full transition-all duration-500 ease-out shadow-lg"
+                        style={{ width: `${processingProgress}%` }}
+                      />
+                    </div>
+                    {isProcessing &&
+                      currentProcessingStats.estimatedTimeRemaining > 0 && (
+                        <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
+                          <div className="flex items-center space-x-2">
+                            <Timer className="h-4 w-4" />
+                            <span>
+                              ETA:{' '}
+                              {formatTime(
+                                Math.round(
+                                  currentProcessingStats.estimatedTimeRemaining
+                                )
+                              )}
+                            </span>
+                          </div>
+                          {currentProcessingStats.avgProcessingTime > 0 && (
                             <div className="flex items-center space-x-2">
                               <Activity className="h-4 w-4" />
                               <span>
                                 Avg:{' '}
-                                {formatTime(currentJob.avgProcessingTime || 0)}
+                                {formatTime(
+                                  Math.round(
+                                    currentProcessingStats.avgProcessingTime
+                                  )
+                                )}
                                 /product
                               </span>
                             </div>
                           )}
-                      </div>
-                    )}
-                </div>
+                        </div>
+                      )}
+                  </div>
 
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {(currentJob.products || []).map((product, index) => (
-                    <div
-                      key={product.id || index}
-                      className={`p-6 rounded-xl border-2 transition-all duration-300 ${
-                        product.status === 'completed'
-                          ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50'
-                          : product.status === 'failed'
-                            ? 'border-red-200 bg-gradient-to-r from-red-50 to-red-100'
-                            : product.status === 'processing'
-                              ? 'border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50'
-                              : 'border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-shrink-0">
-                              {product.status === 'pending' && (
-                                <Clock className="h-6 w-6 text-gray-400" />
-                              )}
-                              {product.status === 'processing' && (
-                                <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
-                              )}
-                              {product.status === 'completed' && (
-                                <CheckCircle className="h-6 w-6 text-green-600" />
-                              )}
-                              {product.status === 'failed' && (
-                                <XCircle className="h-6 w-6 text-red-600" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-gray-900 truncate">
-                                {product.product_name || 'Unknown Product'}
-                              </h4>
-                              <p className="text-sm text-gray-600">
-                                Platform: {product.platform || 'amazon'}
-                                {product.features && (
-                                  <span className="ml-2">
-                                    • Features:{' '}
-                                    {product.features.substring(0, 60)}
-                                    {product.features.length > 60 && '...'}
-                                  </span>
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {processingJobs.map((job, index) => (
+                      <div
+                        key={job.id}
+                        className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                          job.status === 'completed'
+                            ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50'
+                            : job.status === 'failed'
+                              ? 'border-red-200 bg-gradient-to-r from-red-50 to-red-100'
+                              : job.status === 'processing'
+                                ? 'border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50'
+                                : 'border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-4">
+                              <div className="flex-shrink-0">
+                                {job.status === 'pending' && (
+                                  <Clock className="h-6 w-6 text-gray-400" />
                                 )}
-                              </p>
+                                {job.status === 'processing' && (
+                                  <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
+                                )}
+                                {job.status === 'completed' && (
+                                  <CheckCircle className="h-6 w-6 text-green-600" />
+                                )}
+                                {job.status === 'failed' && (
+                                  <XCircle className="h-6 w-6 text-red-600" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-gray-900 truncate">
+                                  {job.productName}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  Platform: {job.platform}
+                                  {job.features && (
+                                    <span className="ml-2">
+                                      • Features:{' '}
+                                      {job.features.substring(0, 60)}
+                                      {job.features.length > 60 && '...'}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center space-x-4">
-                          {product.status === 'completed' &&
-                            product.quality_score && (
+                          <div className="flex items-center space-x-4">
+                            {job.status === 'completed' && job.qualityScore && (
                               <div className="text-center">
                                 <div className="text-lg font-bold text-green-600">
-                                  {product.quality_score.toFixed(0)}%
+                                  {job.qualityScore.toFixed(0)}%
                                 </div>
                                 <div className="text-xs text-green-500">
                                   Quality
@@ -2528,390 +2756,160 @@ export default function EnhancedBulkCSVUploadPage() {
                               </div>
                             )}
 
-                          <div className="text-right">
-                            <span
-                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-                                product.status === 'completed'
-                                  ? 'bg-green-100 text-green-800'
-                                  : product.status === 'failed'
-                                    ? 'bg-red-100 text-red-800'
-                                    : product.status === 'processing'
-                                      ? 'bg-indigo-100 text-indigo-800'
-                                      : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {product.status === 'pending' && '⏳ Waiting'}
-                              {product.status === 'processing' &&
-                                '⚡ Processing'}
-                              {product.status === 'completed' && '✅ Complete'}
-                              {product.status === 'failed' && '❌ Failed'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {product.error_message && (
-                        <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-sm text-red-700">
-                          <strong>Error:</strong> {product.error_message}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {currentJob && currentJob.status === 'completed' && (
-                  <div className="mt-10 flex justify-center space-x-6">
-                    <button
-                      onClick={resetWorkflow}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
-                    >
-                      Start New Job
-                    </button>
-                    <button
-                      onClick={() => setCurrentStep('results')}
-                      className="bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
-                    >
-                      <Download className="h-5 w-5" />
-                      <span>
-                        View Results (
-                        {currentJob && getJobStats(currentJob).completed}{' '}
-                        completed)
-                      </span>
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="text-center mb-10">
-                  <div className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-                    <RefreshCw
-                      className={`h-10 w-10 text-white ${isProcessing ? 'animate-spin' : ''}`}
-                    />
-                  </div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                    AI Processing in Progress
-                  </h2>
-                  <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-                    {isProcessing
-                      ? 'Our advanced AI is generating high-quality content for your products...'
-                      : 'Processing complete! Review your results below.'}
-                  </p>
-                </div>
-
-                <div className="mb-10 grid grid-cols-2 md:grid-cols-5 gap-6">
-                  {[
-                    {
-                      label: 'Total Products',
-                      value: currentProcessingStats.total,
-                      color: 'from-blue-500 to-blue-600',
-                      icon: Database,
-                    },
-                    {
-                      label: 'Pending',
-                      value: currentProcessingStats.pending,
-                      color: 'from-yellow-500 to-orange-500',
-                      icon: Clock,
-                    },
-                    {
-                      label: 'Processing',
-                      value: currentProcessingStats.processing,
-                      color: 'from-indigo-500 to-purple-600',
-                      icon: Cpu,
-                    },
-                    {
-                      label: 'Completed',
-                      value: currentProcessingStats.completed,
-                      color: 'from-green-500 to-emerald-600',
-                      icon: CheckCircle,
-                    },
-                    {
-                      label: 'Failed',
-                      value: currentProcessingStats.failed,
-                      color: 'from-red-500 to-red-600',
-                      icon: XCircle,
-                    },
-                  ].map((stat, index) => {
-                    const Icon = stat.icon
-                    return (
-                      <div
-                        key={index}
-                        className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-all"
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <div
-                            className={`w-10 h-10 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
-                          >
-                            <Icon className="h-5 w-5 text-white" />
-                          </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {stat.value}
-                          </div>
-                        </div>
-                        <div className="text-sm font-medium text-gray-600">
-                          {stat.label}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <div className="mb-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Overall Progress
-                    </h3>
-                    <span className="text-lg font-bold text-indigo-600">
-                      {Math.round(processingProgress)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
-                    <div
-                      className="bg-gradient-to-r from-indigo-500 to-purple-600 h-4 rounded-full transition-all duration-500 ease-out shadow-lg"
-                      style={{ width: `${processingProgress}%` }}
-                    />
-                  </div>
-                  {isProcessing &&
-                    currentProcessingStats.estimatedTimeRemaining > 0 && (
-                      <div className="mt-4 flex items-center justify-center space-x-6 text-sm text-gray-600">
-                        <div className="flex items-center space-x-2">
-                          <Timer className="h-4 w-4" />
-                          <span>
-                            ETA:{' '}
-                            {formatTime(
-                              Math.round(
-                                currentProcessingStats.estimatedTimeRemaining
-                              )
+                            {job.processingTime && (
+                              <div className="text-center">
+                                <div className="text-sm font-semibold text-gray-600">
+                                  {formatTime(job.processingTime)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Time
+                                </div>
+                              </div>
                             )}
-                          </span>
+
+                            <div className="text-right">
+                              <span
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                                  job.status === 'completed'
+                                    ? 'bg-green-100 text-green-800'
+                                    : job.status === 'failed'
+                                      ? 'bg-red-100 text-red-800'
+                                      : job.status === 'processing'
+                                        ? 'bg-indigo-100 text-indigo-800'
+                                        : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {job.status === 'pending' && '⏳ Waiting'}
+                                {job.status === 'processing' && '⚡ Processing'}
+                                {job.status === 'completed' && '✅ Complete'}
+                                {job.status === 'failed' && '❌ Failed'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        {currentProcessingStats.avgProcessingTime > 0 && (
-                          <div className="flex items-center space-x-2">
-                            <Activity className="h-4 w-4" />
-                            <span>
-                              Avg:{' '}
-                              {formatTime(
-                                Math.round(
-                                  currentProcessingStats.avgProcessingTime
-                                )
-                              )}
-                              /product
-                            </span>
+
+                        {job.error && (
+                          <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-sm text-red-700">
+                            <strong>Error:</strong> {job.error}
                           </div>
                         )}
                       </div>
-                    )}
-                </div>
+                    ))}
+                  </div>
 
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {processingJobs.map((job, index) => (
-                    <div
-                      key={job.id}
-                      className={`p-6 rounded-xl border-2 transition-all duration-300 ${
-                        job.status === 'completed'
-                          ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50'
-                          : job.status === 'failed'
-                            ? 'border-red-200 bg-gradient-to-r from-red-50 to-red-100'
-                            : job.status === 'processing'
-                              ? 'border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50'
-                              : 'border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-4">
-                            <div className="flex-shrink-0">
-                              {job.status === 'pending' && (
-                                <Clock className="h-6 w-6 text-gray-400" />
-                              )}
-                              {job.status === 'processing' && (
-                                <Loader2 className="h-6 w-6 text-indigo-600 animate-spin" />
-                              )}
-                              {job.status === 'completed' && (
-                                <CheckCircle className="h-6 w-6 text-green-600" />
-                              )}
-                              {job.status === 'failed' && (
-                                <XCircle className="h-6 w-6 text-red-600" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-gray-900 truncate">
-                                {job.productName}
-                              </h4>
-                              <p className="text-sm text-gray-600">
-                                Platform: {job.platform}
-                                {job.features && (
-                                  <span className="ml-2">
-                                    • Features: {job.features.substring(0, 60)}
-                                    {job.features.length > 60 && '...'}
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-4">
-                          {job.status === 'completed' && job.qualityScore && (
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-green-600">
-                                {job.qualityScore.toFixed(0)}%
-                              </div>
-                              <div className="text-xs text-green-500">
-                                Quality
-                              </div>
-                            </div>
-                          )}
-
-                          {job.processingTime && (
-                            <div className="text-center">
-                              <div className="text-sm font-semibold text-gray-600">
-                                {formatTime(job.processingTime)}
-                              </div>
-                              <div className="text-xs text-gray-500">Time</div>
-                            </div>
-                          )}
-
-                          <div className="text-right">
-                            <span
-                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-                                job.status === 'completed'
-                                  ? 'bg-green-100 text-green-800'
-                                  : job.status === 'failed'
-                                    ? 'bg-red-100 text-red-800'
-                                    : job.status === 'processing'
-                                      ? 'bg-indigo-100 text-indigo-800'
-                                      : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {job.status === 'pending' && '⏳ Waiting'}
-                              {job.status === 'processing' && '⚡ Processing'}
-                              {job.status === 'completed' && '✅ Complete'}
-                              {job.status === 'failed' && '❌ Failed'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {job.error && (
-                        <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-sm text-red-700">
-                          <strong>Error:</strong> {job.error}
-                        </div>
+                  {!isProcessing && (
+                    <div className="mt-10 flex justify-center space-x-6">
+                      <button
+                        onClick={resetWorkflow}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
+                      >
+                        Start Over
+                      </button>
+                      {currentProcessingStats.completed > 0 && (
+                        <button
+                          onClick={() => setCurrentStep('results')}
+                          className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
+                        >
+                          <Download className="h-5 w-5" />
+                          <span>
+                            View Results ({currentProcessingStats.completed}{' '}
+                            completed)
+                          </span>
+                        </button>
                       )}
                     </div>
-                  ))}
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {currentStep === 'results' && (
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
+              <div className="text-center mb-10">
+                <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-xl">
+                  <CheckCircle className="h-10 w-10 text-white" />
                 </div>
-
-                {!isProcessing && (
-                  <div className="mt-10 flex justify-center space-x-6">
-                    <button
-                      onClick={resetWorkflow}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-3 rounded-xl font-semibold transition-colors cursor-pointer"
-                    >
-                      Start Over
-                    </button>
-                    {currentProcessingStats.completed > 0 && (
-                      <button
-                        onClick={() => setCurrentStep('results')}
-                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-10 py-3 rounded-xl font-semibold transition-all flex items-center space-x-2 cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
-                      >
-                        <Download className="h-5 w-5" />
-                        <span>
-                          View Results ({currentProcessingStats.completed}{' '}
-                          completed)
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {currentStep === 'results' && (
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/50 p-8">
-            <div className="text-center mb-10">
-              <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-xl">
-                <CheckCircle className="h-10 w-10 text-white" />
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                {useBackgroundProcessing
-                  ? '🎉 Background Processing Complete!'
-                  : '🎉 Processing Complete!'}
-              </h2>
-              <p className="text-gray-600 mb-6 text-lg">
-                Successfully processed{' '}
-                <span className="font-bold text-green-600">
-                  {useBackgroundProcessing && currentJob
-                    ? `${getJobStats(currentJob).completed} out of ${getJobStats(currentJob).total}`
-                    : `${currentProcessingStats.completed} out of ${currentProcessingStats.total}`}
-                </span>{' '}
-                products with AI-powered content generation
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto mb-10">
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                  <div className="text-3xl font-bold text-green-600 mb-2">
+                <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                  {useBackgroundProcessing
+                    ? '🎉 Background Processing Complete!'
+                    : '🎉 Processing Complete!'}
+                </h2>
+                <p className="text-gray-600 mb-6 text-lg">
+                  Successfully processed{' '}
+                  <span className="font-bold text-green-600">
                     {useBackgroundProcessing && currentJob
-                      ? getJobStats(currentJob).completed
-                      : currentProcessingStats.completed}
-                  </div>
-                  <div className="text-sm font-medium text-green-700">
-                    Successfully Completed
-                  </div>
-                </div>
-                <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
-                  <div className="text-3xl font-bold text-red-600 mb-2">
-                    {useBackgroundProcessing && currentJob
-                      ? getJobStats(currentJob).failed
-                      : currentProcessingStats.failed}
-                  </div>
-                  <div className="text-sm font-medium text-red-700">
-                    Failed to Process
-                  </div>
-                </div>
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
-                  <div className="text-3xl font-bold text-indigo-600 mb-2">
-                    {useBackgroundProcessing && currentJob
-                      ? (currentJob.avgProcessingTime || 0) > 0
-                        ? formatTime(currentJob.avgProcessingTime || 0)
-                        : 'N/A'
-                      : currentProcessingStats.avgProcessingTime > 0
-                        ? formatTime(
-                            Math.round(currentProcessingStats.avgProcessingTime)
-                          )
-                        : 'N/A'}
-                  </div>
-                  <div className="text-sm font-medium text-indigo-700">
-                    Average Processing Time
-                  </div>
-                </div>
-              </div>
+                      ? `${getJobStats(currentJob).completed} out of ${getJobStats(currentJob).total}`
+                      : `${currentProcessingStats.completed} out of ${currentProcessingStats.total}`}
+                  </span>{' '}
+                  products with AI-powered content generation
+                </p>
 
-              <div className="flex justify-center space-x-6">
-                <button
-                  onClick={downloadResults}
-                  disabled={
-                    useBackgroundProcessing && currentJob
-                      ? getJobStats(currentJob).completed === 0
-                      : currentProcessingStats.completed === 0
-                  }
-                  className="bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 disabled:from-gray-400 disabled:to-gray-500 text-white px-10 py-4 rounded-xl font-bold transition-all flex items-center space-x-3 cursor-pointer disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
-                >
-                  <Download className="h-5 w-5" />
-                  <span>Download Results CSV</span>
-                </button>
-                <button
-                  onClick={resetWorkflow}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-4 rounded-xl font-bold transition-colors cursor-pointer"
-                >
-                  Process New File
-                </button>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto mb-10">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                    <div className="text-3xl font-bold text-green-600 mb-2">
+                      {useBackgroundProcessing && currentJob
+                        ? getJobStats(currentJob).completed
+                        : currentProcessingStats.completed}
+                    </div>
+                    <div className="text-sm font-medium text-green-700">
+                      Successfully Completed
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
+                    <div className="text-3xl font-bold text-red-600 mb-2">
+                      {useBackgroundProcessing && currentJob
+                        ? getJobStats(currentJob).failed
+                        : currentProcessingStats.failed}
+                    </div>
+                    <div className="text-sm font-medium text-red-700">
+                      Failed to Process
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border border-indigo-200">
+                    <div className="text-3xl font-bold text-indigo-600 mb-2">
+                      {useBackgroundProcessing && currentJob
+                        ? (currentJob.avgProcessingTime || 0) > 0
+                          ? formatTime(currentJob.avgProcessingTime || 0)
+                          : 'N/A'
+                        : currentProcessingStats.avgProcessingTime > 0
+                          ? formatTime(
+                              Math.round(
+                                currentProcessingStats.avgProcessingTime
+                              )
+                            )
+                          : 'N/A'}
+                    </div>
+                    <div className="text-sm font-medium text-indigo-700">
+                      Average Processing Time
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-center space-x-6">
+                  <button
+                    onClick={downloadResults}
+                    disabled={
+                      useBackgroundProcessing && currentJob
+                        ? getJobStats(currentJob).completed === 0
+                        : currentProcessingStats.completed === 0
+                    }
+                    className="bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 disabled:from-gray-400 disabled:to-gray-500 text-white px-10 py-4 rounded-xl font-bold transition-all flex items-center space-x-3 cursor-pointer disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    <Download className="h-5 w-5" />
+                    <span>Download Results CSV</span>
+                  </button>
+                  <button
+                    onClick={resetWorkflow}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-8 py-4 rounded-xl font-bold transition-colors cursor-pointer"
+                  >
+                    Process New File
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <RecoveryModal />
@@ -2975,6 +2973,6 @@ export default function EnhancedBulkCSVUploadPage() {
           animation-delay: 4s;
         }
       `}</style>
-    </div>
+    </DashboardPageWrapper>
   )
 }

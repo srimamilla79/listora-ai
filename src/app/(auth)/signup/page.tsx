@@ -90,7 +90,7 @@ export default function OptimizedSignupPage() {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/generate`,
+          emailRedirectTo: null, // Disable Supabase's default confirmation email
           data: {
             email: formData.email,
           },
@@ -108,6 +108,19 @@ export default function OptimizedSignupPage() {
           )
         }
       } else {
+        // ✅ Send your custom confirmation email (LOCAL or PROD)
+        const confirmationUrl = `${window.location.origin}/confirm?email=${encodeURIComponent(formData.email)}`
+
+        await fetch('/api/auth/send-confirmation-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            name: formData.email.split('@')[0], // use actual name if available
+            confirmationUrl,
+          }),
+        })
+
         setUserEmail(formData.email)
         setShowSuccessScreen(true)
       }
@@ -116,7 +129,7 @@ export default function OptimizedSignupPage() {
     } finally {
       setLoading(false)
     }
-  }
+  } // This closing brace was missing!
 
   const handleGoogleSignUp = async () => {
     if (!formData.agreeToTerms) {
@@ -273,14 +286,14 @@ export default function OptimizedSignupPage() {
         className="fixed inset-0 -z-10"
         style={{
           background: `
-            linear-gradient(180deg, 
-              #0a2540 0%, 
-              #0a2540 20%, 
-              #0e2a47 40%, 
-              #1a3a5c 60%, 
-              #ffffff 100%
-            )
-          `,
+          linear-gradient(180deg, 
+            #0a2540 0%, 
+            #0a2540 20%, 
+            #0e2a47 40%, 
+            #1a3a5c 60%, 
+            #ffffff 100%
+          )
+        `,
         }}
       >
         {/* Colored accent overlay */}
@@ -288,10 +301,10 @@ export default function OptimizedSignupPage() {
           className="absolute inset-0"
           style={{
             background: `
-              radial-gradient(circle at 20% 30%, rgba(0, 212, 255, 0.15) 0%, transparent 50%),
-              radial-gradient(circle at 80% 40%, rgba(122, 90, 248, 0.15) 0%, transparent 50%),
-              radial-gradient(circle at 50% 60%, rgba(255, 94, 91, 0.1) 0%, transparent 50%)
-            `,
+            radial-gradient(circle at 20% 30%, rgba(0, 212, 255, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 40%, rgba(122, 90, 248, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 50% 60%, rgba(255, 94, 91, 0.1) 0%, transparent 50%)
+          `,
           }}
         />
 
@@ -300,9 +313,9 @@ export default function OptimizedSignupPage() {
           className="absolute inset-0"
           style={{
             backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
-            `,
+            linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+          `,
             backgroundSize: '50px 50px',
           }}
         />

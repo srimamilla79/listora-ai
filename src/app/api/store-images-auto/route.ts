@@ -1,4 +1,4 @@
-// src/app/api/store-images-auto/route.ts - FIXED VERSION
+// src/app/api/store-images-auto/route.ts - FIXED VERSION with Walmart and Custom support
 // ✅ Resolves blob URL server-side fetch issues
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -245,6 +245,8 @@ export async function POST(request: NextRequest) {
         shopify: [] as string[],
         etsy: [] as string[],
         instagram: [] as string[],
+        walmart: [] as string[],
+        custom: [] as string[],
       },
     }
 
@@ -255,6 +257,8 @@ export async function POST(request: NextRequest) {
         shopify: [] as string[],
         etsy: [] as string[],
         instagram: [] as string[],
+        walmart: [] as string[],
+        custom: [] as string[],
       },
     }
 
@@ -319,7 +323,15 @@ export async function POST(request: NextRequest) {
 
     // Process platform images with better error handling
     console.log('🎨 Processing platform-specific images...')
-    const platforms = ['amazon', 'shopify', 'etsy', 'instagram'] as const
+    // Updated platforms array to include walmart and custom
+    const platforms = [
+      'amazon',
+      'shopify',
+      'etsy',
+      'instagram',
+      'walmart',
+      'custom',
+    ] as const
 
     const platformPromises = platforms.map(async (platform) => {
       const platformImages = processedImages[platform] || []

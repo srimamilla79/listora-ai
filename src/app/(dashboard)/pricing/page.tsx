@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import DashboardPageWrapper from '@/components/layout/DashboardPageWrapper'
 import {
   Check,
   Sparkles,
@@ -456,114 +457,44 @@ export default function EnhancedPricingPage() {
   }
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
-      {/* Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
-        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 py-16">
-        {/* Enhanced Header */}
-        <div className="text-center mb-16">
-          {/* Badge - Conditional based on user plan */}
-          {!user || currentPlan === 'starter' ? (
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-full px-6 py-3 mb-8">
-              <Star className="h-5 w-5 text-green-600" />
-              <span className="text-sm font-medium text-green-800">
-                🎉 10 Free Generations Monthly • No Credit Card Required •
-                Honest Pricing
-              </span>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </div>
-          ) : (
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full px-6 py-3 mb-8">
-              <Crown className="h-5 w-5 text-indigo-600" />
-              <span className="text-sm font-medium text-indigo-800">
-                {getDisplayPlanName(currentPlan)} Plan • Transparent Pricing •
-                Change Anytime
-              </span>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </div>
-          )}
-
-          {user ? (
-            <>
-              <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-                Manage Your
-                <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
-                  Subscription
-                </span>
-              </h1>
-              <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">
-                Upgrade or downgrade your plan anytime. Changes take effect
-                immediately with pro-rated billing.
-                <span className="font-semibold text-gray-800 block mt-2">
-                  Only pay for features you actually use.
-                </span>
-              </p>
-            </>
-          ) : (
-            <>
-              <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-                Honest, Transparent
-                <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent block">
-                  Pricing
-                </span>
-              </h1>
-              <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">
-                Start with 10 free generations forever. Scale as you grow with
-                Voice + AI Vision + Bulk Processing + Amazon & Shopify
-                Integration.
-                <span className="font-semibold text-gray-800 block mt-2">
-                  Only pay for features you actually use.
-                </span>
-              </p>
-            </>
-          )}
+    <DashboardPageWrapper title="Pricing">
+      <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-full">
+        {/* Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-0 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+          <div className="absolute top-0 right-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+          <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
         </div>
 
-        {/* Enhanced Current Usage Card */}
-        {user && (
-          <div className="max-w-2xl mx-auto mb-16">
-            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 shadow-xl border border-white/50 relative overflow-hidden">
-              {/* Background Pattern */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full opacity-20 transform translate-x-16 -translate-y-16" />
+        <div className="relative max-w-7xl mx-auto px-4 py-8">
+          {/* Compact Header with Usage Card Side by Side */}
+          <div className="mb-8">
+            {user ? (
+              <div className="grid lg:grid-cols-2 gap-6 items-center">
+                {/* Left: Header Info */}
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                    Manage Your Subscription
+                  </h1>
+                  <p className="text-gray-600">
+                    Upgrade or downgrade anytime with pro-rated billing
+                  </p>
+                </div>
 
-              <div className="relative">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-4">
-                    <div
-                      className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg ${
-                        remainingGenerations > 50
-                          ? 'bg-gradient-to-r from-green-500 to-emerald-600'
-                          : remainingGenerations > 10
-                            ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
-                            : 'bg-gradient-to-r from-red-500 to-red-600'
-                      }`}
-                    >
-                      {remainingGenerations > 50 ? (
-                        <TrendingUp className="h-8 w-8 text-white" />
-                      ) : (
-                        <AlertCircle className="h-8 w-8 text-white" />
-                      )}
-                    </div>
+                {/* Right: Compact Usage Card */}
+                <div className="bg-white/80 backdrop-blur-xl rounded-xl p-6 shadow-lg border border-white/50">
+                  <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        {getDisplayPlanName(currentPlan)} Plan
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {getDisplayPlanName(currentPlan)}
                       </h3>
-                      <p className="text-gray-600">
+                      <p className="text-sm text-gray-600">
                         {currentUsage}/
-                        {currentLimit === 999999 ? '∞' : currentLimit}{' '}
-                        generations this month
+                        {currentLimit === 999999 ? '∞' : currentLimit} used
                       </p>
                     </div>
-                  </div>
-
-                  <div className="text-right">
                     <div
-                      className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
                         remainingGenerations > 50
                           ? 'bg-green-100 text-green-800'
                           : remainingGenerations > 10
@@ -576,715 +507,562 @@ export default function EnhancedPricingPage() {
                         : 'Limit reached'}
                     </div>
                   </div>
-                </div>
 
-                {/* Enhanced Progress Bar */}
-                {currentLimit !== 999999 && (
-                  <div className="mb-6">
-                    <div className="flex justify-between text-sm text-gray-600 mb-2">
-                      <span>Usage Progress</span>
-                      <span>{Math.min(usagePercentage, 100).toFixed(1)}%</span>
+                  {currentLimit !== 999999 && (
+                    <div className="mb-4">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-500 bg-gradient-to-r ${getUsageColor(currentUsage, currentLimit)}`}
+                          style={{
+                            width: `${Math.min(usagePercentage, 100)}%`,
+                          }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className={`h-3 rounded-full transition-all duration-500 bg-gradient-to-r ${getUsageColor(currentUsage, currentLimit)}`}
-                        style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Plan Features Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* UPDATED: Monthly Reset with Billing Cycle Logic */}
-                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Calendar className="h-5 w-5 text-blue-600" />
-                      <span className="text-sm font-semibold text-blue-900">
-                        Billing Cycle
+                  <div className="grid grid-cols-3 gap-3 text-xs">
+                    <div className="bg-blue-50 rounded-lg p-2 text-center">
+                      <Calendar className="h-3 w-3 text-blue-600 mx-auto mb-1" />
+                      <span className="text-blue-700">
+                        {billingInfo
+                          ? `Resets ${billingInfo.formattedDate}`
+                          : 'Monthly reset'}
                       </span>
                     </div>
-                    <p className="text-sm text-blue-700">
-                      {billingInfo ? (
-                        <>
-                          Resets {billingInfo.formattedDate}
-                          {billingInfo.isNearReset && (
-                            <span className="text-orange-600 font-medium ml-1">
-                              ({billingInfo.daysUntilReset} days)
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        // Fallback for starter plan (no subscription date)
-                        <>
-                          Resets{' '}
-                          {new Date(
-                            new Date().getFullYear(),
-                            new Date().getMonth() + 1,
-                            1
-                          ).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </>
-                      )}
-                    </p>
-                  </div>
-
-                  <div
-                    className={`rounded-xl p-4 border ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}
-                  >
-                    <div className="flex items-center space-x-2 mb-2">
+                    <div
+                      className={`rounded-lg p-2 text-center ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'bg-red-50' : 'bg-green-50'}`}
+                    >
                       <Upload
-                        className={`h-5 w-5 ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'text-red-600' : 'text-green-600'}`}
+                        className={`h-3 w-3 mx-auto mb-1 ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'text-red-600' : 'text-green-600'}`}
                       />
                       <span
-                        className={`text-sm font-semibold ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'text-red-900' : 'text-green-900'}`}
+                        className={
+                          getPlanLimit(currentPlan).bulkProducts === 0
+                            ? 'text-red-700'
+                            : 'text-green-700'
+                        }
                       >
-                        Bulk Upload
+                        {getPlanLimit(currentPlan).bulkProducts === 0
+                          ? 'No bulk'
+                          : `${getPlanLimit(currentPlan).bulkProducts} bulk`}
                       </span>
                     </div>
-                    <p
-                      className={`text-sm ${getPlanLimit(currentPlan).bulkProducts === 0 ? 'text-red-700' : 'text-green-700'}`}
-                    >
-                      {getPlanLimit(currentPlan).bulkProducts === 0
-                        ? 'Not Available'
-                        : `Up to ${getPlanLimit(currentPlan).bulkProducts} products`}
-                    </p>
-                  </div>
-
-                  <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Sparkles className="h-5 w-5 text-purple-600" />
-                      <span className="text-sm font-semibold text-purple-900">
-                        AI Features
-                      </span>
+                    <div className="bg-purple-50 rounded-lg p-2 text-center">
+                      <Sparkles className="h-3 w-3 text-purple-600 mx-auto mb-1" />
+                      <span className="text-purple-700">AI enabled</span>
                     </div>
-                    <p className="text-sm text-purple-700">
-                      Voice + Vision + Marketplaces
-                    </p>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center">
+                <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-full px-4 py-2 mb-4">
+                  <Star className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-800">
+                    10 Free Generations Monthly • No Credit Card Required
+                  </span>
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                  Simple, Transparent Pricing
+                </h1>
+                <p className="text-gray-600 max-w-2xl mx-auto">
+                  Start free, scale as you grow with Voice + AI Vision + Bulk
+                  Processing
+                </p>
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Feature Highlights */}
-        <div className="text-center mb-16">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">
-            What makes Listora AI different
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+          {/* Feature Highlights - Compact Version */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 max-w-4xl mx-auto">
             {[
-              {
-                icon: Volume2,
-                label: 'Voice to Content',
-                desc: '1-minute voice → professional copy',
-              },
-              {
-                icon: Eye,
-                label: 'AI Vision Analysis',
-                desc: 'Reads brands, colors from images',
-              },
-              {
-                icon: Cloud,
-                label: 'Background Processing',
-                desc: 'Bulk jobs run while you work',
-              },
-              {
-                icon: Store,
-                label: 'Marketplace Publishing',
-                desc: 'Amazon optimization & Shopify integration',
-              },
+              { icon: Volume2, label: 'Voice Input', desc: '1-min voice' },
+              { icon: Eye, label: 'AI Vision', desc: 'Image analysis' },
+              { icon: Cloud, label: 'Background', desc: 'Bulk processing' },
+              { icon: Store, label: 'Publishing', desc: 'Direct to stores' },
             ].map((feature, index) => {
               const Icon = feature.icon
               return (
                 <div
                   key={index}
-                  className="bg-white/80 backdrop-blur-lg rounded-xl p-6 shadow-lg border border-white/50 hover:shadow-xl transition-all"
+                  className="bg-white/60 backdrop-blur rounded-lg p-4 text-center"
                 >
-                  <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl mx-auto mb-3 flex items-center justify-center">
-                    <Icon className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-1">
+                  <Icon className="h-6 w-6 text-indigo-600 mx-auto mb-2" />
+                  <h3 className="font-semibold text-sm text-gray-900">
                     {feature.label}
                   </h3>
-                  <p className="text-sm text-gray-600">{feature.desc}</p>
+                  <p className="text-xs text-gray-600">{feature.desc}</p>
                 </div>
               )
             })}
           </div>
-        </div>
 
-        {/* Enhanced Pricing Cards - REDESIGNED TO MATCH HOMEPAGE */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start mb-16">
-          {plans.map((plan) => {
-            const Icon = plan.icon
-            const isCurrentPlan = user && currentPlan === plan.planType
+          {/* Enhanced Pricing Cards - REDESIGNED TO MATCH HOMEPAGE */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start mb-16">
+            {plans.map((plan) => {
+              const Icon = plan.icon
+              const isCurrentPlan = user && currentPlan === plan.planType
 
-            // Add top border colors for each plan
-            const topBorderColors = {
-              starter: 'bg-gray-300',
-              business: 'bg-gradient-to-r from-indigo-400 to-purple-500',
-              premium: 'bg-gradient-to-r from-green-400 to-emerald-500',
-              enterprise: 'bg-gradient-to-r from-gray-600 to-gray-800',
-            }
+              // Add top border colors for each plan
+              const topBorderColors = {
+                starter: 'bg-gray-300',
+                business: 'bg-gradient-to-r from-indigo-400 to-purple-500',
+                premium: 'bg-gradient-to-r from-green-400 to-emerald-500',
+                enterprise: 'bg-gradient-to-r from-gray-600 to-gray-800',
+              }
 
-            return (
-              <div
-                key={plan.name}
-                className={`border-2 ${
-                  plan.popular
-                    ? 'border-indigo-500'
-                    : isCurrentPlan
-                      ? 'border-green-500'
-                      : 'border-gray-300'
-                } bg-white relative overflow-hidden ${
-                  plan.popular ? 'transform scale-105' : ''
-                } h-full flex flex-col`}
-              >
-                {/* Top colored border */}
+              return (
                 <div
-                  className={`h-2 ${topBorderColors[plan.planType as keyof typeof topBorderColors]}`}
-                ></div>
+                  key={plan.name}
+                  className={`border-2 ${
+                    plan.popular
+                      ? 'border-indigo-500'
+                      : isCurrentPlan
+                        ? 'border-green-500'
+                        : 'border-gray-300'
+                  } bg-white relative overflow-hidden ${
+                    plan.popular ? 'transform scale-105' : ''
+                  } h-full flex flex-col`}
+                >
+                  {/* Top colored border */}
+                  <div
+                    className={`h-2 ${topBorderColors[plan.planType as keyof typeof topBorderColors]}`}
+                  ></div>
 
-                {/* Most Popular Badge */}
-                {plan.badge && !isCurrentPlan && (
-                  <div className="px-4 py-2 text-center text-white text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600">
-                    {plan.badge}
-                  </div>
-                )}
+                  {/* Most Popular Badge */}
+                  {plan.badge && !isCurrentPlan && (
+                    <div className="px-4 py-2 text-center text-white text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600">
+                      {plan.badge}
+                    </div>
+                  )}
 
-                {/* Current Plan Badge */}
-                {isCurrentPlan && (
-                  <div className="px-4 py-2 text-center text-white text-sm font-medium bg-green-600">
-                    Current Plan
-                  </div>
-                )}
+                  {/* Current Plan Badge */}
+                  {isCurrentPlan && (
+                    <div className="px-4 py-2 text-center text-white text-sm font-medium bg-green-600">
+                      Current Plan
+                    </div>
+                  )}
 
-                {/* Main content container */}
-                <div className="flex flex-col h-full">
-                  {/* Fixed height section 1: Plan name and description - EXACTLY ALIGNED */}
-                  <div className="text-center h-24 flex flex-col justify-center px-4">
-                    <h3 className="text-xl font-bold text-gray-900 mb-1">
-                      {plan.name}
-                    </h3>
-                    <p className="text-sm text-gray-600">{plan.description}</p>
-                  </div>
+                  {/* Main content container */}
+                  <div className="flex flex-col h-full">
+                    {/* Fixed height section 1: Plan name and description - EXACTLY ALIGNED */}
+                    <div className="text-center h-24 flex flex-col justify-center px-4">
+                      <h3 className="text-xl font-bold text-gray-900 mb-1">
+                        {plan.name}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {plan.description}
+                      </p>
+                    </div>
 
-                  {/* Fixed height section 2: Price - EXACTLY ALIGNED */}
-                  <div className="text-center h-32 flex flex-col justify-center px-4">
-                    <div className="mb-1">
-                      <span className="text-3xl font-bold text-gray-900">
-                        ${plan.price}
-                      </span>
-                      {plan.price > 0 && (
-                        <span className="text-gray-600 ml-1">
-                          /{plan.period}
+                    {/* Fixed height section 2: Price - EXACTLY ALIGNED */}
+                    <div className="text-center h-32 flex flex-col justify-center px-4">
+                      <div className="mb-1">
+                        <span className="text-3xl font-bold text-gray-900">
+                          ${plan.price}
                         </span>
+                        {plan.price > 0 && (
+                          <span className="text-gray-600 ml-1">
+                            /{plan.period}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {plan.price > 0 ? 'billed annually' : 'forever free'}
+                      </p>
+                      <p className="text-sm font-medium text-gray-800">
+                        {plan.planType === 'starter'
+                          ? '10 generations/month'
+                          : plan.planType === 'business'
+                            ? '250 generations/month'
+                            : plan.planType === 'premium'
+                              ? '1,000 generations/month'
+                              : 'Unlimited generations'}
+                      </p>
+                    </div>
+
+                    {/* Fixed height section 3: CTA Button - EXACTLY ALIGNED */}
+                    <div className="h-16 flex items-center px-6">
+                      {user && (
+                        <>
+                          {plan.planType === currentPlan ? (
+                            <div className="w-full py-3 px-4 rounded-lg text-sm font-semibold bg-green-100 text-green-800 flex items-center justify-center">
+                              <Award className="mr-2 h-4 w-4" />
+                              Current Plan
+                            </div>
+                          ) : (
+                            (() => {
+                              const isUpgrade =
+                                getPlanLimit(plan.planType).generations >
+                                getPlanLimit(currentPlan).generations
+                              const isDowngrade = getPlanLimit(
+                                plan.planType
+                              ).generations
+                              getPlanLimit(currentPlan).generations
+
+                              return (
+                                <button
+                                  onClick={() => handleUpgrade(plan.planType)}
+                                  disabled={loading}
+                                  className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center ${
+                                    isUpgrade
+                                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                                      : isDowngrade
+                                        ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
+                                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                  {loading &&
+                                  processingPlan === plan.planType ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                      Processing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      {isUpgrade ? (
+                                        <ArrowRight
+                                          className="h-4 w-4 mr-1"
+                                          style={{
+                                            transform: 'rotate(-45deg)',
+                                          }}
+                                        />
+                                      ) : isDowngrade ? (
+                                        <ArrowRight
+                                          className="h-4 w-4 mr-1"
+                                          style={{
+                                            transform: 'rotate(135deg)',
+                                          }}
+                                        />
+                                      ) : null}
+                                      {isUpgrade
+                                        ? 'Upgrade'
+                                        : isDowngrade
+                                          ? 'Downgrade'
+                                          : 'Switch'}
+                                    </>
+                                  )}
+                                </button>
+                              )
+                            })()
+                          )}
+                        </>
+                      )}
+
+                      {/* Sign in button for non-logged users on paid plans */}
+                      {!user && plan.planType !== 'starter' && (
+                        <button
+                          onClick={handleLogin}
+                          className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gray-900 hover:bg-gray-800 text-white"
+                        >
+                          Sign In to View Plan
+                        </button>
+                      )}
+
+                      {/* Start free button for non-logged users on starter plan */}
+                      {!user && plan.planType === 'starter' && (
+                        <button
+                          onClick={handleLogin}
+                          className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                        >
+                          🚀 Start Free
+                        </button>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      {plan.price > 0 ? 'billed annually' : 'forever free'}
-                    </p>
-                    <p className="text-sm font-medium text-gray-800">
-                      {plan.planType === 'starter'
-                        ? '10 generations/month'
-                        : plan.planType === 'business'
-                          ? '250 generations/month'
-                          : plan.planType === 'premium'
-                            ? '1,000 generations/month'
-                            : 'Unlimited generations'}
-                    </p>
-                  </div>
 
-                  {/* Fixed height section 3: CTA Button - EXACTLY ALIGNED */}
-                  <div className="h-16 flex items-center px-6">
-                    {user && (
-                      <>
-                        {plan.planType === currentPlan ? (
-                          <div className="w-full py-3 px-4 rounded-lg text-sm font-semibold bg-green-100 text-green-800 flex items-center justify-center">
-                            <Award className="mr-2 h-4 w-4" />
-                            Current Plan
-                          </div>
-                        ) : (
-                          (() => {
-                            const isUpgrade =
-                              getPlanLimit(plan.planType).generations >
-                              getPlanLimit(currentPlan).generations
-                            const isDowngrade =
-                              getPlanLimit(plan.planType).generations <
-                              getPlanLimit(currentPlan).generations
-
-                            return (
-                              <button
-                                onClick={() => handleUpgrade(plan.planType)}
-                                disabled={loading}
-                                className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center ${
-                                  isUpgrade
-                                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                                    : isDowngrade
-                                      ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
-                                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                              >
-                                {loading && processingPlan === plan.planType ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                    Processing...
-                                  </>
-                                ) : (
-                                  <>
-                                    {isUpgrade ? (
-                                      <ArrowRight className="h-4 w-4 mr-1 rotate-45" />
-                                    ) : isDowngrade ? (
-                                      <ArrowRight className="h-4 w-4 mr-1 rotate-[-135deg]" />
-                                    ) : null}
-                                    {isUpgrade
-                                      ? 'Upgrade'
-                                      : isDowngrade
-                                        ? 'Downgrade'
-                                        : 'Switch'}
-                                  </>
-                                )}
-                              </button>
-                            )
-                          })()
-                        )}
-                      </>
-                    )}
-
-                    {/* Sign in button for non-logged users on paid plans */}
-                    {!user && plan.planType !== 'starter' && (
-                      <button
-                        onClick={handleLogin}
-                        className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gray-900 hover:bg-gray-800 text-white"
-                      >
-                        Sign In to View Plan
-                      </button>
-                    )}
-
-                    {/* Start free button for non-logged users on starter plan */}
-                    {!user && plan.planType === 'starter' && (
-                      <button
-                        onClick={handleLogin}
-                        className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
-                      >
-                        🚀 Start Free
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Flexible section 4: Features */}
-                  <div className="flex-1 px-6 pb-6">
-                    <div className="space-y-4">
-                      <div>
-                        <ul className="space-y-2">
-                          {plan.features.map((feature, idx) => (
-                            <li
-                              key={idx}
-                              className="flex items-start space-x-2"
-                            >
-                              <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                              <span className="text-sm text-gray-700">
-                                {feature}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {plan.limitations && (
+                    {/* Flexible section 4: Features */}
+                    <div className="flex-1 px-6 pb-6">
+                      <div className="space-y-4">
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                            ⚠️ Limitations:
-                          </h4>
                           <ul className="space-y-2">
-                            {plan.limitations.map((limitation, idx) => (
+                            {plan.features.map((feature, idx) => (
                               <li
                                 key={idx}
                                 className="flex items-start space-x-2"
                               >
-                                <span className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
-                                  ❌
-                                </span>
-                                <span className="text-sm text-gray-600">
-                                  {limitation}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {plan.newCapabilities && (
-                        <div>
-                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                            🚀 New Capabilities:
-                          </h4>
-                          <ul className="space-y-2">
-                            {plan.newCapabilities.map((capability, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start space-x-2"
-                              >
-                                <Star className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                                <span className="text-sm text-blue-700 font-medium">
-                                  {capability}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {plan.futureFeatures && (
-                        <div>
-                          <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                            🔮 Future Features:
-                          </h4>
-                          <ul className="space-y-2">
-                            {plan.futureFeatures.map((feature, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start space-x-2"
-                              >
-                                <Building2 className="h-4 w-4 text-purple-500 flex-shrink-0 mt-0.5" />
-                                <span className="text-sm text-purple-700">
+                                <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                <span className="text-sm text-gray-700">
                                   {feature}
                                 </span>
                               </li>
                             ))}
                           </ul>
                         </div>
-                      )}
-                    </div>
 
-                    {/* Money back guarantee - At bottom */}
-                    <div className="mt-6 text-center text-xs text-gray-500">
-                      {plan.planType === 'starter'
-                        ? '✓ No credit card required • ✓ Forever free'
-                        : '30-Day Money Back Guarantee'}
+                        {plan.limitations && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                              ⚠️ Limitations:
+                            </h4>
+                            <ul className="space-y-2">
+                              {plan.limitations.map((limitation, idx) => (
+                                <li
+                                  key={idx}
+                                  className="flex items-start space-x-2"
+                                >
+                                  <span className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5">
+                                    ❌
+                                  </span>
+                                  <span className="text-sm text-gray-600">
+                                    {limitation}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {plan.newCapabilities && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                              🚀 New Capabilities:
+                            </h4>
+                            <ul className="space-y-2">
+                              {plan.newCapabilities.map((capability, idx) => (
+                                <li
+                                  key={idx}
+                                  className="flex items-start space-x-2"
+                                >
+                                  <Star className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                                  <span className="text-sm text-blue-700 font-medium">
+                                    {capability}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {plan.futureFeatures && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                              🔮 Future Features:
+                            </h4>
+                            <ul className="space-y-2">
+                              {plan.futureFeatures.map((feature, idx) => (
+                                <li
+                                  key={idx}
+                                  className="flex items-start space-x-2"
+                                >
+                                  <Building2 className="h-4 w-4 text-purple-500 flex-shrink-0 mt-0.5" />
+                                  <span className="text-sm text-purple-700">
+                                    {feature}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Money back guarantee - At bottom */}
+                      <div className="mt-6 text-center text-xs text-gray-500">
+                        {plan.planType === 'starter'
+                          ? '✓ No credit card required • ✓ Forever free'
+                          : '30-Day Money Back Guarantee'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Combined Feature & Roadmap Section - Tabbed */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 mb-16 border border-white/50 shadow-xl">
+            <div className="max-w-6xl mx-auto">
+              <div className="flex flex-col md:flex-row gap-8">
+                {/* Features */}
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                    <Sparkles className="h-5 w-5 mr-2 text-indigo-600" />
+                    How Our Features Work
+                  </h3>
+                  <div className="grid gap-4">
+                    <div className="flex items-start space-x-3">
+                      <Eye className="h-5 w-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">
+                          AI Vision
+                        </h4>
+                        <p className="text-gray-600 text-xs">
+                          Auto-reads product images for brands, colors &
+                          features
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <Cloud className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">
+                          Background Processing
+                        </h4>
+                        <p className="text-gray-600 text-xs">
+                          Upload CSV & continue working while AI generates
+                          content
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <Volume2 className="h-5 w-5 text-purple-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">
+                          Voice Input
+                        </h4>
+                        <p className="text-gray-600 text-xs">
+                          Speak naturally for 1 minute to create product content
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <Store className="h-5 w-5 text-orange-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-gray-900 text-sm">
+                          Direct Publishing
+                        </h4>
+                        <p className="text-gray-600 text-xs">
+                          One-click to Shopify & Amazon with no copy-paste
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="hidden md:block w-px bg-gray-200"></div>
+
+                {/* Roadmap */}
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                    <Timer className="h-5 w-5 mr-2 text-purple-600" />
+                    Coming Soon
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm text-gray-700">
+                        Enhanced Shopify inventory sync
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-gray-700">
+                        Analytics & performance tracking
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <span className="text-sm text-gray-700">
+                        Enterprise API access
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <span className="text-sm text-gray-700">
+                        Custom brand voice settings
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <a
+                        href="/contact"
+                        className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Contact for enterprise features
+                        <ArrowRight className="h-4 w-4 ml-1" />
+                      </a>
                     </div>
                   </div>
                 </div>
               </div>
-            )
-          })}
-        </div>
-
-        {/* Feature Explanation Section */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 mb-16 border border-white/50 shadow-xl">
-          <h3 className="text-2xl font-bold text-gray-900 mb-8 text-center">
-            What Our Features Actually Do
-          </h3>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Eye className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    AI Vision Analysis
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    Our system automatically reads your product images and
-                    identifies brands, colors, materials, and features using
-                    OpenAI Vision technology. Uses this visual data to generate
-                    more accurate descriptions.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Cloud className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    Background Job Processing
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    Upload CSV with hundreds of products and jobs continue
-                    running even if you close your browser. Navigate freely
-                    while content is being generated. Get email notification
-                    when complete.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Volume2 className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    Voice-to-Content
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    Record up to 1-minute voice recordings. AI converts natural
-                    speech to professional product content. Works in natural
-                    conversation style - just talk about your product normally.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Store className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    Direct Marketplace Publishing
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    One-click publish generated content directly to Shopify &
-                    Amazon optimization. No copy-paste required. Integrates
-                    directly with your seller accounts for seamless workflow.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    Content Library
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    Available to all users (including free tier). Store and
-                    organize all generated content. Search and filter previous
-                    generations. Download content in various formats.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Upload className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-2">
-                    Bulk CSV Upload
-                  </h4>
-                  <p className="text-gray-600 text-sm">
-                    Upload CSV files with multiple products at once. System
-                    processes all products automatically. Available from
-                    Business plan (50 products) up to Enterprise (1,000
-                    products).
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
-        </div>
 
-        {/* Roadmap Section */}
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 mb-16 border border-indigo-200">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-            What We're Building Next
-          </h3>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h4 className="font-semibold text-indigo-900 mb-4 flex items-center">
-                <Timer className="h-5 w-5 mr-2" />
-                Coming Soon
-              </h4>
-              <ul className="space-y-3">
-                <li className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-gray-700">
-                    Enhanced Shopify integration with inventory sync
-                  </span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-700">
-                    Advanced analytics and performance tracking
-                  </span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                  <span className="text-gray-700">
-                    API access for enterprise customers
-                  </span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <span className="text-gray-700">
-                    Custom brand voice settings
-                  </span>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-purple-900 mb-4 flex items-center">
-                <Building2 className="h-5 w-5 mr-2" />
-                Enterprise Inquiries
-              </h4>
-              <ul className="space-y-3">
-                <li className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                  <span className="text-gray-700">
-                    White-label solutions (contact for pricing)
-                  </span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                  <span className="text-gray-700">
-                    Dedicated account management
-                  </span>
-                </li>
-                <li className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                  <span className="text-gray-700">
-                    Custom integrations tailored to your workflow
-                  </span>
-                </li>
-              </ul>
-              <div className="mt-4">
-                <a
-                  href="/contact"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center"
-                >
-                  Contact us for enterprise features
-                  <ArrowRight className="h-4 w-4 ml-1" />
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Enhanced Bottom CTA */}
-        {!user && (
-          <div className="text-center">
-            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-12 max-w-4xl mx-auto border border-white/50 shadow-xl relative overflow-hidden">
-              {/* Background Pattern */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full opacity-20 transform translate-x-32 -translate-y-32" />
-
-              <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl">
-                  <Rocket className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-3xl font-bold text-gray-900 mb-4">
-                  Ready to Start Creating Amazing Content?
+          {/* Compact Bottom CTA for non-logged users */}
+          {!user && (
+            <div className="text-center mb-8">
+              <div className="bg-white/80 backdrop-blur-xl rounded-xl p-8 max-w-2xl mx-auto border border-white/50 shadow-lg">
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                  Ready to Start Creating?
                 </h3>
-                <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                  Start with 10 free generations forever. No credit card
-                  required. Experience the power of Voice + AI Vision +
-                  Background Processing + Amazon & Shopify Integration.
+                <p className="text-gray-600 mb-6">
+                  10 free generations forever. No credit card required.
                 </p>
-
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
-                  <button
-                    onClick={handleLogin}
-                    className="group bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center cursor-pointer"
-                  >
-                    <Sparkles className="mr-2 h-5 w-5 group-hover:animate-spin" />
-                    Start Creating Content
-                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-500">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>10 free generations monthly</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>No credit card required</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Setup in 60 seconds</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>Honest pricing, real features</span>
-                  </div>
-                </div>
+                <button
+                  onClick={handleLogin}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg flex items-center mx-auto"
+                >
+                  <Sparkles className="mr-2 h-5 w-5" />
+                  Start Creating Content
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Enhanced Footer */}
-        <div className="text-center mt-16">
-          <div className="bg-white/60 backdrop-blur-lg rounded-xl p-6 max-w-2xl mx-auto border border-white/50">
-            <p className="text-gray-600 mb-4">
+          {/* Compact Footer */}
+          <div className="text-center py-6 border-t border-gray-200">
+            <p className="text-sm text-gray-600 mb-3">
               All plans include AI content generation, platform optimization,
               and enterprise-grade security.
             </p>
-            <div className="flex justify-center space-x-8 text-sm">
+            <div className="flex justify-center space-x-6 text-sm">
               <a
                 href="/terms"
+                className="text-gray-500 hover:text-gray-700"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
               >
-                <Shield className="h-4 w-4" />
-                <span>Terms</span>
+                Terms
               </a>
               <a
                 href="/privacy"
+                className="text-gray-500 hover:text-gray-700"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
               >
-                <Shield className="h-4 w-4" />
-                <span>Privacy</span>
+                Privacy
               </a>
               <a
                 href="/contact"
+                className="text-gray-500 hover:text-gray-700"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
               >
-                <Users className="h-4 w-4" />
-                <span>Support</span>
+                Support
               </a>
             </div>
           </div>
         </div>
-      </div>
 
-      <style jsx>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
+        <style jsx>{`
+          @keyframes blob {
+            0% {
+              transform: translate(0px, 0px) scale(1);
+            }
+            33% {
+              transform: translate(30px, -50px) scale(1.1);
+            }
+            66% {
+              transform: translate(-20px, 20px) scale(0.9);
+            }
+            100% {
+              transform: translate(0px, 0px) scale(1);
+            }
           }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
+          .animate-blob {
+            animation: blob 7s infinite;
           }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
+          .animation-delay-2000 {
+            animation-delay: 2s;
           }
-          100% {
-            transform: translate(0px, 0px) scale(1);
+          .animation-delay-4000 {
+            animation-delay: 4s;
           }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
-    </div>
+        `}</style>
+      </div>
+    </DashboardPageWrapper>
   )
 }

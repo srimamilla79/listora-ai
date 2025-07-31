@@ -723,7 +723,6 @@ function createPrompt(
         'Create a complete Amazon-optimized content package with SEO-friendly title, bullet points, description, Instagram caption, and blog intro. Focus on keywords, benefits, and conversion.',
     },
     ebay: {
-      // ← ADD THIS
       title: 'eBay Listing Package',
       instructions:
         'Create eBay-optimized content with competitive pricing focus, condition details, shipping info, and buyer confidence elements. Emphasize value, authenticity, and quick purchase incentives.',
@@ -742,6 +741,16 @@ function createPrompt(
       title: 'Instagram Content Package',
       instructions:
         'Create a comprehensive Instagram content package with engaging caption, hashtags, and complementary blog intro for cross-platform marketing.',
+    },
+    walmart: {
+      title: 'Walmart Marketplace Listing Package',
+      instructions:
+        'Create Walmart-optimized content emphasizing value, competitive pricing, and practical benefits. Include clear product specifications, everyday low price messaging, and family-friendly appeal. Focus on bulk options, fast shipping, and trusted quality at affordable prices.',
+    },
+    custom: {
+      title: 'Universal Product Content Package',
+      instructions:
+        'Create versatile, platform-agnostic content that works across any e-commerce platform. Use professional language without platform-specific requirements. Focus on clear benefits, technical specifications, and universal value propositions suitable for both B2B and B2C contexts.',
     },
   }
 
@@ -912,6 +921,33 @@ Instructions: ${config.instructions}`
     prompt += ` Incorporate the natural, authentic details from the voice input to make the content more genuine and compelling.`
   }
 
+  // Platform-specific enhancements for Walmart and Custom
+  if (platform === 'walmart') {
+    prompt += `
+
+WALMART-SPECIFIC REQUIREMENTS:
+- Emphasize everyday low prices and value for money
+- Include family-friendly language and practical benefits
+- Mention bulk buying options if applicable
+- Use terms like "Great Value", "Rollback", or "Everyday Low Price" where appropriate
+- Focus on quantity, practicality, and cost-effectiveness
+- Compare favorably against competitors on price
+- Highlight fast, free shipping options`
+  }
+
+  if (platform === 'custom') {
+    prompt += `
+
+UNIVERSAL CONTENT REQUIREMENTS:
+- Avoid platform-specific terminology or branding
+- Use neutral, professional language suitable for any marketplace
+- Include comprehensive technical specifications
+- Provide content in easily adaptable sections
+- Balance B2B and B2C appeal
+- Focus on product quality and universal benefits
+- Make content modular for easy customization`
+  }
+
   // 🚀 NEW: Custom section selection
   if (isCustomSelection) {
     prompt += `
@@ -938,6 +974,14 @@ Please provide a comprehensive content package with ALL of the following section
         ? '\n- Emphasize premium/professional quality where appropriate'
         : ''
     }${voiceTranscription ? '\n- Incorporate key elements from voice input' : ''}`
+
+    if (platform === 'walmart') {
+      prompt +=
+        '\n- Include value-focused keywords like "affordable", "value pack", or "family size"'
+    } else if (platform === 'custom') {
+      prompt += '\n- Keep title versatile and platform-neutral'
+    }
+
     sectionNumber++
   }
 
@@ -954,6 +998,15 @@ Please provide a comprehensive content package with ALL of the following section
         ? '\n- Use authentic language from voice description'
         : ''
     }`
+
+    if (platform === 'walmart') {
+      prompt += '\n- Emphasize value, savings, and practical everyday benefits'
+      prompt += '\n- Include family-friendly features and bulk options'
+    } else if (platform === 'custom') {
+      prompt += '\n- Use universally appealing benefit statements'
+      prompt += '\n- Avoid marketplace-specific claims'
+    }
+
     sectionNumber++
   }
 
@@ -971,6 +1024,17 @@ Please provide a comprehensive content package with ALL of the following section
         ? '\n- Weave in natural product insights from voice input'
         : ''
     }`
+
+    if (platform === 'walmart') {
+      prompt += '\n- Emphasize affordability and everyday use cases'
+      prompt += '\n- Include comparison with similar products on value'
+      prompt += '\n- Mention warranty, returns, and customer satisfaction'
+    } else if (platform === 'custom') {
+      prompt += '\n- Structure content in modular paragraphs'
+      prompt += '\n- Include technical specifications section'
+      prompt += '\n- Provide both feature and benefit explanations'
+    }
+
     sectionNumber++
   }
 
@@ -984,6 +1048,16 @@ Please provide a comprehensive content package with ALL of the following section
 - Call-to-action for engagement${
       hasProcessedImages ? '\n- Use visual appeal as a hook' : ''
     }${voiceTranscription ? '\n- Capture the enthusiasm from voice input' : ''}`
+
+    if (platform === 'walmart') {
+      prompt +=
+        '\n- Include hashtags like #WalmartFinds #GreatValue #FamilySavings'
+      prompt += '\n- Focus on practical lifestyle benefits'
+    } else if (platform === 'custom') {
+      prompt += '\n- Use generic, widely applicable hashtags'
+      prompt += '\n- Keep brand mentions neutral'
+    }
+
     sectionNumber++
   }
 
@@ -999,6 +1073,15 @@ Please provide a comprehensive content package with ALL of the following section
         ? '\n- Use authentic insights from voice description'
         : ''
     }`
+
+    if (platform === 'walmart') {
+      prompt += '\n- Focus on budget-conscious lifestyle content'
+      prompt += '\n- Include family and value-oriented themes'
+    } else if (platform === 'custom') {
+      prompt += '\n- Keep tone professional and adaptable'
+      prompt += '\n- Avoid platform-specific references'
+    }
+
     sectionNumber++
   }
 
@@ -1011,6 +1094,15 @@ Please provide a comprehensive content package with ALL of the following section
         ? '\n- Leverage professional presentation for trust-building'
         : ''
     }`
+
+    if (platform === 'walmart') {
+      prompt += '\n- Emphasize limited-time savings or rollback prices'
+      prompt += '\n- Include "Add to Cart" and "Buy Now" language'
+      prompt += '\n- Mention free shipping thresholds'
+    } else if (platform === 'custom') {
+      prompt += '\n- Provide multiple CTA options for different platforms'
+      prompt += '\n- Include both soft and hard sell variations'
+    }
   }
 
   prompt += `

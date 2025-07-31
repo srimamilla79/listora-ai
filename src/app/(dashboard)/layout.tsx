@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import UniversalHeader from '@/components/layout/UniversalHeader'
 
 export default function DashboardLayout({
   children,
@@ -70,17 +69,6 @@ export default function DashboardLayout({
     }
   }, [router, supabase])
 
-  const handleSignOut = async () => {
-    if (!supabase) return
-
-    try {
-      await supabase.auth.signOut()
-      router.push('/login')
-    } catch (error) {
-      console.error('Sign out error:', error)
-    }
-  }
-
   if (loading || !mounted || !supabase) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
@@ -96,10 +84,5 @@ export default function DashboardLayout({
     return null // Will redirect to login
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <UniversalHeader user={user} onSignOut={handleSignOut} />
-      <main>{children}</main>
-    </div>
-  )
+  return <div className="min-h-screen bg-gray-50">{children}</div>
 }

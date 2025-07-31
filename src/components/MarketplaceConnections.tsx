@@ -1,4 +1,4 @@
-// src/components/MarketplaceConnections.tsx - ROCK SOLID VERSION - NO MORE SPINNING
+// src/components/MarketplaceConnections.tsx - TEMPORARY FIX VERSION - COMPLETE
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -185,93 +185,44 @@ export default function MarketplaceConnections({
     try {
       const supabase = createClient()
 
-      console.log(
-        '🔍 MarketplaceConnections: Testing database connectivity first...'
-      )
+      // TEMPORARY FIX: Skip connectivity test and go straight to queries
+      console.log('🔍 MarketplaceConnections: Running direct queries...')
 
-      // 🔧 TEST database connectivity with a simple query first
-      try {
-        const testQuery = await supabase
-          .from('platform_connections')
-          .select('count', { count: 'exact', head: true })
-        console.log('✅ Database connectivity test passed')
-      } catch (testError) {
-        console.log(
-          '⚠️ Database connectivity test failed, using cached/fallback mode'
-        )
-
-        // 🔧 SMART FALLBACK: Check URL for recent OAuth completion
-        if (typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search)
-          const shopifyConnected = urlParams.get('shopify') === 'connected'
-          const amazonConnected = urlParams.get('amazon') === 'connected'
-          const ebayConnected = urlParams.get('ebay') === 'connected'
-
-          if (shopifyConnected || amazonConnected || ebayConnected) {
-            console.log('🔄 OAuth detected in URL, updating connections')
-
-            const updatedConnections = connections.map((conn) => ({
-              ...conn,
-              connected:
-                (conn.platform === 'amazon' && amazonConnected) ||
-                (conn.platform === 'shopify' && shopifyConnected) ||
-                (conn.platform === 'ebay' && ebayConnected) ||
-                conn.connected, // Keep existing state for other platforms
-            }))
-
-            setConnections(updatedConnections)
-
-            // Cache the updated connections
-            const cacheKey = `connections_${currentUserId}`
-            const cacheTimestampKey = `connections_timestamp_${currentUserId}`
-            localStorage.setItem(cacheKey, JSON.stringify(updatedConnections))
-            localStorage.setItem(cacheTimestampKey, Date.now().toString())
-
-            if (onConnectionChange) {
-              updatedConnections.forEach((conn) => {
-                onConnectionChange(conn.platform, conn.connected)
-              })
-            }
-
-            setLoading(false)
-            return
-          }
-        }
-
-        // If no OAuth detected, keep current cached state
-        console.log('💾 Using existing cached connection state')
-        setLoading(false)
-        return
-      }
-
-      console.log('🔍 MarketplaceConnections: Running database queries...')
-
-      // 🔧 SIMPLIFIED queries with longer timeouts and better error handling
-      let amazonData = null
-      let shopifyData = null
-      let ebayData = null
-
-      // Parallel queries with 5-second timeout each
-      const queryPromises = [
+      // Run all queries in parallel with simpler approach
+      const [amazonResult, shopifyResult, ebayResult] = await Promise.all([
         // Amazon query
         supabase
           .from('amazon_connections')
           .select('access_token, seller_id, marketplace_id, created_at')
           .eq('user_id', currentUserId)
           .eq('status', 'active')
-          .limit(1)
-          .then((result: any) => ({ type: 'amazon', result }))
-          .catch((error: any) => ({ type: 'amazon', error })),
+          .then((result: any) => ({
+            success: !result.error,
+            data: result.data?.[0] || null,
+            error: result.error,
+          }))
+          .catch((err: any) => ({
+            success: false,
+            data: null,
+            error: err,
+          })),
 
-        // Shopify query - try the most permissive query first
+        // Shopify query - more permissive (no status filter)
         supabase
           .from('platform_connections')
           .select('*')
           .eq('user_id', currentUserId)
           .eq('platform', 'shopify')
-          .limit(1)
-          .then((result: any) => ({ type: 'shopify', result }))
-          .catch((error: any) => ({ type: 'shopify', error })),
+          .then((result: any) => ({
+            success: !result.error,
+            data: result.data?.[0] || null,
+            error: result.error,
+          }))
+          .catch((err: any) => ({
+            success: false,
+            data: null,
+            error: err,
+          })),
 
         // eBay query
         supabase
@@ -279,55 +230,44 @@ export default function MarketplaceConnections({
           .select('access_token, seller_info, created_at')
           .eq('user_id', currentUserId)
           .eq('status', 'active')
-          .limit(1)
-          .then((result: any) => ({ type: 'ebay', result }))
-          .catch((error: any) => ({ type: 'ebay', error })),
-      ]
-
-      // Wait for all queries with overall timeout
-      const queryTimeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Overall query timeout')), 8000)
-      )
-
-      const queryResults = await Promise.race([
-        Promise.allSettled(queryPromises),
-        queryTimeout,
+          .then((result: any) => ({
+            success: !result.error,
+            data: result.data?.[0] || null,
+            error: result.error,
+          }))
+          .catch((err: any) => ({
+            success: false,
+            data: null,
+            error: err,
+          })),
       ])
 
-      console.log('✅ All database queries completed')
+      console.log('✅ All queries completed')
+      console.log('🔍 Amazon result:', amazonResult)
+      console.log('🔍 Shopify result:', shopifyResult)
+      console.log('🔍 eBay result:', ebayResult)
 
-      // Process results
-      if (Array.isArray(queryResults)) {
-        for (const queryResult of queryResults) {
-          if (queryResult.status === 'fulfilled') {
-            const { type, result, error } = queryResult.value
+      // 🔧 FALLBACK: If Shopify main query failed, try alternative queries
+      let shopifyData = shopifyResult.data
+      if (!shopifyData && shopifyResult.error) {
+        console.log('🔄 Trying Shopify fallback query with status=connected...')
+        const fallbackResult = await supabase
+          .from('platform_connections')
+          .select('*')
+          .eq('user_id', currentUserId)
+          .eq('platform', 'shopify')
+          .eq('status', 'connected')
+          .single()
 
-            if (error) {
-              console.log(`⚠️ ${type} query failed:`, error.message)
-            } else if (result?.data) {
-              console.log(
-                `✅ ${type} query successful, found:`,
-                result.data.length,
-                'records'
-              )
-
-              if (type === 'amazon') {
-                amazonData =
-                  result.data.find((conn: any) => conn.access_token?.trim()) ||
-                  null
-              } else if (type === 'shopify') {
-                // For Shopify, accept any record regardless of status
-                shopifyData = result.data[0] || null
-                console.log('🔍 Shopify data found:', shopifyData)
-              } else if (type === 'ebay') {
-                ebayData =
-                  result.data.find((conn: any) => conn.access_token?.trim()) ||
-                  null
-              }
-            }
-          }
+        if (!fallbackResult.error && fallbackResult.data) {
+          shopifyData = fallbackResult.data
+          console.log('✅ Shopify fallback query successful:', shopifyData)
         }
       }
+
+      // Process results
+      const amazonData = amazonResult.data
+      const ebayData = ebayResult.data
 
       console.log('🔍 Final connection status:')
       console.log('🔍 Amazon connected:', !!amazonData?.access_token)
@@ -405,18 +345,21 @@ export default function MarketplaceConnections({
             '🔄 OAuth detected in URL, assuming connection successful'
           )
 
-          const fallbackConnections = [
-            { platform: 'amazon', connected: amazonConnected },
-            { platform: 'shopify', connected: shopifyConnected },
-            { platform: 'ebay', connected: ebayConnected },
-          ]
+          const fallbackConnections = connections.map((conn) => ({
+            ...conn,
+            connected:
+              (conn.platform === 'amazon' && amazonConnected) ||
+              (conn.platform === 'shopify' && shopifyConnected) ||
+              (conn.platform === 'ebay' && ebayConnected) ||
+              conn.connected,
+          }))
 
           setConnections(fallbackConnections)
 
           if (onConnectionChange) {
-            onConnectionChange('amazon', amazonConnected)
-            onConnectionChange('shopify', shopifyConnected)
-            onConnectionChange('ebay', ebayConnected)
+            fallbackConnections.forEach((conn) => {
+              onConnectionChange(conn.platform, conn.connected)
+            })
           }
 
           console.log('✅ Using OAuth URL fallback for connections')
@@ -426,6 +369,7 @@ export default function MarketplaceConnections({
 
       // Keep existing cached state instead of resetting to disconnected
       console.log('💾 Keeping existing connection state due to error')
+      setError('Unable to refresh connections. Using cached state.')
     } finally {
       setLoading(false)
       console.log('✅ MarketplaceConnections loading completed')
@@ -543,6 +487,22 @@ export default function MarketplaceConnections({
           </div>
         </div>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-600" />
+            <p className="text-yellow-700 text-sm">{error}</p>
+            <button
+              onClick={handleRetry}
+              className="ml-auto text-yellow-700 hover:text-yellow-800 text-sm font-medium"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Platform Cards */}
       <div className="p-6 space-y-4">

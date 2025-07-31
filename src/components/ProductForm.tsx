@@ -164,6 +164,8 @@ interface ProcessedImage {
     shopify: string
     etsy: string
     instagram: string
+    walmart: string
+    custom: string
   }
   isStored?: boolean
   publicUrls?: {
@@ -173,6 +175,8 @@ interface ProcessedImage {
       shopify?: string
       etsy?: string
       instagram?: string
+      walmart?: string
+      custom?: string
     }
   }
 }
@@ -646,6 +650,18 @@ export default function ProductForm({
       description: 'Social-first + blog content',
       imageSize: '1080x1080',
     },
+    {
+      value: 'walmart',
+      label: '🏬 Walmart',
+      description: 'Marketplace listing + competitive pricing',
+      imageSize: '1000x1000',
+    },
+    {
+      value: 'custom',
+      label: '⚙️ Custom Platform',
+      description: 'Generic content for any platform',
+      imageSize: '1200x1200',
+    },
   ]
 
   // Image processing functions
@@ -857,6 +873,32 @@ export default function ProductForm({
               }
             })
         ),
+        walmart: await Promise.all(
+          processedImages
+            .map((img) => img.platforms.walmart)
+            .filter(Boolean)
+            .map(async (url) => {
+              try {
+                return await convertBlobToDataUrl(url)
+              } catch (error) {
+                console.error('❌ Failed to convert Walmart image:', error)
+                throw error
+              }
+            })
+        ),
+        custom: await Promise.all(
+          processedImages
+            .map((img) => img.platforms.custom)
+            .filter(Boolean)
+            .map(async (url) => {
+              try {
+                return await convertBlobToDataUrl(url)
+              } catch (error) {
+                console.error('❌ Failed to convert Custom image:', error)
+                throw error
+              }
+            })
+        ),
       }
 
       console.log('✅ All blob URLs converted to data URLs successfully')
@@ -904,10 +946,12 @@ export default function ProductForm({
           publicUrls: {
             original: result.publicUrls.original[index],
             processed: {
-              amazon: result.publicUrls.processed.amazon[index],
-              shopify: result.publicUrls.processed.shopify[index],
-              etsy: result.publicUrls.processed.etsy[index],
-              instagram: result.publicUrls.processed.instagram[index],
+              amazon: result.publicUrls.processed.amazon?.[index],
+              shopify: result.publicUrls.processed.shopify?.[index],
+              etsy: result.publicUrls.processed.etsy?.[index],
+              instagram: result.publicUrls.processed.instagram?.[index],
+              walmart: result.publicUrls.processed.walmart?.[index],
+              custom: result.publicUrls.processed.custom?.[index],
             },
           },
         }))
@@ -987,6 +1031,8 @@ export default function ProductForm({
         shopify: resizeImage(canvas, 1024, 1024),
         etsy: resizeImage(canvas, 2000, 2000),
         instagram: resizeImage(canvas, 1080, 1080),
+        walmart: resizeImage(canvas, 1000, 1000),
+        custom: resizeImage(canvas, 1200, 1200),
       }
 
       setProcessedImages((prev) =>
@@ -1039,7 +1085,14 @@ export default function ProductForm({
         original: file,
         originalPreview: URL.createObjectURL(file),
         isProcessing: false,
-        platforms: { amazon: '', shopify: '', etsy: '', instagram: '' },
+        platforms: {
+          amazon: '',
+          shopify: '',
+          etsy: '',
+          instagram: '',
+          walmart: '',
+          custom: '',
+        },
         isStored: false,
       }))
 
@@ -1252,7 +1305,7 @@ export default function ProductForm({
     }
   }
 
-  // 3. FIXED: Enhanced handleGenerate with better state management (around line 577)
+  // Replace your handleGenerate function with this fixed version
   const handleGenerate = async () => {
     const startTime = Date.now()
     console.log('🚀 Starting enhanced content generation...')
@@ -1289,29 +1342,35 @@ export default function ProductForm({
       }
     }
 
-    // 🛡 Enhanced timeout protection
+    // 🛡 FIX: Increase timeout to 60 seconds to match API timeout
     const timeoutId = setTimeout(() => {
       if (!hasSetLoadingToFalse) {
         console.warn('⚠️ Generation timeout - force clearing loading')
         clearLoadingState()
-        addNotification('Generation timeout. Please try again.', 'error')
+        addNotification(
+          'Generation is taking longer than expected. Content may still appear shortly.',
+          'info'
+        )
       }
-    }, 45000)
+    }, 60000) // Changed from 45000 to 60000 (60 seconds)
 
     try {
       // Validation checks
       if (!productName.trim()) {
         addNotification('Please enter a product name', 'error')
+        clearTimeout(timeoutId)
         return
       }
 
       if (!features.trim()) {
         addNotification('Please enter product features', 'error')
+        clearTimeout(timeoutId)
         return
       }
 
       if (!user || !supabase) {
         addNotification('Please wait for the component to load', 'error')
+        clearTimeout(timeoutId)
         return
       }
 
@@ -1320,6 +1379,7 @@ export default function ProductForm({
           'Please select at least one content section to generate',
           'error'
         )
+        clearTimeout(timeoutId)
         return
       }
 
@@ -1331,6 +1391,7 @@ export default function ProductForm({
           `Monthly generation limit reached (${actualCurrentUsage}/${actualMonthlyLimit}). Please upgrade your plan to continue.`,
           'error'
         )
+        clearTimeout(timeoutId)
         router.push('/pricing')
         return
       }
@@ -1370,13 +1431,16 @@ export default function ProductForm({
       } else {
         console.log('ℹ️ No images to analyze')
       }
-      // API call
+
+      // API call with better timeout handling
       console.log('📝 Making generation API call...')
       const controller = new AbortController()
+
+      // FIX: Match API timeout with UI timeout
       const apiTimeoutId = setTimeout(() => {
         controller.abort()
         console.warn('⏰ API call manually aborted after timeout')
-      }, 50000)
+      }, 55000) // Slightly less than UI timeout (55 seconds)
 
       const requestBody = {
         productName,
@@ -1390,101 +1454,120 @@ export default function ProductForm({
         selectedSections: selectedSections,
       }
 
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      })
+      try {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+        })
 
-      clearTimeout(apiTimeoutId)
+        clearTimeout(apiTimeoutId)
 
-      if (!response.ok) {
-        let errorMessage = `HTTP error! status: ${response.status}`
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorMessage
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError)
-        }
-        throw new Error(errorMessage)
-      }
-
-      const data = await response.json()
-      console.log('✅ API call successful')
-
-      // Update content
-      const newContent = data.result || 'Content generated successfully!'
-      setGeneratedContent(newContent)
-
-      // Handle success
-      if (data.contentId) {
-        console.log('✅ Content ID received:', data.contentId)
-        setLastGeneratedContentId(data.contentId)
-        setHasGeneratedFinalContent(true)
-
-        // Update usage callback
-        if (onGenerationSuccess) {
+        if (!response.ok) {
+          let errorMessage = `HTTP error! status: ${response.status}`
           try {
-            onGenerationSuccess()
-          } catch (callbackError) {
-            console.error('Success callback failed:', callbackError)
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorMessage
+          } catch (parseError) {
+            console.error('Failed to parse error response:', parseError)
+          }
+          throw new Error(errorMessage)
+        }
+
+        const data = await response.json()
+        console.log('✅ API call successful')
+
+        // Update content
+        const newContent = data.result || 'Content generated successfully!'
+        setGeneratedContent(newContent)
+
+        // Handle success
+        if (data.contentId) {
+          console.log('✅ Content ID received:', data.contentId)
+          setLastGeneratedContentId(data.contentId)
+          setHasGeneratedFinalContent(true)
+
+          // Update usage callback
+          if (onGenerationSuccess) {
+            try {
+              onGenerationSuccess()
+            } catch (callbackError) {
+              console.error('Success callback failed:', callbackError)
+            }
+          }
+
+          // Update counters
+          if (
+            !dismissedPrompts.includes('post-generation') &&
+            componentMounted
+          ) {
+            setShowPostGenerationPrompt(true)
+          }
+
+          const newCount = userGenerationCount + 1
+          setUserGenerationCount(newCount)
+
+          if (
+            newCount >= 3 &&
+            !dismissedPrompts.includes('smart-promotion') &&
+            componentMounted &&
+            dataLoaded
+          ) {
+            setShowSmartPromotion(true)
           }
         }
 
-        // Update counters
-        if (!dismissedPrompts.includes('post-generation') && componentMounted) {
-          setShowPostGenerationPrompt(true)
-        }
-
-        const newCount = userGenerationCount + 1
-        setUserGenerationCount(newCount)
-
+        // Image storage
         if (
-          newCount >= 3 &&
-          !dismissedPrompts.includes('smart-promotion') &&
-          componentMounted &&
-          dataLoaded
+          processedImages.length > 0 &&
+          !processedImages.some((img) => img.isStored) &&
+          data.contentId
         ) {
-          setShowSmartPromotion(true)
+          console.log('💾 Starting image storage...')
+          try {
+            await storeImagesToSupabase(data.contentId)
+            console.log('✅ Image storage completed')
+          } catch (storageError) {
+            console.error('Image storage failed:', storageError)
+            addNotification(
+              'Content saved! Image storage failed - you can try saving images again later.',
+              'info'
+            )
+          }
         }
-      }
 
-      // Image storage
-      if (
-        processedImages.length > 0 &&
-        !processedImages.some((img) => img.isStored) &&
-        data.contentId
-      ) {
-        console.log('💾 Starting image storage...')
-        try {
-          await storeImagesToSupabase(data.contentId)
-          console.log('✅ Image storage completed')
-        } catch (storageError) {
-          console.error('Image storage failed:', storageError)
+        const totalTime = Date.now() - startTime
+        console.log(
+          `🎉 Generation completed in ${Math.round(totalTime / 1000)}s`
+        )
+
+        const sectionCount = getSelectedSectionCount()
+        const sectionText =
+          sectionCount === 6
+            ? 'complete content package'
+            : `${sectionCount} content sections`
+
+        addNotification(
+          isVoiceContentAvailable
+            ? `🎤 Voice content enhanced (${sectionText}) and saved!`
+            : `🎉 ${sectionText} generated successfully in ${Math.round(totalTime / 1000)}s!`,
+          'success'
+        )
+      } catch (fetchError) {
+        // Handle specific timeout vs other errors
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          console.error('⚠️ Request was aborted due to timeout')
           addNotification(
-            'Content saved! Image storage failed - you can try saving images again later.',
+            'The request is taking longer than expected. Content may still appear in a moment. If not, please try again.',
             'info'
           )
+          // Don't throw - let the outer timeout handle cleanup
+        } else {
+          throw fetchError
         }
       }
-
-      const totalTime = Date.now() - startTime
-      console.log(`🎉 Generation completed in ${Math.round(totalTime / 1000)}s`)
-
-      const sectionCount = getSelectedSectionCount()
-      const sectionText =
-        sectionCount === 6
-          ? 'complete content package'
-          : `${sectionCount} content sections`
-
-      addNotification(
-        isVoiceContentAvailable
-          ? `🎤 Voice content enhanced (${sectionText}) and saved!`
-          : `🎉 ${sectionText} generated successfully in ${Math.round(totalTime / 1000)}s!`,
-        'success'
-      )
     } catch (error) {
       const errorTime = Date.now() - startTime
       console.error(
@@ -1501,6 +1584,9 @@ export default function ProductForm({
             'Network error. Please check your connection and try again.'
         } else if (error.message.includes('limit')) {
           userMessage = error.message
+        } else if (error.name === 'AbortError') {
+          userMessage =
+            'Generation is taking longer than expected. Please wait a moment and check if content appears.'
         } else {
           userMessage = error.message
         }
@@ -1938,7 +2024,7 @@ export default function ProductForm({
 
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/50">
         <div className="bg-gradient-to-r from-indigo-700 via-slate-700 to-gray-700 px-8 py-8">
-          <h2 className="text-3xl font-bold text-white flex items-center">
+          <h2 className="text-display-title text-white flex items-center">
             <Sparkles className="mr-3 h-8 w-8" />
             AI Content Generator
           </h2>
@@ -2562,7 +2648,7 @@ export default function ProductForm({
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Target Platform
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {platforms.map((p) => (
                     <div
                       key={p.value}
