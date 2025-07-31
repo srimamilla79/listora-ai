@@ -95,7 +95,7 @@ export default function DashboardSidebar({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:w-64 md:flex-col relative z-50">
+      <aside className="hidden md:flex md:w-64 md:flex-col relative z-40">
         {' '}
         <div className="flex flex-col flex-grow bg-gray-900 h-full">
           <div className="flex items-center flex-shrink-0 px-4 pt-5">
@@ -212,7 +212,7 @@ export default function DashboardSidebar({
             <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
               <div className="flex items-center flex-shrink-0 px-4">
                 <span className="text-2xl font-semibold text-white">
-                  Listora<span className="text-indigo-400">.</span>ai
+                  Listora<span className="text-indigo-400"> </span>AI
                 </span>
               </div>
               <nav className="mt-8 px-2 space-y-1">
@@ -280,7 +280,7 @@ export default function DashboardSidebar({
 
       {/* Mobile menu button */}
       <button
-        className="fixed top-4 left-4 z-50 p-2 bg-gray-900 text-white rounded-lg md:hidden"
+        className="fixed top-4 left-4 z-40 p-2 bg-gray-900 text-white rounded-lg md:hidden"
         onClick={() => setSidebarOpen(true)}
       >
         <Menu className="h-6 w-6" />
