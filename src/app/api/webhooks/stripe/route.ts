@@ -178,88 +178,13 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
   }
 
   try {
-    console.log('🔍 DEBUG: About to retrieve subscription from Stripe...')
-    console.log('🔍 DEBUG: Subscription ID:', session.subscription)
-
-    // OPTIMIZED: Skip Stripe API call and use webhook data directly
-    // This was the main cause of timeouts
     const subscriptionId = session.subscription
     const customerId = session.customer
+    const currentMonth = new Date().toISOString().slice(0, 7)
 
     console.log('✅ Using webhook data directly (skipping Stripe API call)')
-    console.log('📦 Subscription details from webhook:', {
-      id: subscriptionId,
-      customer: customerId,
-      planName: planName,
-    })
 
-    // Check if user has existing subscription
-    console.log('🔍 Checking for existing subscription...')
-    console.log('🔍 DEBUG: userId being queried:', userId)
-
-    try {
-      const { data: existingSubscription, error: subCheckError } =
-        await supabase
-          .from('user_subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-          .single()
-
-      console.log('🔍 Subscription check result:', {
-        hasData: !!existingSubscription,
-        hasError: !!subCheckError,
-        errorCode: subCheckError?.code,
-        errorMessage: subCheckError?.message,
-      })
-
-      if (subCheckError && subCheckError.code !== 'PGRST116') {
-        console.error('❌ Error checking existing subscription:', subCheckError)
-        throw new Error(
-          `Failed to check existing subscription: ${subCheckError.message}`
-        )
-      }
-
-      console.log(
-        '🔍 Existing subscription check:',
-        existingSubscription ? 'Found' : 'None'
-      )
-
-      if (
-        existingSubscription &&
-        existingSubscription.stripe_subscription_id !== subscriptionId
-      ) {
-        console.log(
-          '🗑️ Would cancel old subscription:',
-          existingSubscription.stripe_subscription_id
-        )
-        console.log('⚠️ Skipping Stripe API cancellation to prevent timeout')
-      }
-    } catch (error) {
-      console.error('❌ CRITICAL: Subscription check failed:', {
-        error: (error as Error).message,
-        stack: (error as Error).stack,
-        userId: userId,
-        type: typeof userId,
-      })
-      throw error
-    }
-
-    // Continue with the rest...
-    console.log('📊 Getting current usage...')
-
-    // Get current usage for preservation
-    const currentMonth = new Date().toISOString().slice(0, 7)
-    const { data: currentUsage } = await supabase
-      .from('user_usage_tracking')
-      .select('usage_count')
-      .eq('user_id', userId)
-      .eq('month_year', currentMonth)
-      .single()
-
-    const preservedUsage = currentUsage?.usage_count || 0
-    console.log('📊 Preserving usage:', preservedUsage)
-
-    // Save subscription data
+    // Prepare all data first
     const subscriptionData = {
       user_id: userId,
       stripe_customer_id: customerId,
@@ -273,7 +198,7 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
             : planName === 'enterprise'
               ? 99
               : 29,
-      status: 'active', // Assume active since checkout completed
+      status: 'active',
       current_period_start: new Date().toISOString(),
       current_period_end: new Date(
         Date.now() + 30 * 24 * 60 * 60 * 1000
@@ -282,32 +207,6 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       updated_at: new Date().toISOString(),
     }
 
-    console.log('💾 Saving subscription data...')
-
-    // Upsert subscription
-    const { error: subscriptionError } = await supabase
-      .from('user_subscriptions')
-      .upsert(subscriptionData, {
-        onConflict: 'user_id',
-        ignoreDuplicates: false,
-      })
-
-    if (subscriptionError) {
-      throw new Error(
-        `Failed to save subscription: ${subscriptionError.message}`
-      )
-    }
-
-    console.log('✅ Subscription saved successfully')
-
-    // Update user plan - first deactivate old plans
-    await supabase
-      .from('user_plans')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('user_id', userId)
-      .eq('is_active', true)
-
-    // Create new active plan
     const userPlanData = {
       user_id: userId,
       plan_type: planName === 'pro' ? 'business' : planName,
@@ -317,6 +216,90 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     }
 
+    // Get current usage FIRST (single query)
+    console.log('📊 Getting current usage...')
+    const { data: currentUsage } = await supabase
+      .from('user_usage_tracking')
+      .select('usage_count')
+      .eq('user_id', userId)
+      .eq('month_year', currentMonth)
+      .single()
+
+    const preservedUsage = currentUsage?.usage_count || 0
+    console.log('📊 Current usage:', preservedUsage)
+
+    // Calculate limits
+    const limits: Record<string, number> = {
+      pro: 250,
+      business: 250,
+      premium: 1000,
+      enterprise: 999999,
+      starter: 10,
+    }
+    const newLimit = limits[planName] || 250
+    const isOverLimit = preservedUsage > newLimit
+
+    console.log(
+      `📊 Usage check: ${preservedUsage}/${newLimit}, over limit: ${isOverLimit}`
+    )
+
+    // Execute all updates in parallel
+    console.log('💾 Updating all tables...')
+
+    const updates = await Promise.all([
+      // Update subscription
+      supabase
+        .from('user_subscriptions')
+        .upsert(subscriptionData, {
+          onConflict: 'user_id',
+          ignoreDuplicates: false,
+        }),
+
+      // Deactivate old plans
+      supabase
+        .from('user_plans')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('is_active', true),
+
+      // Update usage tracking
+      supabase.from('user_usage_tracking').upsert(
+        {
+          user_id: userId,
+          month_year: currentMonth,
+          usage_count: preservedUsage,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,month_year' }
+      ),
+
+      // Update legacy usage
+      supabase.from('user_usage').upsert(
+        {
+          user_id: userId,
+          month_year: currentMonth,
+          generations_limit: newLimit,
+          generations_used: preservedUsage,
+          plan_name: planName,
+          is_over_limit: isOverLimit,
+          over_limit_since: isOverLimit ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,month_year' }
+      ),
+    ])
+
+    // Check for errors
+    const errors = updates
+      .filter((result) => result.error)
+      .map((result) => result.error)
+    if (errors.length > 0) {
+      throw new Error(
+        `Database updates failed: ${errors.map((e) => e.message).join(', ')}`
+      )
+    }
+
+    // Insert new plan (separate because it's an insert, not update)
     const { error: planError } = await supabase
       .from('user_plans')
       .insert(userPlanData)
@@ -325,64 +308,14 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       throw new Error(`Failed to create user plan: ${planError.message}`)
     }
 
-    console.log('✅ User plan updated successfully')
-
-    // Preserve usage tracking
-    const usageTrackingData = {
-      user_id: userId,
-      month_year: currentMonth,
-      usage_count: preservedUsage,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    await supabase
-      .from('user_usage_tracking')
-      .upsert(usageTrackingData, { onConflict: 'user_id,month_year' })
-
-    console.log(`✅ Usage tracking preserved: ${preservedUsage} generations`)
-
-    // Update legacy user_usage table with over-limit protection
-    const limits: Record<string, number> = {
-      pro: 250,
-      business: 250,
-      premium: 1000,
-      enterprise: 999999,
-      starter: 10, // Add starter limit
-    }
-    const newLimit = limits[planName] || 250
-
-    // Check if user will be over limit after plan change
-    const isOverLimit = preservedUsage > newLimit
-    const effectiveUsage = preservedUsage // Keep actual usage, don't reduce it
-
-    console.log(
-      `📊 Usage check: ${effectiveUsage}/${newLimit}, over limit: ${isOverLimit}`
-    )
-
-    const usageData = {
-      user_id: userId,
-      month_year: currentMonth,
-      generations_limit: newLimit,
-      generations_used: effectiveUsage, // Preserve actual usage
-      plan_name: planName,
-      is_over_limit: isOverLimit, // Track over-limit status
-      over_limit_since: isOverLimit ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    }
-
-    await supabase
-      .from('user_usage')
-      .upsert(usageData, { onConflict: 'user_id,month_year' })
+    console.log('✅ All updates completed successfully')
 
     if (isOverLimit) {
       console.log(
-        `⚠️ User ${userId} is over limit: ${effectiveUsage}/${newLimit} for plan ${planName}`
+        `⚠️ User ${userId} is over limit: ${preservedUsage}/${newLimit} for plan ${planName}`
       )
-      // TODO: Send over-limit notification email in future
     }
 
-    console.log('✅ Legacy usage limits updated with over-limit protection')
     console.log(
       '🎉 Checkout completed successfully for user:',
       userId,
