@@ -133,9 +133,16 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
     throw new Error(`No userId in session metadata for session: ${session.id}`)
   }
 
+  console.log(
+    '🔍 DEBUG: Checking session.subscription value:',
+    session.subscription
+  )
+
   if (!session.subscription) {
     throw new Error(`No subscription in checkout session: ${session.id}`)
   }
+
+  console.log('🔍 DEBUG: Session.subscription exists, proceeding...')
 
   try {
     console.log('🔍 DEBUG: About to retrieve subscription from Stripe...')
