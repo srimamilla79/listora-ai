@@ -139,27 +139,15 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
 
   try {
     console.log('🔍 DEBUG: About to retrieve subscription from Stripe...')
-
     // Get subscription details
-    let subscription
-    try {
-      subscription = await stripe.subscriptions.retrieve(session.subscription, {
+    const subscription = await stripe.subscriptions.retrieve(
+      session.subscription,
+      {
         expand: ['items.data.price'], // Only expand what we need
-      })
-      console.log('🔍 DEBUG: Stripe subscription retrieved successfully')
-    } catch (stripeError) {
-      console.error(
-        '❌ CRITICAL: Failed to retrieve subscription from Stripe:',
-        {
-          subscriptionId: session.subscription,
-          error: (stripeError as Error).message,
-          stack: (stripeError as Error).stack,
-        }
-      )
-      throw new Error(
-        `Failed to retrieve subscription ${session.subscription}: ${(stripeError as Error).message}`
-      )
-    }
+      }
+    )
+
+    console.log('🔍 DEBUG: Stripe subscription retrieved successfully')
     console.log('📦 Subscription details:', {
       id: subscription.id,
       status: subscription.status,
