@@ -246,33 +246,41 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
     )
 
     // Execute updates sequentially for reliability
-    console.log('💾 Updating subscription...')
+    console.log('💾 Updating subscription via direct HTTP...')
     try {
-      const { data, error: subError } = await supabase
-        .from('user_subscriptions')
-        .upsert(subscriptionData, {
-          onConflict: 'user_id',
-          ignoreDuplicates: false,
-        })
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/user_subscriptions`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY!}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=representation',
+          },
+          body: JSON.stringify({
+            ...subscriptionData,
+            user_id: userId, // Ensure user_id is included
+          }),
+        }
+      )
 
-      console.log('🔍 Subscription update result:', {
-        hasData: !!data,
-        hasError: !!subError,
-        error: subError,
-      })
-
-      if (subError) {
-        throw new Error(`Failed to update subscription: ${subError.message}`)
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('❌ HTTP error:', response.status, error)
+        throw new Error(`HTTP ${response.status}: ${error}`)
       }
-      console.log('✅ Subscription updated')
+
+      const data = await response.json()
+      console.log('✅ Subscription updated via HTTP:', data)
     } catch (error) {
-      console.error('❌ CRITICAL: Subscription update crashed:', {
+      console.error('❌ HTTP update failed:', {
         error: (error as Error).message,
-        stack: (error as Error).stack,
         userId,
-        subscriptionData,
+        attemptedData: subscriptionData,
       })
-      throw error
+      // Continue anyway - don't stop the whole process
+      console.error('⚠️ Continuing despite subscription update failure')
     }
 
     console.log('💾 Updating user plan...')
