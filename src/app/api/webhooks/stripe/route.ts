@@ -142,14 +142,28 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
   try {
     console.log('🔍 DEBUG: About to retrieve subscription from Stripe...')
     console.log('🔍 DEBUG: Subscription ID:', session.subscription)
+    console.log('🔍 DEBUG: Stripe instance type:', typeof stripe)
+    console.log('🔍 DEBUG: Stripe instance methods:', Object.keys(stripe))
 
     // Get subscription details using the stripe instance
-    const subscription = await stripe.subscriptions.retrieve(
-      session.subscription,
-      {
+    let subscription
+    try {
+      console.log('🔍 DEBUG: Starting Stripe API call...')
+      subscription = await stripe.subscriptions.retrieve(session.subscription, {
         expand: ['items.data.price'],
-      }
-    )
+      })
+      console.log('🔍 DEBUG: Stripe API call completed!')
+    } catch (stripeApiError) {
+      console.error('❌ STRIPE API ERROR CAUGHT:', {
+        error: stripeApiError,
+        message: (stripeApiError as any)?.message,
+        type: (stripeApiError as any)?.type,
+        code: (stripeApiError as any)?.code,
+        statusCode: (stripeApiError as any)?.statusCode,
+        subscriptionId: session.subscription,
+      })
+      throw stripeApiError
+    }
 
     console.log('✅ Stripe subscription retrieved successfully')
     console.log('📦 Subscription details:', {
