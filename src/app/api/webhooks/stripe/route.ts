@@ -138,6 +138,7 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
   }
 
   try {
+    console.log('🔍 DEBUG: About to retrieve subscription from Stripe...')
     // Get subscription details
     const subscription = await stripe.subscriptions.retrieve(
       session.subscription,
@@ -146,11 +147,14 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       }
     )
 
+    console.log('🔍 DEBUG: Stripe subscription retrieved successfully')
     console.log('📦 Subscription details:', {
       id: subscription.id,
       status: subscription.status,
       planName: planName,
     })
+
+    console.log('🔍 DEBUG: About to check for existing subscription...')
 
     // Check if user has existing subscription and handle it
     const { data: existingSubscription } = await supabase
@@ -158,6 +162,11 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       .select('*')
       .eq('user_id', userId)
       .single()
+
+    console.log(
+      '🔍 DEBUG: Existing subscription check completed:',
+      existingSubscription ? 'Found existing' : 'No existing'
+    )
 
     if (existingSubscription) {
       console.log('🔄 Updating existing subscription for user:', userId)
@@ -172,6 +181,7 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
           await stripe.subscriptions.cancel(
             existingSubscription.stripe_subscription_id
           )
+          console.log('🔍 DEBUG: Old subscription canceled successfully')
         } catch (cancelError) {
           console.warn(
             '⚠️ Could not cancel old subscription:',
@@ -181,6 +191,8 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
         }
       }
     }
+
+    console.log('🔍 DEBUG: About to get current usage...')
 
     // Get current usage before updating plan (PRESERVATION LOGIC)
     const currentMonth = new Date().toISOString().slice(0, 7)
@@ -192,7 +204,12 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       .single()
 
     const preservedUsage = currentUsage?.usage_count || 0
-    console.log('📊 Preserving usage:', preservedUsage)
+    console.log(
+      '🔍 DEBUG: Current usage retrieved. Preserving:',
+      preservedUsage
+    )
+
+    console.log('🔍 DEBUG: About to save subscription data...')
 
     // Save subscription to user_subscriptions table
     const subscriptionData = {
