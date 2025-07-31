@@ -388,9 +388,22 @@ async function handleSubscriptionCreated(
     let customerEmail = subscription.metadata?.customer_email
 
     if (!customerEmail) {
-      console.log(
-        '⚠️ No customer email in metadata, skipping subscription.created'
-      )
+      console.log('⚠️ No customer email in metadata, trying Stripe API...')
+      try {
+        const customer = await stripe.customers.retrieve(subscription.customer)
+        customerEmail = (customer as any).email
+        console.log('✅ Retrieved email from Stripe API:', customerEmail)
+      } catch (error) {
+        console.log(
+          '❌ Could not retrieve customer email:',
+          (error as Error).message
+        )
+        return
+      }
+    }
+
+    if (!customerEmail) {
+      console.log('❌ No customer email found, skipping subscription.created')
       return
     }
 
