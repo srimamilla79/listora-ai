@@ -3,9 +3,7 @@
 // ✅ Universal content extraction + Taxonomy API integration
 // ✅ Smart fallbacks ensure every product publishes successfully
 // ✅ Handles ALL eBay required aspects automatically
-// ✅ FIXED: Social media content cleaning (no more hashtags/emojis)
-// ✅ FIXED: iPhone model and storage extraction
-// ✅ FIXED: Detailed error messages
+// ✅ FIXED: Brand extraction, error messages, and category detection
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 
@@ -129,7 +127,10 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Processing full content length:', fullText.length)
 
     // ✅ DUAL TOKEN SYSTEM: Get category using Application Token
-    const categoryResult = await detectCategoryWithDualTokens(fullText)
+    const categoryResult = await detectCategoryWithDualTokens(
+      fullText,
+      mergedProductContent.generated_content
+    )
     console.log('🏷️ Final category decision:', categoryResult)
 
     // ✅ UNIVERSAL: Extract title from generated content
@@ -330,19 +331,20 @@ export async function POST(request: NextRequest) {
     // ✅ ENHANCED: Parse eBay-specific errors for better user feedback
     let userMessage = 'Failed to publish to eBay'
     let missingFields: string[] = []
+    let errorDetails: any = {}
 
-    // Check if error message contains specific eBay requirements
-    if (err.message.includes('eBay listing requirements not met')) {
-      userMessage = 'eBay listing requirements not met'
-
-      // Try to extract missing fields from the error
-      if ((err as any).missingFields) {
-        missingFields = (err as any).missingFields
-      }
+    // Check if error has attached details from createEbayListing
+    if ((err as any).missingFields) {
+      missingFields = (err as any).missingFields
+    }
+    if ((err as any).errorDetails) {
+      errorDetails = (err as any).errorDetails
     }
 
     // Build detailed error message
-    if (missingFields.length > 0) {
+    if (errorDetails.brandMismatch) {
+      userMessage = errorDetails.message
+    } else if (missingFields.length > 0) {
       userMessage = `eBay requires the following information that could not be found in your product description:\n\n${missingFields.map((field) => `• ${field}`).join('\n')}\n\nPlease update your product description to include these details and try again.`
     } else if (err.message) {
       userMessage = err.message
@@ -353,8 +355,9 @@ export async function POST(request: NextRequest) {
         error: userMessage,
         platform: 'ebay',
         missingFields: missingFields.length > 0 ? missingFields : undefined,
-        details:
-          missingFields.length > 0
+        details: errorDetails.brandMismatch
+          ? errorDetails
+          : missingFields.length > 0
             ? {
                 message: 'Required information missing',
                 fields: missingFields,
@@ -431,7 +434,7 @@ function extractTitleFromContent(content: string): string | null {
   }
 }
 
-// ✅ UNIVERSAL BRAND EXTRACTION - Find Any Brand from YOUR Content
+// ✅ UNIVERSAL BRAND EXTRACTION - FIXED to not grab first word
 function extractBrandSafe(fullText: string): string {
   try {
     if (!fullText) return 'Unbranded'
@@ -440,45 +443,69 @@ function extractBrandSafe(fullText: string): string {
 
     // ✅ METHOD 1: Look for explicit brand mentions in YOUR content
     const brandPatterns = [
-      /from\s+([A-Z][a-zA-Z0-9\s&]{1,15}),?\s+a\s+(?:leader|world|renowned|company|brand)/i,
-      /brand[:\s]+([a-zA-Z0-9\s&]+?)(?:\n|,|\.|$)/i,
-      /by\s+([A-Z][a-zA-Z0-9\s&]{1,15})(?:\n|,|\.|$)/i,
-      /made\s+by\s+([a-zA-Z0-9\s&]+?)(?:\n|,|\.|$)/i,
+      /\bbrand[:\s]+([a-zA-Z0-9\s&]+?)(?:\n|,|\.|$)/i,
+      /\bby\s+([A-Z][a-zA-Z0-9\s&]{1,15})(?:\n|,|\.|$)/i,
+      /\bmade\s+by\s+([a-zA-Z0-9\s&]+?)(?:\n|,|\.|$)/i,
+      /\bfrom\s+([A-Z][a-zA-Z0-9\s&]{1,15}),?\s+(?:a\s+)?(?:leader|world|renowned|company|brand)/i,
+      /\b([A-Z][a-zA-Z0-9\s&]{1,15})'s\s+/i, // Possessive pattern (Nike's, Apple's)
     ]
 
     for (const pattern of brandPatterns) {
       const match = fullText.match(pattern)
       if (match && match[1]) {
         const brand = match[1].trim()
-        if (brand.length > 1 && brand.length < 20) {
-          console.log(`✅ Brand found in content: ${brand}`)
+        if (brand.length > 1 && brand.length < 20 && !isCommonWord(brand)) {
+          console.log(`✅ Brand found from pattern: ${brand}`)
           return brand
         }
       }
     }
 
-    // ✅ METHOD 2: Extract first meaningful word from title
+    // ✅ METHOD 2: Look for repeated capitalized words (likely brands)
+    const words = fullText.split(/\s+/)
+    const wordCounts: Record<string, number> = {}
+
+    for (const word of words) {
+      const cleanWord = word.replace(/[^\w]/g, '')
+
+      // Only consider proper capitalized words, not all caps
+      if (
+        cleanWord.length >= 2 &&
+        cleanWord.length <= 15 &&
+        /^[A-Z][a-z]/.test(cleanWord) &&
+        !isCommonWord(cleanWord)
+      ) {
+        wordCounts[cleanWord] = (wordCounts[cleanWord] || 0) + 1
+      }
+    }
+
+    // Find words that appear multiple times (likely a brand)
+    for (const [word, count] of Object.entries(wordCounts)) {
+      if (count >= 2) {
+        console.log(`✅ Brand from frequency (${count}x): ${word}`)
+        return word
+      }
+    }
+
+    // ✅ METHOD 3: Check title for possessive brand pattern
     const titleMatch = fullText.match(
       /\*\*1\.\s*PRODUCT\s+TITLE[^:]*:\*\*\s*\n([^\n]+)/i
     )
     if (titleMatch) {
       const title = titleMatch[1]
 
-      // Look for first capitalized word that could be a brand
-      const words = title.split(/\s+/)
-      for (const word of words) {
-        const cleanWord = word.replace(/[^\w]/g, '')
+      // Look for possessive patterns (Nike's, Apple's)
+      const possessiveMatch = title.match(/\b([A-Z][a-zA-Z]+)'s\b/)
+      if (possessiveMatch && !isCommonWord(possessiveMatch[1])) {
+        console.log(`✅ Brand from title possessive: ${possessiveMatch[1]}`)
+        return possessiveMatch[1]
+      }
 
-        // Universal brand criteria: Capitalized, reasonable length, not common words
-        if (
-          cleanWord.length >= 2 &&
-          cleanWord.length <= 15 &&
-          /^[A-Z]/.test(cleanWord) &&
-          !isCommonWord(cleanWord)
-        ) {
-          console.log(`✅ Brand from title: ${cleanWord}`)
-          return cleanWord
-        }
+      // Look for "by Brand" pattern
+      const byMatch = title.match(/\bby\s+([A-Z][a-zA-Z]+)\b/i)
+      if (byMatch && !isCommonWord(byMatch[1])) {
+        console.log(`✅ Brand from title 'by': ${byMatch[1]}`)
+        return byMatch[1]
       }
     }
 
@@ -490,51 +517,268 @@ function extractBrandSafe(fullText: string): string {
   }
 }
 
-// ✅ HELPER: Check if word is too common to be a brand
+// ✅ HELPER: Check if word is too common to be a brand (EXPANDED)
 function isCommonWord(word: string): boolean {
   const commonWords = [
+    // Gender/demographic words
     'Men',
     'Mens',
     'Women',
     'Womens',
     'Ladies',
+    'Unisex',
+    'Adult',
+    'Adults',
     'Kids',
     'Boys',
     'Girls',
-    'Lenin', // Add this - it's a shirt type, not a brand
-    'Oxford', // Add common shirt types
-    'Button',
-    'Dress',
-    'Shirt', // ADD THIS - prevents "Shirt" from being a brand
-    'Shirts', // ADD THIS
-    'Blouse', // ADD THIS
-    'Top', // This is already there but make sure
+    'Baby',
+    'Infant',
+    'Toddler',
+    'Youth',
+    'Teen',
+
+    // Marketing/quality words
+    'Affordable',
     'Premium',
     'Quality',
     'Professional',
     'Advanced',
     'Enhanced',
+    'Deluxe',
+    'Luxury',
+    'Budget',
+    'Cheap',
+    'Expensive',
+    'Value',
+    'Economy',
+    'Genuine',
+    'Authentic',
+    'Original',
+    'Official',
+    'Certified',
+    'Guaranteed',
+
+    // Descriptive words
+    'New',
+    'Used',
+    'Refurbished',
+    'Vintage',
+    'Retro',
+    'Modern',
+    'Classic',
+    'Traditional',
+    'Contemporary',
+    'Beautiful',
+    'Elegant',
+    'Stylish',
+    'Trendy',
+    'Comfortable',
+    'Durable',
+    'Reliable',
+    'Sturdy',
+    'Lightweight',
+    'Heavy',
+    'Portable',
+    'Adjustable',
+    'Flexible',
+    'Waterproof',
+    'Breathable',
+
+    // Size/quantity words
+    'Small',
+    'Medium',
+    'Large',
+    'Extra',
+    'Big',
+    'Little',
+    'Mini',
+    'Micro',
+    'Mega',
+    'Ultra',
+    'Super',
+    'Jumbo',
+    'Compact',
+    'Full',
+    'Queen',
+    'King',
+    'Single',
+    'Double',
+    'Triple',
+    'Multiple',
+    'Various',
+    'Assorted',
+
+    // Common product types (not brands)
+    'Shirt',
+    'Shirts',
+    'Shoe',
+    'Shoes',
+    'Sneaker',
+    'Sneakers',
+    'Boot',
+    'Boots',
+    'Watch',
+    'Watches',
+    'Bag',
+    'Bags',
+    'Purse',
+    'Wallet',
+    'Belt',
+    'Hat',
+    'Cap',
+    'Phone',
+    'Phones',
+    'Laptop',
+    'Computer',
+    'Tablet',
+    'Device',
+    'Gadget',
+    'Tool',
+    'Tools',
+    'Accessory',
+    'Accessories',
+    'Part',
+    'Parts',
+    'Item',
+
+    // Clothing specific
+    'Lenin',
+    'Oxford',
+    'Polo',
+    'Tee',
+    'Tank',
+    'Dress',
+    'Skirt',
+    'Pants',
+    'Jeans',
+    'Shorts',
+    'Jacket',
+    'Coat',
+    'Sweater',
+    'Hoodie',
+    'Cardigan',
+    'Blouse',
+    'Top',
+    'Bottom',
+    'Suit',
+    'Tie',
+    'Scarf',
+    'Gloves',
+    'Socks',
+
+    // Common title words
     'With',
     'And',
-    'Pure',
-    'Gold',
-    'Silver',
-    'White',
-    'Black',
-    'Blue',
-    'Red',
-    'New',
+    'Or',
+    'For',
+    'The',
     'Best',
     'Top',
-    'High',
     'Great',
-    'Super',
-    'Ultra',
-    'Mega',
-    'Max',
-    'Pro',
+    'Good',
+    'Nice',
+    'Perfect',
+    'Ideal',
+    'Ultimate',
+    'Essential',
+    'Must',
+    'Have',
+    'Bundle',
+    'Set',
+    'Pack',
+    'Kit',
+    'Collection',
+    'Series',
+    'Edition',
+    'Version',
+
+    // Materials (not brands)
+    'Cotton',
+    'Leather',
+    'Silk',
+    'Wool',
+    'Polyester',
+    'Nylon',
+    'Spandex',
+    'Canvas',
+    'Denim',
+    'Suede',
+    'Velvet',
+    'Satin',
+    'Linen',
+    'Cashmere',
+    'Plastic',
+    'Metal',
+    'Wood',
+    'Glass',
+    'Ceramic',
+    'Stone',
+    'Rubber',
+
+    // Colors
+    'Black',
+    'White',
+    'Red',
+    'Blue',
+    'Green',
+    'Yellow',
+    'Purple',
+    'Orange',
+    'Pink',
+    'Brown',
+    'Gray',
+    'Grey',
+    'Gold',
+    'Silver',
+    'Bronze',
+    'Beige',
+    'Navy',
+    'Teal',
+    'Burgundy',
+    'Maroon',
+    'Olive',
+    'Coral',
+    'Turquoise',
+
+    // Other common words
     'Plus',
-    'Mini',
+    'Pro',
+    'Max',
+    'Air',
+    'Pure',
+    'True',
+    'Real',
+    'Natural',
+    'Organic',
+    'Eco',
+    'Smart',
+    'Quick',
+    'Fast',
+    'Slow',
+    'Easy',
+    'Simple',
+    'Basic',
+    'Standard',
+    'Regular',
+    'Normal',
+    'Special',
+    'Limited',
+    'Exclusive',
+    'Custom',
+    'Personalized',
+    'Handmade',
+    'Homemade',
+    'DIY',
+    'Ready',
+    'Instant',
+    'All',
+    'Every',
+    'Any',
+    'Some',
+    'Many',
+    'Few',
+    'Several',
   ]
   return commonWords.includes(word)
 }
@@ -1705,9 +1949,10 @@ async function getApplicationToken(): Promise<string> {
   }
 }
 
-// ✅ DUAL TOKEN CATEGORY DETECTION
+// ✅ DUAL TOKEN CATEGORY DETECTION - FIXED to pass generatedContent
 async function detectCategoryWithDualTokens(
-  fullText: string
+  fullText: string,
+  generatedContent: string
 ): Promise<CategoryResult> {
   try {
     console.log('🔍 Starting dual-token category detection...')
@@ -1724,8 +1969,12 @@ async function detectCategoryWithDualTokens(
       }
     }
 
+    // Extract clean product info from generated content
+    const cleanQuery = extractProductTypeForCategory(generatedContent, fullText)
+    console.log('🔍 Clean category query:', cleanQuery)
+
     const suggestions = await getCategorySuggestionsWithAppToken(
-      fullText,
+      cleanQuery,
       appToken
     )
     if (!suggestions || suggestions.length === 0) {
@@ -1779,6 +2028,43 @@ async function detectCategoryWithDualTokens(
       categoryName: 'Cell Phones & Smartphones',
       source: 'bulletproof_fallback',
     }
+  }
+}
+
+// ✅ NEW: Extract clean product type for category detection
+function extractProductTypeForCategory(
+  generatedContent: string,
+  fullText: string
+): string {
+  try {
+    // Extract title
+    const titleMatch = generatedContent.match(
+      /\*\*1\.\s*PRODUCT\s+TITLE[^:]*:\*\*\s*\n([^\n]+)/i
+    )
+    if (titleMatch) {
+      const title = titleMatch[1]
+
+      // Remove marketing words and extract core product
+      const cleanTitle = title
+        .replace(
+          /Affordable|Premium|Quality|Professional|Advanced|Enhanced/gi,
+          ''
+        )
+        .replace(/Perfect for.*/i, '')
+        .replace(/Ideal for.*/i, '')
+        .replace(/[-,].*/g, '') // Remove everything after dash or comma
+        .trim()
+
+      // Return core product words
+      if (cleanTitle.length > 10) {
+        return cleanTitle.substring(0, 50)
+      }
+    }
+
+    // Fallback to basic text analysis
+    return fullText.substring(0, 100)
+  } catch (error) {
+    return fullText.substring(0, 100)
   }
 }
 
@@ -2183,69 +2469,86 @@ async function createEbayListing(
   const errorsMatch = xmlResponse.match(/<Errors>[\s\S]*?<\/Errors>/g)
   let hasRealErrors = false
   let userFriendlyError = ''
+  const missingSpecifics: string[] = []
+  let errorDetails: any = {}
 
   if (errorsMatch) {
-    const missingSpecifics: string[] = []
-    let detailedError = ''
-
     errorsMatch.forEach((error, index) => {
       console.log(`Error/Warning ${index + 1}:`, error)
 
-      // Parse specific error types
       if (error.includes('<SeverityCode>Error</SeverityCode>')) {
         hasRealErrors = true
 
-        // Extract missing item specifics
+        // Extract both short and long messages
         const shortMessageMatch = error.match(
           /<ShortMessage>([^<]+)<\/ShortMessage>/
         )
+        const longMessageMatch = error.match(
+          /<LongMessage>([^<]+)<\/LongMessage>/
+        )
+        const errorCodeMatch = error.match(/<ErrorCode>([^<]+)<\/ErrorCode>/)
 
+        const shortMessage = shortMessageMatch ? shortMessageMatch[1] : ''
+        const longMessage = longMessageMatch ? longMessageMatch[1] : ''
+        const errorCode = errorCodeMatch ? errorCodeMatch[1] : ''
+
+        // Handle different error types
         if (
-          shortMessageMatch &&
-          shortMessageMatch[1].includes('item specific')
+          longMessage.includes('title includes extra brand names') ||
+          errorCode === '240'
         ) {
-          // Extract the specific field name
-          const fieldMatch = shortMessageMatch[1].match(
+          // Extract the brands mentioned
+          const titleBrandMatch = listingData.Title.match(
+            /\b([A-Z][a-zA-Z]+)'s\b/
+          )
+          const itemBrand = listingData.ItemSpecifics?.find(
+            (s) => s.Name === 'Brand'
+          )?.Value[0]
+
+          errorDetails.brandMismatch = true
+          errorDetails.message = `Brand mismatch error: Your title contains a brand name that doesn't match the item specifics.\n\n`
+          if (titleBrandMatch && itemBrand) {
+            errorDetails.message += `• Title contains: "${titleBrandMatch[1]}"\n`
+            errorDetails.message += `• Item specific brand: "${itemBrand}"\n\n`
+          }
+          errorDetails.message += `Please ensure the brand in your title matches the brand in item specifics, or remove brand names from the title.`
+          userFriendlyError = errorDetails.message
+        } else if (
+          shortMessage.includes('item specific') &&
+          shortMessage.includes('missing')
+        ) {
+          const fieldMatch = shortMessage.match(
             /The item specific ([^.]+) is missing/
           )
           if (fieldMatch && fieldMatch[1]) {
             missingSpecifics.push(fieldMatch[1])
           }
-        }
-
-        // Capture other specific errors
-        const longMessageMatch = error.match(
-          /<LongMessage>([^<]+)<\/LongMessage>/
-        )
-        if (longMessageMatch) {
-          const errorMsg = longMessageMatch[1]
-          if (errorMsg.includes('at least 1 picture')) {
-            detailedError =
-              'At least one product image is required for eBay listings.'
-          } else if (errorMsg.includes('Title is missing')) {
-            detailedError =
-              'Product title is missing or too short. Titles must be at least 15 characters.'
-          } else if (errorMsg.includes('Description is missing')) {
-            detailedError = 'Product description is required for eBay listings.'
-          }
+        } else if (longMessage.includes('at least 1 picture')) {
+          userFriendlyError =
+            'At least one product image is required for eBay listings.'
+        } else if (longMessage.includes('Title is missing')) {
+          userFriendlyError =
+            'Product title is missing or too short. Titles must be at least 15 characters.'
+        } else {
+          // Capture any other error with full details
+          userFriendlyError = `eBay Error (${errorCode}): ${longMessage || shortMessage}`
         }
       }
     })
 
     // Build comprehensive error message
-    if (missingSpecifics.length > 0) {
-      userFriendlyError = `eBay requires the following item specifics: ${missingSpecifics.join(', ')}. Please ensure your product description includes: ${missingSpecifics.map((field) => `\n• ${field}`).join('')}`
-    } else if (detailedError) {
-      userFriendlyError = detailedError
-    } else if (hasRealErrors) {
-      userFriendlyError =
-        'eBay listing requirements not met. Please check your product details and try again.'
+    if (missingSpecifics.length > 0 && !userFriendlyError) {
+      userFriendlyError = `eBay requires the following item specifics:\n${missingSpecifics.map((field) => `• ${field}`).join('\n')}\n\nPlease update your product description to include these details.`
     }
 
     if (hasRealErrors && ack !== 'Success' && ack !== 'Warning') {
-      const error = new Error(userFriendlyError)
+      const error = new Error(
+        userFriendlyError ||
+          'eBay listing requirements not met. Please check your product details and try again.'
+      )
       // Attach additional details to the error object
       ;(error as any).missingFields = missingSpecifics
+      ;(error as any).errorDetails = errorDetails
       ;(error as any).ebayErrors = errorsMatch
       throw error
     }
