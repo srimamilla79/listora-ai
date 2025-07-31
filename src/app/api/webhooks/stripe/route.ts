@@ -194,11 +194,19 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
     })
 
     // Check if user has existing subscription
-    const { data: existingSubscription } = await supabase
+    console.log('🔍 Checking for existing subscription...')
+    const { data: existingSubscription, error: subCheckError } = await supabase
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
       .single()
+
+    if (subCheckError && subCheckError.code !== 'PGRST116') {
+      console.error('❌ Error checking existing subscription:', subCheckError)
+      throw new Error(
+        `Failed to check existing subscription: ${subCheckError.message}`
+      )
+    }
 
     console.log(
       '🔍 Existing subscription check:',
