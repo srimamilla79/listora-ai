@@ -237,18 +237,33 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
 
     // Execute updates sequentially for reliability
     console.log('💾 Updating subscription...')
-    const { error: subError } = await supabase
-      .from('user_subscriptions')
-      .upsert(subscriptionData, {
-        onConflict: 'user_id',
-        ignoreDuplicates: false,
+    try {
+      const { data, error: subError } = await supabase
+        .from('user_subscriptions')
+        .upsert(subscriptionData, {
+          onConflict: 'user_id',
+          ignoreDuplicates: false,
+        })
+
+      console.log('🔍 Subscription update result:', {
+        hasData: !!data,
+        hasError: !!subError,
+        error: subError,
       })
 
-    if (subError) {
-      console.error('❌ Subscription update failed:', subError)
-      throw new Error(`Failed to update subscription: ${subError.message}`)
+      if (subError) {
+        throw new Error(`Failed to update subscription: ${subError.message}`)
+      }
+      console.log('✅ Subscription updated')
+    } catch (error) {
+      console.error('❌ CRITICAL: Subscription update crashed:', {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        userId,
+        subscriptionData,
+      })
+      throw error
     }
-    console.log('✅ Subscription updated')
 
     console.log('💾 Updating user plan...')
     // Deactivate old plans
