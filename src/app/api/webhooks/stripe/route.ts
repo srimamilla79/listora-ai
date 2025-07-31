@@ -195,35 +195,57 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
 
     // Check if user has existing subscription
     console.log('🔍 Checking for existing subscription...')
-    const { data: existingSubscription, error: subCheckError } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
+    console.log('🔍 DEBUG: userId being queried:', userId)
 
-    if (subCheckError && subCheckError.code !== 'PGRST116') {
-      console.error('❌ Error checking existing subscription:', subCheckError)
-      throw new Error(
-        `Failed to check existing subscription: ${subCheckError.message}`
-      )
-    }
+    try {
+      const { data: existingSubscription, error: subCheckError } =
+        await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .single()
 
-    console.log(
-      '🔍 Existing subscription check:',
-      existingSubscription ? 'Found' : 'None'
-    )
+      console.log('🔍 Subscription check result:', {
+        hasData: !!existingSubscription,
+        hasError: !!subCheckError,
+        errorCode: subCheckError?.code,
+        errorMessage: subCheckError?.message,
+      })
 
-    if (
-      existingSubscription &&
-      existingSubscription.stripe_subscription_id !== subscriptionId
-    ) {
+      if (subCheckError && subCheckError.code !== 'PGRST116') {
+        console.error('❌ Error checking existing subscription:', subCheckError)
+        throw new Error(
+          `Failed to check existing subscription: ${subCheckError.message}`
+        )
+      }
+
       console.log(
-        '🗑️ Would cancel old subscription:',
-        existingSubscription.stripe_subscription_id
+        '🔍 Existing subscription check:',
+        existingSubscription ? 'Found' : 'None'
       )
-      // Skip actual cancellation to avoid API timeout - just log it
-      console.log('⚠️ Skipping Stripe API cancellation to prevent timeout')
+
+      if (
+        existingSubscription &&
+        existingSubscription.stripe_subscription_id !== subscriptionId
+      ) {
+        console.log(
+          '🗑️ Would cancel old subscription:',
+          existingSubscription.stripe_subscription_id
+        )
+        console.log('⚠️ Skipping Stripe API cancellation to prevent timeout')
+      }
+    } catch (error) {
+      console.error('❌ CRITICAL: Subscription check failed:', {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+        userId: userId,
+        type: typeof userId,
+      })
+      throw error
     }
+
+    // Continue with the rest...
+    console.log('📊 Getting current usage...')
 
     // Get current usage for preservation
     const currentMonth = new Date().toISOString().slice(0, 7)
