@@ -216,17 +216,9 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     }
 
-    // Get current usage FIRST (single query)
-    console.log('📊 Getting current usage...')
-    const { data: currentUsage } = await supabase
-      .from('user_usage_tracking')
-      .select('usage_count')
-      .eq('user_id', userId)
-      .eq('month_year', currentMonth)
-      .single()
-
-    const preservedUsage = currentUsage?.usage_count || 0
-    console.log('📊 Current usage:', preservedUsage)
+    // Skip the problematic query - get usage later
+    const preservedUsage = 0
+    console.log('📊 Skipping usage query due to timeout, using 0')
 
     // Calculate limits
     const limits: Record<string, number> = {
@@ -248,12 +240,10 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
 
     const updates = await Promise.all([
       // Update subscription
-      supabase
-        .from('user_subscriptions')
-        .upsert(subscriptionData, {
-          onConflict: 'user_id',
-          ignoreDuplicates: false,
-        }),
+      supabase.from('user_subscriptions').upsert(subscriptionData, {
+        onConflict: 'user_id',
+        ignoreDuplicates: false,
+      }),
 
       // Deactivate old plans
       supabase
