@@ -312,21 +312,32 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
 
     console.log(`✅ Usage tracking preserved: ${preservedUsage} generations`)
 
-    // Update legacy user_usage table
+    // Update legacy user_usage table with over-limit protection
     const limits: Record<string, number> = {
       pro: 250,
       business: 250,
       premium: 1000,
       enterprise: 999999,
+      starter: 10, // Add starter limit
     }
-    const limit = limits[planName] || 250
+    const newLimit = limits[planName] || 250
+
+    // Check if user will be over limit after plan change
+    const isOverLimit = preservedUsage > newLimit
+    const effectiveUsage = preservedUsage // Keep actual usage, don't reduce it
+
+    console.log(
+      `📊 Usage check: ${effectiveUsage}/${newLimit}, over limit: ${isOverLimit}`
+    )
 
     const usageData = {
       user_id: userId,
       month_year: currentMonth,
-      generations_limit: limit,
-      generations_used: preservedUsage,
+      generations_limit: newLimit,
+      generations_used: effectiveUsage, // Preserve actual usage
       plan_name: planName,
+      is_over_limit: isOverLimit, // Track over-limit status
+      over_limit_since: isOverLimit ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     }
 
@@ -334,7 +345,14 @@ async function handleCheckoutCompleted(event: any, stripe: any, supabase: any) {
       .from('user_usage')
       .upsert(usageData, { onConflict: 'user_id,month_year' })
 
-    console.log('✅ Legacy usage limits updated')
+    if (isOverLimit) {
+      console.log(
+        `⚠️ User ${userId} is over limit: ${effectiveUsage}/${newLimit} for plan ${planName}`
+      )
+      // TODO: Send over-limit notification email in future
+    }
+
+    console.log('✅ Legacy usage limits updated with over-limit protection')
     console.log(
       '🎉 Checkout completed successfully for user:',
       userId,
