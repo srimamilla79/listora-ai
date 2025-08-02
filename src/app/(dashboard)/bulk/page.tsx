@@ -1946,7 +1946,7 @@ export default function EnhancedBulkCSVUploadPage() {
                       onClick={handleUpgrade}
                       className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-8 py-3 rounded-xl font-semibold transition-all cursor-pointer shadow-lg"
                     >
-                      Upgrade to Business Plan
+                      Upgrade Now
                     </button>
                   </div>
                 ) : (

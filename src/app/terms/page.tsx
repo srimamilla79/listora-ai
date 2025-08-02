@@ -1,4 +1,4 @@
-// src/app/terms/page.tsx - Enhanced for Maximum Legal Protection
+// src/app/terms/page.tsx - Updated Privacy-First Version - COMPLETE
 import Link from 'next/link'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 
@@ -35,10 +35,27 @@ export default function TermsOfServicePage() {
           </h1>
 
           <p className="text-gray-600 mb-8">
-            <strong>Effective Date:</strong> June 10, 2025
+            <strong>Effective Date:</strong> August 02, 2025
             <br />
-            <strong>Last Updated:</strong> June 10, 2025
+            <strong>Last Updated:</strong> August 02, 2025
+            <br />
+            <strong className="text-green-600">
+              Version 2.0 - Enhanced Privacy Protection
+            </strong>
           </p>
+
+          {/* Privacy First Notice */}
+          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-bold text-green-900 mb-2">
+              🔒 Your Data Privacy is Our Priority
+            </h2>
+            <p className="text-green-800">
+              Unlike many AI services, Listora AI does <strong>NOT</strong> use
+              your content, data, or inputs to train or improve our AI models.
+              Your data remains exclusively yours. This commitment is
+              fundamental to our service.
+            </p>
+          </div>
 
           <div className="prose prose-lg max-w-none">
             <section className="mb-8">
@@ -56,9 +73,9 @@ export default function TermsOfServicePage() {
               <p className="text-gray-700 font-medium mb-4">
                 IMPORTANT: BY ACCESSING, USING, OR REGISTERING FOR OUR SERVICE,
                 YOU EXPRESSLY ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND
-                AGREE TO BE BOUND BY THESE TERMS, INCLUDING THE AI-SPECIFIC
-                PROVISIONS, ARBITRATION CLAUSE, AND CLASS ACTION WAIVER. IF YOU
-                DO NOT AGREE TO THESE TERMS, DO NOT USE OUR SERVICE.
+                AGREE TO BE BOUND BY THESE TERMS, INCLUDING OUR PRIVACY-FIRST
+                APPROACH, ARBITRATION CLAUSE, AND CLASS ACTION WAIVER. IF YOU DO
+                NOT AGREE TO THESE TERMS, DO NOT USE OUR SERVICE.
               </p>
               <p className="text-gray-700 leading-relaxed">
                 These Terms apply to all users, including visitors, registered
@@ -94,6 +111,20 @@ export default function TermsOfServicePage() {
                 <li>Export capabilities and bulk processing features</li>
                 <li>Analytics and performance tracking tools</li>
               </ul>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-blue-900 font-semibold mb-2">
+                  IMPORTANT PRIVACY COMMITMENT:
+                </p>
+                <p className="text-blue-800">
+                  Unlike many AI services, Listora AI does NOT use your content,
+                  data, or inputs to train or improve our AI models. Your data
+                  remains exclusively yours. We use pre-trained AI models that
+                  process your content in real-time without learning from or
+                  retaining your information.
+                </p>
+              </div>
+
               <p className="text-gray-700 font-medium mb-4">
                 <strong>CRITICAL AI DISCLAIMER:</strong> Our Service uses
                 artificial intelligence and machine learning algorithms that are
@@ -322,39 +353,92 @@ export default function TermsOfServicePage() {
               </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                5.2 Your Content and Data Rights
+                5.2 Your Content and Data Rights - COMPLETE PRIVACY
               </h3>
               <p className="text-gray-700 leading-relaxed mb-4">
                 You retain ownership of any original content, data, or materials
-                you upload to our Service ("User Content"). However, by using
-                our Service, you grant us extensive rights as described below.
+                you upload to our Service ("User Content").
               </p>
 
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-4">
+                <p className="text-green-900 font-bold mb-3">
+                  YOU RETAIN FULL OWNERSHIP of all content you create using our
+                  Service.
+                </p>
+                <p className="text-green-800 font-semibold mb-3">
+                  Listora AI commits to the following:
+                </p>
+
+                <div className="mb-4">
+                  <h4 className="font-bold text-green-900 mb-2">
+                    YOUR DATA IS NEVER USED FOR AI TRAINING:
+                  </h4>
+                  <ul className="list-disc pl-6 text-green-800 space-y-1">
+                    <li>
+                      We do NOT use your content to train or improve our AI
+                      models
+                    </li>
+                    <li>
+                      OpenAI does not train their models on data submitted
+                      through their API
+                    </li>
+                    <li>
+                      We do NOT learn from or adapt to your specific content
+                    </li>
+                    <li>We do NOT create datasets from your information</li>
+                    <li>
+                      Your content is processed for immediate results; OpenAI
+                      may retain it temporarily (up to 30 days) solely for
+                      safety monitoring, not training
+                    </li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-green-900 mb-2">
+                    YOUR CONTENT REMAINS PRIVATE:
+                  </h4>
+                  <ul className="list-disc pl-6 text-green-800 space-y-1">
+                    <li>
+                      Your content is stored securely in your account for your
+                      exclusive access
+                    </li>
+                    <li>
+                      We do not access your content except as necessary to
+                      provide the Service
+                    </li>
+                    <li>Your content is never shared with other users</li>
+                    <li>You can delete your content at any time</li>
+                    <li>We maintain strict data isolation between users</li>
+                  </ul>
+                </div>
+              </div>
+
               <h3 className="text-xl font-medium text-gray-900 mb-3">
-                5.3 Comprehensive License Grant to Listora AI
+                5.3 Limited License Grant to Listora AI for Service Operation
               </h3>
-              <p className="text-gray-700 font-medium leading-relaxed mb-4">
-                CRITICAL LICENSE TERMS: By uploading or inputting content into
-                our Service, you grant Listora AI a worldwide, perpetual,
-                irrevocable, non-exclusive, royalty-free, sublicensable, and
-                transferable license to use, reproduce, modify, adapt, publish,
-                translate, distribute, display, and create derivative works from
-                your User Content for the purposes of:
+              <p className="text-gray-700 leading-relaxed mb-4">
+                By using our Service, you grant us a limited, non-exclusive,
+                revocable license solely to:
               </p>
               <ul className="list-disc pl-6 text-gray-700 mb-4 space-y-2">
-                <li>Providing and improving our Service</li>
-                <li>Training and enhancing our AI models and algorithms</li>
-                <li>Developing new features and capabilities</li>
-                <li>Analytics and service optimization</li>
                 <li>
-                  Creating training datasets for internal and partner AI
-                  development
+                  Process your content through our AI systems to generate
+                  results
                 </li>
-                <li>Research and development purposes</li>
+                <li>Store your content in your account for your access</li>
+                <li>Display your content back to you through our interface</li>
                 <li>
-                  Marketing and promotional activities (with anonymization)
+                  Create temporary copies as technically necessary for service
+                  operation
                 </li>
+                <li>Provide customer support when you request assistance</li>
               </ul>
+              <p className="text-gray-700 font-medium">
+                This license is solely for providing you the Service and does
+                not include any rights to use your content for AI training,
+                model improvement, marketing, or sharing with others.
+              </p>
 
               <h3 className="text-xl font-medium text-gray-900 mb-3">
                 5.4 AI-Generated Content Ownership and Risks
@@ -511,7 +595,7 @@ export default function TermsOfServicePage() {
 
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-                7. Privacy, Data Protection, and AI Training
+                7. Privacy, Data Protection, and NO AI Training
               </h2>
               <p className="text-gray-700 leading-relaxed mb-4">
                 Your privacy is governed by our Privacy Policy, which is
@@ -522,27 +606,23 @@ export default function TermsOfServicePage() {
                   We collect and process your data as described in our Privacy
                   Policy
                 </li>
-                <li>
-                  <strong>AI Training Consent:</strong> Your content will be
-                  used to train and improve our AI models indefinitely
+                <li className="font-bold text-green-700">
+                  We do NOT use your content for AI training - EVER
                 </li>
                 <li>
-                  We implement industry-standard security measures to protect
+                  We use secure cloud infrastructure and encryption to protect
                   your data
                 </li>
                 <li>
-                  You have certain rights regarding your personal information,
-                  subject to AI training limitations
+                  You have certain rights regarding your personal information
                 </li>
-                <li>
-                  Data deletion requests cannot reverse AI training that has
-                  already occurred
-                </li>
+                <li>We never sell your personal information</li>
               </ul>
               <p className="text-gray-700 leading-relaxed">
                 By using our Service, you consent to our data practices as
-                described in our Privacy Policy and these Terms, including the
-                use of your content for AI model training.
+                described in our Privacy Policy, with the explicit understanding
+                that your content is never used for AI model training or
+                improvement.
               </p>
             </section>
 
@@ -819,9 +899,9 @@ export default function TermsOfServicePage() {
               <p className="text-gray-700 leading-relaxed">
                 Upon termination: (a) your access to the Service will cease
                 immediately; (b) you remain liable for all outstanding fees and
-                obligations; (c) we may delete your account and data after a
-                reasonable period; (d) content used for AI training will remain
-                in our systems; (e) all provisions that should survive
+                obligations; (c) we may delete your account and data after 90
+                days; (d) we will not use your content for AI training even
+                after termination; (e) all provisions that should survive
                 termination will remain in effect, including indemnification,
                 limitation of liability, and dispute resolution.
               </p>
@@ -1089,18 +1169,20 @@ export default function TermsOfServicePage() {
               </div>
             </section>
 
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-              <p className="text-red-800 text-sm font-medium mb-2">
-                <strong>IMPORTANT LEGAL NOTICE:</strong>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+              <p className="text-green-800 text-sm font-medium mb-2">
+                <strong>YOUR PRIVACY IS OUR PRIORITY:</strong>
               </p>
-              <p className="text-red-700 text-sm">
-                These Terms of Service were last updated on June 10, 2025. This
-                document represents our current terms and conditions and has
-                been designed to provide maximum legal protection. BY USING OUR
-                SERVICE, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND
-                AGREE TO BE BOUND BY THESE TERMS, INCLUDING THE ARBITRATION
-                CLAUSE, CLASS ACTION WAIVER, AND AI-SPECIFIC PROVISIONS. If you
-                do not agree to these terms, do not use our Service.
+              <p className="text-green-700 text-sm">
+                These Terms of Service were updated on August 02, 2025, to
+                clarify our commitment to your privacy. Unlike many AI services,
+                we do NOT use your data to train our AI models. Your content
+                remains exclusively yours. BY USING OUR SERVICE, YOU ACKNOWLEDGE
+                THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE
+                TERMS, INCLUDING THE ARBITRATION CLAUSE AND CLASS ACTION WAIVER.
+                We're confident you'll appreciate our privacy-first approach,
+                but if you have any concerns about these terms, please contact
+                us at legal@listora.ai before using our Service.
               </p>
             </div>
           </div>
