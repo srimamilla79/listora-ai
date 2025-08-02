@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import DashboardPageWrapper from '@/components/layout/DashboardPageWrapper'
+import Link from 'next/link'
 import {
   Check,
   Sparkles,
@@ -32,6 +33,7 @@ import {
   Building2,
   Store,
   Calendar,
+  MessageSquare,
 } from 'lucide-react'
 
 interface UserPlan {
@@ -413,10 +415,10 @@ export default function EnhancedPricingPage() {
     },
     {
       name: 'Enterprise',
-      price: 99,
-      period: 'month',
+      price: 'Custom' as string | number,
+      period: ' ',
       description: 'Unlimited scale for enterprise needs',
-      badge: 'Maximum Scale',
+      badge: 'Contact Sales',
       features: [
         'Unlimited content generations',
         'Everything in Premium plan',
@@ -655,21 +657,26 @@ export default function EnhancedPricingPage() {
                         {plan.description}
                       </p>
                     </div>
-
                     {/* Fixed height section 2: Price - EXACTLY ALIGNED */}
                     <div className="text-center h-32 flex flex-col justify-center px-4">
                       <div className="mb-1">
                         <span className="text-3xl font-bold text-gray-900">
-                          ${plan.price}
+                          {typeof plan.price === 'number'
+                            ? `$${plan.price}`
+                            : plan.price}
                         </span>
-                        {plan.price > 0 && (
+                        {typeof plan.price === 'number' && plan.price > 0 && (
                           <span className="text-gray-600 ml-1">
                             /{plan.period}
                           </span>
                         )}
                       </div>
                       <p className="text-sm text-gray-600 mb-2">
-                        {plan.price > 0 ? 'billed annually' : 'forever free'}
+                        {typeof plan.price === 'number'
+                          ? plan.price > 0
+                            ? 'billed monthly'
+                            : 'forever free'
+                          : 'Contact for pricing'}
                       </p>
                       <p className="text-sm font-medium text-gray-800">
                         {plan.planType === 'starter'
@@ -691,6 +698,16 @@ export default function EnhancedPricingPage() {
                               <Award className="mr-2 h-4 w-4" />
                               Current Plan
                             </div>
+                          ) : plan.planType === 'enterprise' &&
+                            currentPlan !== 'enterprise' ? (
+                            // Special handling for Enterprise plan - Contact Sales
+                            <Link
+                              href="/contact?plan=enterprise"
+                              className="w-full py-3 px-4 rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                            >
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Contact Sales
+                            </Link>
                           ) : (
                             (() => {
                               const isUpgrade =
@@ -751,13 +768,26 @@ export default function EnhancedPricingPage() {
                       )}
 
                       {/* Sign in button for non-logged users on paid plans */}
-                      {!user && plan.planType !== 'starter' && (
-                        <button
-                          onClick={handleLogin}
-                          className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gray-900 hover:bg-gray-800 text-white"
+                      {!user &&
+                        plan.planType !== 'starter' &&
+                        plan.planType !== 'enterprise' && (
+                          <button
+                            onClick={handleLogin}
+                            className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gray-900 hover:bg-gray-800 text-white"
+                          >
+                            Sign In to View Plan
+                          </button>
+                        )}
+
+                      {/* Contact Sales button for non-logged users on enterprise plan */}
+                      {!user && plan.planType === 'enterprise' && (
+                        <Link
+                          href="/contact?plan=enterprise"
+                          className="w-full py-3 px-4 rounded-lg font-medium text-sm transition-all cursor-pointer bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-md hover:shadow-lg flex items-center justify-center"
                         >
-                          Sign In to View Plan
-                        </button>
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Contact Sales
+                        </Link>
                       )}
 
                       {/* Start free button for non-logged users on starter plan */}

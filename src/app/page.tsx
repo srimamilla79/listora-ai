@@ -1309,11 +1309,11 @@ export default function HomePage() {
               },
               {
                 name: 'Enterprise',
-                price: '$99',
-                period: 'per month',
+                price: 'Custom', // Changed from '$99'
+                period: '', // Changed from 'per month' to empty string
                 description: 'Unlimited global scale for enterprise needs',
                 limit: 'Unlimited content generations',
-                badge: null,
+                badge: 'Contact Sales', // Changed from null
                 topBorderColor: '',
                 features: [
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
@@ -1329,7 +1329,7 @@ export default function HomePage() {
                   'White-label solutions (contact us)',
                   'Additional platform integrations',
                 ],
-                cta: '🚀 Start Free Trial',
+                cta: '📞 Contact Sales', // Changed from '🚀 Start Free Trial'
                 popular: false,
                 borderColor: 'border-gray-300',
                 buttonStyle: 'bg-gray-900 hover:bg-gray-800 text-white',
@@ -1405,7 +1405,12 @@ export default function HomePage() {
 
                   {/* CTA Button */}
                   <button
-                    onClick={handleSignup}
+                    onClick={
+                      plan.name === 'Enterprise'
+                        ? () =>
+                            (window.location.href = '/contact?plan=enterprise')
+                        : handleSignup
+                    }
                     className={`w-full py-3 px-4 rounded-lg text-form-label font-semibold transition-all transform hover:scale-105 shadow-md ${plan.buttonStyle}`}
                   >
                     {plan.cta}

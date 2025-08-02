@@ -351,11 +351,17 @@ export default function EnhancedGeneratePage() {
                 {/* Upgrade Button */}
                 {userPlan !== 'enterprise' && (
                   <a
-                    href="/pricing"
+                    href={
+                      userPlan === 'premium'
+                        ? '/contact?plan=enterprise'
+                        : '/pricing'
+                    }
                     className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                   >
                     <ArrowUpRight className="h-4 w-4" />
-                    <span className="text-sm font-medium">Upgrade</span>
+                    <span className="text-sm font-medium">
+                      {userPlan === 'premium' ? 'Contact Sales' : 'Upgrade'}
+                    </span>
                   </a>
                 )}
               </div>

@@ -198,7 +198,7 @@ const PLAN_LIMITS = {
     name: 'Enterprise',
     maxBulkProducts: 1000,
     monthlyGenerations: 999999,
-    price: '$99/month',
+    price: 'Contact Us',
     features: [
       'Bulk CSV upload (1000 products)',
       'Priority phone support',
@@ -1748,13 +1748,19 @@ export default function EnhancedBulkCSVUploadPage() {
                 </div>
               </div>
               {userPlan !== 'enterprise' && (
-                <button
-                  onClick={handleUpgrade}
+                <a
+                  href={
+                    userPlan === 'premium'
+                      ? '/contact?plan=enterprise'
+                      : '/pricing'
+                  }
                   className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer flex items-center space-x-2"
                 >
                   <Crown className="h-4 w-4" />
-                  <span>Upgrade</span>
-                </button>
+                  <span>
+                    {userPlan === 'premium' ? 'Contact Sales' : 'Upgrade'}
+                  </span>
+                </a>
               )}
             </div>
           </div>

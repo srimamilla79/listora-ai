@@ -37,6 +37,21 @@ export default function EnhancedContactPage() {
   useEffect(() => {
     setIsClient(true)
   }, [])
+  // Add this new useEffect after the existing one
+  useEffect(() => {
+    // Check if user came from pricing page for enterprise plan
+    const urlParams = new URLSearchParams(window.location.search)
+    const plan = urlParams.get('plan')
+
+    if (plan === 'enterprise') {
+      setFormData((prev) => ({
+        ...prev,
+        subject: 'enterprise',
+        message:
+          'I am interested in learning more about the Enterprise plan for my organization.',
+      }))
+    }
+  }, [])
 
   const validateForm = () => {
     const errors: any = {}
