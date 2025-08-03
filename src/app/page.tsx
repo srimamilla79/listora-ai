@@ -1524,7 +1524,12 @@ export default function HomePage() {
               <h3 className="font-bold text-white mb-6">Support</h3>
               <ul className="space-y-3 text-sm text-gray-400">
                 <li>
-                  <span className="text-gray-500">Help Center</span>
+                  <Link
+                    href="/support"
+                    className="hover:text-white transition-colors cursor-pointer"
+                  >
+                    FAQs & Support
+                  </Link>
                 </li>
                 <li>
                   <button

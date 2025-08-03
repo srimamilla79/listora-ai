@@ -156,14 +156,14 @@ export default function EnhancedContactPage() {
     },
     {
       icon: HelpCircle,
-      title: 'Help Center',
+      title: 'FAQs & Support',
       value: 'Browse FAQs',
       description: 'Self-service guides, tutorials, and common questions',
       responseTime: 'Instant access',
       available: '24/7',
       color: 'from-purple-500 to-purple-600',
       isLink: true,
-      href: '/help',
+      href: '/support', // Changed from '/help' to '/support'
     },
   ]
 
@@ -630,15 +630,15 @@ export default function EnhancedContactPage() {
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-8 text-white text-center">
             <h2 className="text-2xl font-bold mb-4">Need Immediate Help?</h2>
             <p className="text-indigo-100 mb-6 max-w-2xl mx-auto">
-              Check out our comprehensive help center with tutorials, guides,
+              Check out our comprehensive FAQs and support section with guides
               and frequently asked questions to get answers instantly.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/help"
+                href="/support"
                 className="inline-flex items-center bg-white text-indigo-600 px-6 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors"
               >
-                Visit Help Center
+                Visit FAQs & Support
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
               <span className="inline-flex items-center border border-white/50 text-white/70 px-6 py-3 rounded-lg font-medium cursor-not-allowed">
@@ -680,8 +680,8 @@ export default function EnhancedContactPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/help" className="hover:text-blue-600">
-                    Help Center
+                  <Link href="/support" className="hover:text-blue-600">
+                    FAQs & Support
                   </Link>
                 </li>
               </ul>
