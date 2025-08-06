@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import DashboardPageWrapper from '@/components/layout/DashboardPageWrapper'
 import { Sparkles, TrendingUp, Zap, Activity, ArrowUpRight } from 'lucide-react'
+import { useLanguage } from '@/contexts/LanguageContext'
+import { Globe } from 'lucide-react'
 
 export default function EnhancedGeneratePage() {
   const [user, setUser] = useState<any>(undefined)
@@ -21,6 +23,12 @@ export default function EnhancedGeneratePage() {
   const [monthlyLimit, setMonthlyLimit] = useState(10)
 
   const router = useRouter()
+  const {
+    outputLanguage,
+    setOutputLanguage,
+    inputLanguage,
+    supportedLanguages,
+  } = useLanguage()
 
   useEffect(() => {
     setMounted(true)
@@ -345,6 +353,13 @@ export default function EnhancedGeneratePage() {
                   </div>
                   <span className="text-sm font-medium text-green-700">
                     AI Ready
+                  </span>
+                </div>
+                {/* Language Status */}
+                <div className="flex items-center space-x-3 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <Globe className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-700">
+                    {supportedLanguages[outputLanguage]?.name || 'English'}
                   </span>
                 </div>
 

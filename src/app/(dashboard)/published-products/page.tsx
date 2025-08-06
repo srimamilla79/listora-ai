@@ -1,4 +1,4 @@
-// src/app/(dashboard)/published-products/page.tsx - Fixed version
+// src/app/(dashboard)/published-products/page.tsx - With Walmart Support
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -36,6 +36,8 @@ import {
   Zap,
   Store,
   MoreVertical,
+  TrendingDown,
+  X,
 } from 'lucide-react'
 
 interface PublishedProduct {
@@ -85,6 +87,15 @@ export default function PublishedProductsPage() {
   const [sortBy, setSortBy] = useState('published_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [user, setUser] = useState<any>(null)
+
+  // New states for price/inventory updates
+  const [showPriceModal, setShowPriceModal] = useState(false)
+  const [showInventoryModal, setShowInventoryModal] = useState(false)
+  const [selectedProduct, setSelectedProduct] =
+    useState<PublishedProduct | null>(null)
+  const [newPrice, setNewPrice] = useState('')
+  const [newQuantity, setNewQuantity] = useState('')
+  const [isUpdating, setIsUpdating] = useState(false)
 
   // ✅ SSR-safe Supabase state management
   const [supabase, setSupabase] = useState<any>(null)
@@ -204,6 +215,95 @@ export default function PublishedProductsPage() {
     }
   }
 
+  // Update Walmart Price
+  const updateWalmartPrice = async () => {
+    if (!selectedProduct || !newPrice || !user) return
+
+    try {
+      setIsUpdating(true)
+
+      const response = await fetch('/api/walmart/update-price', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku: selectedProduct.sku,
+          newPrice: newPrice,
+          userId: user.id,
+          productId: selectedProduct.id,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Failed to update price')
+
+      const result = await response.json()
+
+      // Update local state
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === selectedProduct.id
+            ? { ...p, price: parseFloat(newPrice) }
+            : p
+        )
+      )
+
+      setShowPriceModal(false)
+      setSelectedProduct(null)
+      setNewPrice('')
+
+      // Show success message (you can add a toast notification here)
+      console.log('✅ Price updated successfully:', result)
+    } catch (error) {
+      console.error('Error updating price:', error)
+      setError('Failed to update price')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  // Update Walmart Inventory
+  const updateWalmartInventory = async () => {
+    if (!selectedProduct || !newQuantity || !user) return
+
+    try {
+      setIsUpdating(true)
+
+      const response = await fetch('/api/walmart/update-inventory', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku: selectedProduct.sku,
+          newQuantity: newQuantity,
+          userId: user.id,
+          productId: selectedProduct.id,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Failed to update inventory')
+
+      const result = await response.json()
+
+      // Update local state
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === selectedProduct.id
+            ? { ...p, quantity: parseInt(newQuantity) }
+            : p
+        )
+      )
+
+      setShowInventoryModal(false)
+      setSelectedProduct(null)
+      setNewQuantity('')
+
+      console.log('✅ Inventory updated successfully:', result)
+    } catch (error) {
+      console.error('Error updating inventory:', error)
+      setError('Failed to update inventory')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   // Get status badge styling with enhanced statuses
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -295,7 +395,7 @@ export default function PublishedProductsPage() {
     )
   }
 
-  // Get platform icon and details
+  // Get platform icon and details - UPDATED WITH WALMART
   const getPlatformInfo = (platform: string) => {
     const platformConfig = {
       amazon: {
@@ -330,6 +430,14 @@ export default function PublishedProductsPage() {
         borderColor: 'border-purple-200',
         lightBg: 'from-purple-500 to-violet-600',
       },
+      walmart: {
+        icon: '🏪',
+        name: 'Walmart',
+        color: 'text-blue-700',
+        bgColor: 'bg-gradient-to-r from-blue-50 to-indigo-50',
+        borderColor: 'border-blue-300',
+        lightBg: 'from-blue-600 to-indigo-600',
+      },
     }
 
     return (
@@ -344,24 +452,37 @@ export default function PublishedProductsPage() {
     )
   }
 
-  // Get method badge for Amazon
+  // Get method badge for Amazon/Walmart
   const getMethodBadge = (product: PublishedProduct) => {
-    if (product.platform !== 'amazon' || !product.method) return null
+    if (product.platform === 'walmart') {
+      // Check if it's via Feed API or direct
+      if (product.platform_data?.feedId) {
+        return (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-200 ml-2 shadow-sm">
+            <Zap className="w-3 h-3 mr-1" />
+            Feed API
+          </span>
+        )
+      }
+    }
 
-    if (product.method === 'template') {
+    if (product.platform === 'amazon' && product.method) {
+      if (product.method === 'template') {
+        return (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-50 to-violet-50 text-purple-700 border border-purple-200 ml-2 shadow-sm">
+            <Download className="w-3 h-3 mr-1" />
+            Template
+          </span>
+        )
+      }
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-50 to-violet-50 text-purple-700 border border-purple-200 ml-2 shadow-sm">
-          <Download className="w-3 h-3 mr-1" />
-          Template
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-50 to-sky-50 text-blue-700 border border-blue-200 ml-2 shadow-sm">
+          API
         </span>
       )
     }
 
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-50 to-sky-50 text-blue-700 border border-blue-200 ml-2 shadow-sm">
-        API
-      </span>
-    )
+    return null
   }
 
   // Filter and sort products
@@ -434,7 +555,7 @@ export default function PublishedProductsPage() {
                   </span>
                 </div>
                 <p className="text-gray-600 mt-2 text-lg ml-16">
-                  Manage your marketplace listings
+                  Manage your marketplace listings across all platforms
                 </p>
               </div>
 
@@ -494,7 +615,7 @@ export default function PublishedProductsPage() {
               </div>
               <div className="mt-4 flex items-center text-sm text-gray-600">
                 <TrendingUp className="h-4 w-4 mr-1 text-blue-500" />
-                <span>Across 4 platforms</span>
+                <span>Across 5 platforms</span>
               </div>
             </div>
 
@@ -555,14 +676,14 @@ export default function PublishedProductsPage() {
             </div>
           </div>
 
-          {/* Platform Breakdown Card */}
+          {/* Platform Breakdown Card - UPDATED WITH WALMART */}
           {Object.keys(stats.platformBreakdown).length > 0 && (
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white/50 p-6 shadow-xl">
               <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
                 <Store className="h-5 w-5 mr-2 text-indigo-600" />
                 Platform Distribution
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {Object.entries(stats.platformBreakdown).map(
                   ([platform, count]) => {
                     const platformInfo = getPlatformInfo(platform)
@@ -595,7 +716,7 @@ export default function PublishedProductsPage() {
             </div>
           )}
 
-          {/* Enhanced Filters */}
+          {/* Enhanced Filters - UPDATED WITH WALMART */}
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white/50 p-6 shadow-xl">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
@@ -620,6 +741,7 @@ export default function PublishedProductsPage() {
                   <option value="shopify">🛍️ Shopify</option>
                   <option value="ebay">🔨 eBay</option>
                   <option value="etsy">🎨 Etsy</option>
+                  <option value="walmart">🏪 Walmart</option>
                 </select>
 
                 <select
@@ -661,7 +783,7 @@ export default function PublishedProductsPage() {
             </div>
           </div>
 
-          {/* Products Display */}
+          {/* Products Display - UPDATED WITH WALMART */}
           {filteredProducts.length === 0 ? (
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-white/50 p-16 shadow-xl text-center">
               <div className="w-24 h-24 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-8">
@@ -806,23 +928,69 @@ export default function PublishedProductsPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </button>
+
+                              {/* Price Update - Only for Walmart */}
+                              {product.platform === 'walmart' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedProduct(product)
+                                    setNewPrice(product.price?.toString() || '')
+                                    setShowPriceModal(true)
+                                  }}
+                                  className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all"
+                                  title="Update Price"
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                </button>
+                              )}
+
+                              {/* Inventory Update - Only for Walmart */}
+                              {product.platform === 'walmart' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedProduct(product)
+                                    setNewQuantity(
+                                      product.quantity?.toString() || ''
+                                    )
+                                    setShowInventoryModal(true)
+                                  }}
+                                  className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all"
+                                  title="Update Inventory"
+                                >
+                                  <Package className="h-4 w-4" />
+                                </button>
+                              )}
+
                               <button
                                 className="p-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
                                 title="Edit Product"
                               >
                                 <Edit3 className="h-4 w-4" />
                               </button>
-                              {product.platform_url && (
+
+                              {(product.platform_url ||
+                                product.platform === 'walmart') && (
                                 <a
-                                  href={product.platform_url}
+                                  href={
+                                    product.platform_url ||
+                                    (product.platform === 'walmart'
+                                      ? `https://seller.walmart.com/items-and-inventory/manage-items?searchType=ALL_ITEMS&searchQuery=${product.sku}`
+                                      : '#')
+                                  }
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className={`p-2 hover:bg-gray-50 rounded-lg transition-all ${platformInfo.color}`}
-                                  title={`View on ${platformInfo.name}`}
+                                  title={
+                                    product.platform === 'walmart' &&
+                                    !product.platform_url
+                                      ? `View in Walmart Seller Center (SKU: ${product.sku})`
+                                      : `View on ${platformInfo.name}`
+                                  }
                                 >
                                   <ExternalLink className="h-4 w-4" />
                                 </a>
                               )}
+
                               <button
                                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-all"
                                 title="More Options"
@@ -865,6 +1033,275 @@ export default function PublishedProductsPage() {
             </div>
           </div>
         </div>
+
+        {/* Price Update Modal */}
+        {showPriceModal && selectedProduct && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  Update Price
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowPriceModal(false)
+                    setSelectedProduct(null)
+                    setNewPrice('')
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Product</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedProduct.title}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    SKU: {selectedProduct.sku}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Current Price
+                  </label>
+                  <div className="flex items-center space-x-2 text-lg">
+                    <DollarSign className="h-5 w-5 text-gray-400" />
+                    <span className="font-semibold">
+                      {selectedProduct.price?.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Price
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newPrice}
+                      onChange={(e) => setNewPrice(e.target.value)}
+                      className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter new price"
+                    />
+                  </div>
+                </div>
+
+                {newPrice && parseFloat(newPrice) !== selectedProduct.price && (
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-blue-700">
+                        Price Change:
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        {parseFloat(newPrice) > (selectedProduct.price || 0) ? (
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-600" />
+                        )}
+                        <span
+                          className={`font-semibold ${
+                            parseFloat(newPrice) > (selectedProduct.price || 0)
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                          }`}
+                        >
+                          {(
+                            ((parseFloat(newPrice) -
+                              (selectedProduct.price || 0)) /
+                              (selectedProduct.price || 1)) *
+                            100
+                          ).toFixed(1)}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowPriceModal(false)
+                    setSelectedProduct(null)
+                    setNewPrice('')
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={updateWalmartPrice}
+                  disabled={
+                    !newPrice ||
+                    isUpdating ||
+                    parseFloat(newPrice) === selectedProduct.price
+                  }
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader className="h-4 w-4 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Update Price</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Inventory Update Modal */}
+        {showInventoryModal && selectedProduct && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  Update Inventory
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowInventoryModal(false)
+                    setSelectedProduct(null)
+                    setNewQuantity('')
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Product</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedProduct.title}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    SKU: {selectedProduct.sku}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Current Inventory
+                  </label>
+                  <div className="flex items-center space-x-2 text-lg">
+                    <Package className="h-5 w-5 text-gray-400" />
+                    <span className="font-semibold">
+                      {selectedProduct.quantity || 0} units
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Quantity
+                  </label>
+                  <div className="relative">
+                    <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="number"
+                      value={newQuantity}
+                      onChange={(e) => setNewQuantity(e.target.value)}
+                      className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter new quantity"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                {newQuantity &&
+                  parseInt(newQuantity) !== selectedProduct.quantity && (
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-blue-700">
+                          Inventory Change:
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          {parseInt(newQuantity) >
+                          (selectedProduct.quantity || 0) ? (
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 text-red-600" />
+                          )}
+                          <span
+                            className={`font-semibold ${
+                              parseInt(newQuantity) >
+                              (selectedProduct.quantity || 0)
+                                ? 'text-green-600'
+                                : 'text-red-600'
+                            }`}
+                          >
+                            {parseInt(newQuantity) >
+                            (selectedProduct.quantity || 0)
+                              ? '+'
+                              : ''}
+                            {parseInt(newQuantity) -
+                              (selectedProduct.quantity || 0)}{' '}
+                            units
+                          </span>
+                        </div>
+                      </div>
+                      {parseInt(newQuantity) === 0 && (
+                        <p className="text-xs text-orange-600 mt-2">
+                          ⚠️ Setting inventory to 0 will mark the item as out of
+                          stock
+                        </p>
+                      )}
+                    </div>
+                  )}
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowInventoryModal(false)
+                    setSelectedProduct(null)
+                    setNewQuantity('')
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={updateWalmartInventory}
+                  disabled={
+                    !newQuantity ||
+                    isUpdating ||
+                    parseInt(newQuantity) === selectedProduct.quantity
+                  }
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader className="h-4 w-4 animate-spin" />
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Update Inventory</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx>{`

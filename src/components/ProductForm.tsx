@@ -5,8 +5,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import debounce from 'lodash.debounce'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { LanguagePreferencesManager } from '@/components/LanguagePreferencesManager'
 import { useLanguagePreferences } from '@/hooks/useLanguagePreferences'
+import { useLanguage } from '@/contexts/LanguageContext'
+import { normalizeLanguageCode } from '@/utils/languageDetection'
+import { SUPPORTED_LANGUAGES } from '@/config/languages'
 
 import {
   Upload,
@@ -45,6 +47,7 @@ import {
 import MarketplaceConnections from '@/components/MarketplaceConnections'
 import UnifiedPublisher from '@/components/UnifiedPublisher'
 import MultilingualVoiceRecorder from '@/components/VoiceRecorder'
+import { ProductFormOnboarding } from '@/components/ProductFormOnboarding'
 
 // 🧠 FINAL FIX: Base64 conversion utility added here
 const convertToBase64 = (file: File): Promise<string> => {
@@ -304,10 +307,6 @@ export default function ProductForm({
 
   // 🌍 NEW: Multilingual voice state
   const { updateUsageStats } = useLanguagePreferences()
-  const [selectedLanguages, setSelectedLanguages] = useState({
-    input: 'auto',
-    output: 'en',
-  })
 
   // 🔧 CRITICAL FIX: Add generation attempt counter to prevent infinite blocking
   const [generationAttempts, setGenerationAttempts] = useState(0)
@@ -316,6 +315,7 @@ export default function ProductForm({
   // Usage validation state
   const [isAdmin, setIsAdmin] = useState(false)
   const [showUsageLimitWarning, setShowUsageLimitWarning] = useState(false)
+  const [preferences, setPreferences] = useState<any>(undefined)
 
   // Amazon integration state
   const [amazonConnected, setAmazonConnected] = useState(false)
@@ -335,6 +335,14 @@ export default function ProductForm({
 
   const router = useRouter()
 
+  // Language context integration
+  const {
+    outputLanguage,
+    setOutputLanguage,
+    currentPlatform,
+    setCurrentPlatform,
+  } = useLanguage()
+
   // ✅ Initialize Supabase client after component mounts
   useEffect(() => {
     setMounted(true)
@@ -347,6 +355,68 @@ export default function ProductForm({
       ;(window as any).supabase = supabaseClient
     }
   }, [])
+  // Smart default language loading
+  useEffect(() => {
+    if (!mounted) return
+
+    const getDefaultLanguage = () => {
+      const savedLang = localStorage.getItem('preferred_output_language')
+      if (savedLang) {
+        return savedLang
+      }
+      const browserLang = navigator.language.slice(0, 2).toLowerCase()
+      const keepNativeLanguages = [
+        'en',
+        'es',
+        'fr',
+        'de',
+        'pt',
+        'it',
+        'nl',
+        'ja',
+        'ko',
+        'zh',
+        'ar',
+        'he',
+        'ru',
+        'tr',
+        'th',
+        'vi',
+        'id',
+        'hi',
+      ]
+      if (
+        keepNativeLanguages.includes(browserLang) &&
+        SUPPORTED_LANGUAGES[browserLang]
+      ) {
+        return browserLang
+      }
+      return 'en'
+    }
+
+    // Only set if outputLanguage is not set or is 'en' and a preference exists
+    if (
+      (!outputLanguage || outputLanguage === 'en') &&
+      localStorage.getItem('preferred_output_language')
+    ) {
+      const defaultLanguage = getDefaultLanguage()
+      if (defaultLanguage !== outputLanguage) {
+        setOutputLanguage(defaultLanguage)
+        // Show a subtle notification about the default
+        if (!localStorage.getItem('preferred_output_language')) {
+          addNotification(
+            `Output language set to ${defaultLanguage.toUpperCase()}. You can change this anytime.`,
+            'info'
+          )
+        }
+      }
+    }
+  }, [mounted, outputLanguage])
+
+  // Update platform when it changes
+  useEffect(() => {
+    setCurrentPlatform(platform)
+  }, [platform, setCurrentPlatform])
 
   // Update local state when props change
   useEffect(() => {
@@ -406,6 +476,7 @@ export default function ProductForm({
   const remainingGenerations = actualMonthlyLimit - actualCurrentUsage
   const usagePercentage = (actualCurrentUsage / actualMonthlyLimit) * 100
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const debouncedLanguageSave = useRef<any>(null)
 
   // 🚀 NEW: Content section handlers
   const toggleSection = (section: keyof ContentSections) => {
@@ -557,56 +628,85 @@ export default function ProductForm({
       setShowUsageLimitWarning(false)
     }
   }, [actualCurrentUsage, actualMonthlyLimit, isAdmin])
+  // ADD THIS NEW useEffect HERE - Load preferences
+  useEffect(() => {
+    const loadPreferences = async () => {
+      if (!user || !supabase) return
 
-  // 🌍 NEW: Enhanced voice content handler for multilingual results (Phase 1 only)
-  async function updateFormWithVoiceContent(result: any) {
-    const updates = []
+      try {
+        const { data, error } = await supabase
+          .from('user_language_preferences')
+          .select('*')
+          .eq('user_id', user.id)
+          .single()
 
-    if (result.transcription) {
-      updates.push(() => setTranscription(result.transcription))
-      // 🎯 NEW: Use transcription as features if features field is empty
-
-      updates.push(() => setFeatures(result.transcription))
-    }
-
-    if (result.productName) {
-      updates.push(() => setProductName(result.productName))
-    }
-
-    // 🎯 IMPORTANT: Only set voice content available, NOT final content
-    if (result.transcription || result.productName) {
-      updates.push(() => setIsVoiceContentAvailable(true))
-      // 🔧 CRITICAL FIX: Reset final content flag to ensure button works
-      updates.push(() => setHasGeneratedFinalContent(false))
-    }
-
-    // 🚫 REMOVED: No generatedContent handling here - that's Phase 2
-
-    // 🌍 Handle multilingual results
-    if (result.detectedLanguage) {
-      console.log('🌍 Detected language:', result.detectedLanguage)
-
-      // Show language detection feedback
-      if (result.wasTranslated) {
-        addNotification(
-          `🌍 Detected ${result.detectedLanguage.toUpperCase()} and translated to ${result.targetLanguage.toUpperCase()}!`,
-          'success'
-        )
-      } else {
-        addNotification(
-          `🎯 Detected ${result.detectedLanguage.toUpperCase()} with ${Math.round((result.confidence || 0.9) * 100)}% confidence`,
-          'info'
-        )
+        if (data) {
+          setPreferences(data)
+        } else {
+          // Create default preferences if none exist
+          setPreferences({
+            preferred_input_language: 'auto',
+            preferred_output_language: 'en',
+          })
+        }
+      } catch (error) {
+        console.error('Error loading preferences:', error)
+        setPreferences({
+          preferred_input_language: 'auto',
+          preferred_output_language: 'en',
+        })
       }
     }
 
-    // 🎯 NEW: Show Phase 1 complete message
-    addNotification(
-      '🎤 Voice processed! Form filled successfully. Add images and generate content.',
-      'success'
-    )
+    loadPreferences()
+  }, [user, supabase])
 
-    updates.forEach((update) => update())
+  async function updateFormWithVoiceContent(result: any) {
+    console.log('🔍 NEW FUNCTION DEBUG:', result)
+
+    // Show transcription in original language
+    if (result.transcription) {
+      setTranscription(result.transcription)
+
+      if (result.translatedProductName) {
+        setProductName(result.translatedProductName)
+      } else if (result.productName) {
+        setProductName(result.productName)
+      }
+
+      if (result.translatedFeatures) {
+        setFeatures(result.translatedFeatures)
+      } else if (result.transcription) {
+        setFeatures(result.transcription)
+      }
+
+      setIsVoiceContentAvailable(true)
+      setHasGeneratedFinalContent(false)
+    }
+
+    // Show language detection notification
+    if (result.detectedLanguage) {
+      const detectedLangName =
+        SUPPORTED_LANGUAGES[result.detectedLanguage]?.name ||
+        result.detectedLanguage
+
+      addNotification(
+        `🎤 Detected ${detectedLangName} (${Math.round((result.confidence || 0.95) * 100)}% confidence)`,
+        'info'
+      )
+
+      // FIX: Use the wasTranslated flag from the API response
+      if (result.wasTranslated) {
+        // If it was translated, show the target language (which should be the outputLanguage)
+        const targetLang = result.targetLanguage || outputLanguage || 'en'
+        const targetLangName =
+          SUPPORTED_LANGUAGES[targetLang]?.name || targetLang.toUpperCase()
+        addNotification(`📝 Status: Translated to ${targetLangName}`, 'info')
+      } else {
+        // If it wasn't translated, it was transcribed in the original language
+        addNotification(`📝 Status: Transcribed in ${detectedLangName}`, 'info')
+      }
+    }
   }
 
   // 🌍 SIMPLIFIED: Reset voice recorder function
@@ -1452,6 +1552,9 @@ export default function ProductForm({
         voiceTranscription: transcription || undefined,
         existingContent: isVoiceContentAvailable ? generatedContent : undefined,
         selectedSections: selectedSections,
+        // Language parameters from context
+        targetLanguage: outputLanguage || 'en',
+        sourceLanguage: 'auto',
       }
 
       try {
@@ -1549,10 +1652,12 @@ export default function ProductForm({
             ? 'complete content package'
             : `${sectionCount} content sections`
 
+        const languageText =
+          outputLanguage !== 'en' ? ` in ${outputLanguage.toUpperCase()}` : ''
         addNotification(
           isVoiceContentAvailable
-            ? `🎤 Voice content enhanced (${sectionText}) and saved!`
-            : `🎉 ${sectionText} generated successfully in ${Math.round(totalTime / 1000)}s!`,
+            ? `🎤 Voice content enhanced (${sectionText}) and saved${languageText}!`
+            : `🎉 ${sectionText} generated successfully${languageText} in ${Math.round(totalTime / 1000)}s!`,
           'success'
         )
       } catch (fetchError) {
@@ -1783,1109 +1888,1298 @@ export default function ProductForm({
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
-        {notifications.map((notification) => (
-          <div
-            key={notification.id}
-            className={`max-w-md p-4 rounded-lg shadow-lg border-l-4 transform transition-all duration-300 ease-in-out ${
-              notification.type === 'success'
-                ? 'bg-green-50 border-green-400 text-green-800'
-                : notification.type === 'error'
-                  ? 'bg-red-50 border-red-400 text-red-800'
-                  : 'bg-blue-50 border-blue-400 text-blue-800'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                {notification.type === 'success' && (
-                  <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
-                )}
-                {notification.type === 'error' && (
-                  <X className="h-5 w-5 mr-2 text-red-600" />
-                )}
-                {notification.type === 'info' && (
-                  <Cloud className="h-5 w-5 mr-2 text-blue-600" />
-                )}
-                <span className="text-sm font-medium">
-                  {notification.message}
-                </span>
-              </div>
-              <button
-                onClick={() => removeNotification(notification.id)}
-                className="text-gray-400 hover:text-gray-600 ml-4"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Usage Limit Warning */}
-      {showUsageLimitWarning && !isAdmin && (
-        <div className="mb-6 p-4 bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-orange-100 p-2 rounded-full">
-                <AlertTriangle className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <h4 className="font-bold text-orange-900">
-                  Almost at your limit!
-                </h4>
-                <p className="text-orange-700 text-sm">
-                  Only {remainingGenerations} generations left this month.
-                  Consider upgrading to continue.
-                </p>
-                <div className="flex items-center space-x-4 mt-1 text-xs text-orange-600">
-                  <span>⚡ 10x more generations</span>
-                  <span>🎨 Advanced features</span>
-                  <span>🚀 Priority processing</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => router.push('/pricing')}
-                className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg"
-              >
-                <Rocket className="h-4 w-4" />
-                <span>Upgrade</span>
-              </button>
-              <button
-                onClick={() => dismissPrompt('usage-limit')}
-                className="text-gray-400 hover:text-gray-600 p-1"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Smart Bulk Upload Promotion - Priority-based display */}
-      {shouldShowPromotions &&
-        (() => {
-          // Priority 1: Post-generation prompt
-          if (showPostGenerationPrompt) {
-            return (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold text-blue-900">
-                      Need to generate more products?
-                    </h4>
-                    <p className="text-blue-700 text-sm">
-                      Upload a CSV and process hundreds at once instead of one
-                      by one
-                    </p>
-                    <div className="flex items-center space-x-4 mt-1 text-xs text-blue-600">
-                      <span>⚡ Save 90% time</span>
-                      <span>📊 Bulk processing</span>
-                      <span>🚀 Scale your business</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => router.push('/bulk')}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Try Bulk Upload
-                    </button>
-                    <button
-                      onClick={() => dismissPrompt('post-generation')}
-                      className="text-gray-400 hover:text-gray-600 p-1"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          }
-
-          // Priority 2: Power user promotion
-          if (showSmartPromotion) {
-            return (
-              <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-green-100 p-2 rounded-full">
-                      <TrendingUp className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-green-900">
-                        You're a power user! 🎉
-                      </h4>
-                      <p className="text-green-700 text-sm">
-                        You've generated {userGenerationCount} products. Save
-                        10x time with bulk upload!
-                      </p>
-                      <div className="flex items-center space-x-4 mt-2 text-xs text-green-600">
-                        <span className="flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          10x Faster
-                        </span>
-                        <span className="flex items-center">
-                          <FileSpreadsheet className="h-3 w-3 mr-1" />
-                          Process hundreds at once
-                        </span>
-                        <span className="flex items-center">
-                          <Zap className="h-3 w-3 mr-1" />
-                          Your plan supports bulk upload
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => router.push('/bulk')}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
-                    >
-                      Try Bulk Upload
-                    </button>
-                    <button
-                      onClick={() => dismissPrompt('smart-promotion')}
-                      className="text-gray-400 hover:text-gray-600 p-1"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          }
-
-          // Priority 3: Subtle form integration
-          if (
-            userGenerationCount === 0 ||
-            (!showPostGenerationPrompt &&
-              !showSmartPromotion &&
-              !dismissedPrompts.includes('form-integration'))
-          ) {
-            return (
-              <div className="text-center mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-gray-600 text-sm mb-2">
-                  Have multiple products to generate?
-                </p>
-                <button
-                  onClick={() => router.push('/bulk')}
-                  className="text-blue-600 hover:text-blue-700 font-medium inline-flex items-center space-x-2 group text-sm"
-                >
-                  <FileSpreadsheet className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                  <span>📊 Switch to Bulk Upload</span>
-                </button>
-                <button
-                  onClick={() => dismissPrompt('form-integration')}
-                  className="ml-2 text-gray-400 hover:text-gray-600 p-1"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )
-          }
-
-          return null
-        })()}
-
-      {/* Storage Status Banner */}
-      {hasUnstoredImages && !storingImages && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Cloud className="h-5 w-5 text-blue-600 mr-2" />
-              <p className="text-blue-800 text-sm">
-                Your processed images are ready to be saved permanently
-              </p>
-            </div>
-            <button
-              onClick={() => storeImagesToSupabase()}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+    <ProductFormOnboarding>
+      <div className="max-w-7xl mx-auto">
+        {/* Toast Notifications */}
+        <div className="fixed top-4 right-4 z-50 space-y-2">
+          {notifications.map((notification) => (
+            <div
+              key={notification.id}
+              className={`max-w-md p-4 rounded-lg shadow-lg border-l-4 transform transition-all duration-300 ease-in-out ${
+                notification.type === 'success'
+                  ? 'bg-green-50 border-green-400 text-green-800'
+                  : notification.type === 'error'
+                    ? 'bg-red-50 border-red-400 text-red-800'
+                    : 'bg-blue-50 border-blue-400 text-blue-800'
+              }`}
             >
-              <Save className="h-4 w-4 mr-2" />
-              Save Images
-            </button>
-          </div>
-        </div>
-      )}
-
-      {storingImages && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
-          <div className="flex items-center">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600 mr-3"></div>
-            <p className="text-green-800 text-sm">
-              Saving images to your account... This may take a few moments.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/50">
-        <div className="bg-gradient-to-r from-indigo-700 via-slate-700 to-gray-700 px-8 py-8">
-          <h2 className="text-display-title text-white flex items-center">
-            <Sparkles className="mr-3 h-8 w-8" />
-            AI Content Generator
-          </h2>
-          <p className="text-slate-200 mt-3 text-lg">
-            Create comprehensive product content packages with professional
-            image processing and multilingual voice input
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-              ✓ Multilingual Voice Input
-            </span>
-            <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-              ✓ Product Descriptions
-            </span>
-            <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-              ✓ Instagram Captions
-            </span>
-            <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-              ✓ Image Processing
-            </span>
-            <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-              ✓ Cloud Storage
-            </span>
-          </div>
-        </div>
-
-        <div className="p-8">
-          {/* Voice Integration Section */}
-          <div className="mb-8 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg">
-                  <Mic className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">
-                    🎤 Voice to Content - Multilingual
-                  </h3>
-                  <p className="text-gray-600">
-                    Speak in any language, get professional content worldwide
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
-                  className={`px-6 py-3 rounded-lg transition-all font-medium ${
-                    showVoiceRecorder
-                      ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg'
-                  }`}
-                  style={{
-                    minHeight: '48px',
-                    minWidth: '180px',
-                    touchAction: 'manipulation',
-                  }}
-                >
-                  {showVoiceRecorder
-                    ? 'Hide Voice Recorder'
-                    : '🎤 Start Voice Input'}
-                </button>
-              </div>
-            </div>
-
-            {showVoiceRecorder && (
-              <>
-                {/* 🔧 FIX: Remove dynamic keys that cause re-mounting */}
-                <div className="voice-lang-prefs">
-                  <LanguagePreferencesManager
-                    selectedPlatform={platform}
-                    onPreferencesChange={(input, output) => {
-                      setSelectedLanguages({ input, output })
-                    }}
-                  />
-                </div>
-
-                <div className="mt-4">
-                  {/* 🔧 FIX: Use stable key that doesn't change */}
-                  <MultilingualVoiceRecorder
-                    key={`voice-recorder-${voiceRecorderKey}`}
-                    supabase={supabase}
-                    onContentGenerated={async (result) => {
-                      console.log('🎤 Voice content received:', result)
-                      await updateFormWithVoiceContent(result)
-                      // Update usage statistics
-                      if (result.detectedLanguage && result.targetLanguage) {
-                        await updateUsageStats(
-                          result.detectedLanguage,
-                          result.targetLanguage,
-                          result.wasTranslated || false,
-                          platform
-                        )
-                      }
-                    }}
-                    onTranscriptionComplete={setTranscription}
-                    onProcessingChange={(isProcessing) => {
-                      console.log('🎤 Processing state changed:', isProcessing)
-                      // You can add loading state here if needed
-                    }}
-                  />
-                </div>
-              </>
-            )}
-            {/* Voice Status */}
-            {isVoiceContentAvailable && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-green-800 font-medium">
-                    ✅ Voice content generated and ready!
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  {notification.type === 'success' && (
+                    <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                  )}
+                  {notification.type === 'error' && (
+                    <X className="h-5 w-5 mr-2 text-red-600" />
+                  )}
+                  {notification.type === 'info' && (
+                    <Cloud className="h-5 w-5 mr-2 text-blue-600" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {notification.message}
                   </span>
                 </div>
-                <p className="text-green-700 text-sm mt-1">
-                  Product name and content have been filled. You can now add
-                  images and finalize.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Input Section */}
-            <div className="space-y-6">
-              <div>
-                <label
-                  htmlFor="productName"
-                  className="block text-sm font-semibold text-gray-700 mb-3"
+                <button
+                  onClick={() => removeNotification(notification.id)}
+                  className="text-gray-400 hover:text-gray-600 ml-4"
                 >
-                  Product Name
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="text"
-                  id="productName"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  placeholder={
-                    isVoiceContentAvailable
-                      ? 'Filled by voice input'
-                      : 'e.g., Wireless Bluetooth Headphones'
-                  }
-                  className={`w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-slate-100 focus:border-slate-500 transition-all duration-200 text-gray-900 placeholder-gray-500 ${
-                    isVoiceContentAvailable
-                      ? 'bg-green-50 border-green-300'
-                      : 'border-gray-200'
-                  }`}
-                />
-                {isVoiceContentAvailable && (
-                  <p className="text-green-600 text-sm mt-1">
-                    ✅ Filled by voice input
-                  </p>
-                )}
+                  <X className="h-4 w-4" />
+                </button>
               </div>
+            </div>
+          ))}
+        </div>
 
-              <div>
-                <label
-                  htmlFor="features"
-                  className="block text-sm font-semibold text-gray-700 mb-3"
-                >
-                  Key Features & Benefits
-                </label>
-                <textarea
-                  id="features"
-                  value={features}
-                  onChange={(e) => setFeatures(e.target.value)}
-                  placeholder={
-                    isVoiceContentAvailable
-                      ? 'Enhanced from voice input'
-                      : 'e.g., Noise cancelling, 20-hour battery life, premium leather padding...'
-                  }
-                  rows={5}
-                  className={`w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-slate-100 focus:border-slate-500 transition-all duration-200 resize-none text-gray-900 placeholder-gray-500 ${
-                    isVoiceContentAvailable
-                      ? 'bg-green-50 border-green-300'
-                      : 'border-gray-200'
-                  }`}
-                />
-              </div>
-
-              {/* 🚀 NEW: Content Section Selection */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    📝 Content Sections to Generate
-                  </label>
-                  <button
-                    onClick={() => setShowContentSections(!showContentSections)}
-                    className="flex items-center space-x-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span>{showContentSections ? 'Hide' : 'Customize'}</span>
-                  </button>
+        {/* Usage Limit Warning */}
+        {showUsageLimitWarning && !isAdmin && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-orange-100 p-2 rounded-full">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
                 </div>
+                <div>
+                  <h4 className="font-bold text-orange-900">
+                    Almost at your limit!
+                  </h4>
+                  <p className="text-orange-700 text-sm">
+                    Only {remainingGenerations} generations left this month.
+                    Consider upgrading to continue.
+                  </p>
+                  <div className="flex items-center space-x-4 mt-1 text-xs text-orange-600">
+                    <span>⚡ 10x more generations</span>
+                    <span>🎨 Advanced features</span>
+                    <span>🚀 Priority processing</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => router.push('/pricing')}
+                  className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white px-4 py-2 rounded-lg font-medium flex items-center space-x-2 transition-all transform hover:scale-105 shadow-lg"
+                >
+                  <Rocket className="h-4 w-4" />
+                  <span>Upgrade</span>
+                </button>
+                <button
+                  onClick={() => dismissPrompt('usage-limit')}
+                  className="text-gray-400 hover:text-gray-600 p-1"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-                {/* Quick Summary */}
-                <div className="mb-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
+        {/* Smart Bulk Upload Promotion - Priority-based display */}
+        {shouldShowPromotions &&
+          (() => {
+            // Priority 1: Post-generation prompt
+            if (showPostGenerationPrompt) {
+              return (
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">
-                          {getSelectedSectionCount() === 6
-                            ? 'Complete Content Package'
-                            : `${getSelectedSectionCount()} Content Sections`}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {getSelectedSectionCount() === 6
-                            ? 'All sections selected - full package generation'
-                            : `Generating ${getSelectedSectionCount()} of 6 available sections`}
-                        </p>
+                    <div>
+                      <h4 className="font-semibold text-blue-900">
+                        Need to generate more products?
+                      </h4>
+                      <p className="text-blue-700 text-sm">
+                        Upload a CSV and process hundreds at once instead of one
+                        by one
+                      </p>
+                      <div className="flex items-center space-x-4 mt-1 text-xs text-blue-600">
+                        <span>⚡ Save 90% time</span>
+                        <span>📊 Bulk processing</span>
+                        <span>🚀 Scale your business</span>
                       </div>
                     </div>
-                    <button
-                      onClick={toggleAllSections}
-                      className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-                    >
-                      {Object.values(selectedSections).every(Boolean)
-                        ? 'Deselect All'
-                        : 'Select All'}
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => router.push('/bulk')}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Try Bulk Upload
+                      </button>
+                      <button
+                        onClick={() => dismissPrompt('post-generation')}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
+              )
+            }
 
-                {/* Expandable Content Sections */}
-                {showContentSections && (
-                  <div className="space-y-3 bg-white rounded-xl border border-gray-200 p-6">
-                    <h5 className="font-semibold text-gray-900 mb-4">
-                      Choose what to generate:
-                    </h5>
-
-                    {[
-                      {
-                        key: 'title' as keyof ContentSections,
-                        label: 'Product Title/Headline',
-                        description: 'SEO-optimized main title',
-                        icon: Target,
-                        color: 'from-blue-500 to-blue-600',
-                      },
-                      {
-                        key: 'sellingPoints' as keyof ContentSections,
-                        label: 'Key Selling Points',
-                        description: '5-7 bullet points highlighting benefits',
-                        icon: Sparkles,
-                        color: 'from-green-500 to-green-600',
-                      },
-                      {
-                        key: 'description' as keyof ContentSections,
-                        label: 'Detailed Product Description',
-                        description: 'Comprehensive description with benefits',
-                        icon: FileText,
-                        color: 'from-purple-500 to-purple-600',
-                      },
-                      {
-                        key: 'instagramCaption' as keyof ContentSections,
-                        label: 'Instagram Caption',
-                        description: 'Social media caption with hashtags',
-                        icon: Share2,
-                        color: 'from-pink-500 to-pink-600',
-                      },
-                      {
-                        key: 'blogIntro' as keyof ContentSections,
-                        label: 'Blog Introduction',
-                        description: 'Compelling blog post introduction',
-                        icon: MessageSquare,
-                        color: 'from-orange-500 to-orange-600',
-                      },
-                      {
-                        key: 'callToAction' as keyof ContentSections,
-                        label: 'Call-to-Action',
-                        description: 'Platform-specific conversion focus',
-                        icon: Target,
-                        color: 'from-red-500 to-red-600',
-                      },
-                    ].map((section) => {
-                      const Icon = section.icon
-                      return (
-                        <div
-                          key={section.key}
-                          className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center space-x-3 flex-1">
-                            <div
-                              className={`w-8 h-8 bg-gradient-to-r ${section.color} rounded-lg flex items-center justify-center`}
-                            >
-                              <Icon className="h-4 w-4 text-white" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
-                                {section.label}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                {section.description}
-                              </div>
-                            </div>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedSections[section.key]}
-                              onChange={() => toggleSection(section.key)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                          </label>
-                        </div>
-                      )
-                    })}
-
-                    {getSelectedSectionCount() === 0 && (
-                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <p className="text-amber-800 text-sm">
-                          ⚠️ Please select at least one content section to
-                          generate.
-                        </p>
+            // Priority 2: Power user promotion
+            if (showSmartPromotion) {
+              return (
+                <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="bg-green-100 p-2 rounded-full">
+                        <TrendingUp className="h-5 w-5 text-green-600" />
                       </div>
-                    )}
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-green-900">
+                          You're a power user! 🎉
+                        </h4>
+                        <p className="text-green-700 text-sm">
+                          You've generated {userGenerationCount} products. Save
+                          10x time with bulk upload!
+                        </p>
+                        <div className="flex items-center space-x-4 mt-2 text-xs text-green-600">
+                          <span className="flex items-center">
+                            <Clock className="h-3 w-3 mr-1" />
+                            10x Faster
+                          </span>
+                          <span className="flex items-center">
+                            <FileSpreadsheet className="h-3 w-3 mr-1" />
+                            Process hundreds at once
+                          </span>
+                          <span className="flex items-center">
+                            <Zap className="h-3 w-3 mr-1" />
+                            Your plan supports bulk upload
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => router.push('/bulk')}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                      >
+                        Try Bulk Upload
+                      </button>
+                      <button
+                        onClick={() => dismissPrompt('smart-promotion')}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                )}
+                </div>
+              )
+            }
+
+            // Priority 3: Subtle form integration
+            if (
+              userGenerationCount === 0 ||
+              (!showPostGenerationPrompt &&
+                !showSmartPromotion &&
+                !dismissedPrompts.includes('form-integration'))
+            ) {
+              return (
+                <div className="text-center mb-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-gray-600 text-sm mb-2">
+                    Have multiple products to generate?
+                  </p>
+                  <button
+                    onClick={() => router.push('/bulk')}
+                    className="text-blue-600 hover:text-blue-700 font-medium inline-flex items-center space-x-2 group text-sm"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                    <span>📊 Switch to Bulk Upload</span>
+                  </button>
+                  <button
+                    onClick={() => dismissPrompt('form-integration')}
+                    className="ml-2 text-gray-400 hover:text-gray-600 p-1"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )
+            }
+
+            return null
+          })()}
+
+        {/* Storage Status Banner */}
+        {hasUnstoredImages && !storingImages && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Cloud className="h-5 w-5 text-blue-600 mr-2" />
+                <p className="text-blue-800 text-sm">
+                  Your processed images are ready to be saved permanently
+                </p>
+              </div>
+              <button
+                onClick={() => storeImagesToSupabase()}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save Images
+              </button>
+            </div>
+          </div>
+        )}
+
+        {storingImages && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600 mr-3"></div>
+              <p className="text-green-800 text-sm">
+                Saving images to your account... This may take a few moments.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/50">
+          <div className="bg-gradient-to-r from-indigo-700 via-slate-700 to-gray-700 px-8 py-8">
+            <h2 className="text-display-title text-white flex items-center">
+              <Sparkles className="mr-3 h-8 w-8" />
+              AI Content Generator
+            </h2>
+            <p className="text-slate-200 mt-3 text-lg">
+              Create comprehensive product content packages with professional
+              image processing and multilingual voice input
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
+                ✓ Multilingual Voice Input
+              </span>
+              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
+                ✓ Product Descriptions
+              </span>
+              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
+                ✓ Instagram Captions
+              </span>
+              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
+                ✓ Image Processing
+              </span>
+              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
+                ✓ Cloud Storage
+              </span>
+            </div>
+          </div>
+
+          <div className="p-8">
+            {/* Voice Integration Section */}
+            <div className="mb-8 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg">
+                    <Mic className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      🎤 Voice to Content - Multilingual
+                    </h3>
+                    <p className="text-gray-600">
+                      Speak in any language, get professional content worldwide
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
+                    className={`px-6 py-3 rounded-lg transition-all font-medium ${
+                      showVoiceRecorder
+                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg'
+                    }`}
+                    style={{
+                      minHeight: '48px',
+                      minWidth: '180px',
+                      touchAction: 'manipulation',
+                    }}
+                  >
+                    {showVoiceRecorder
+                      ? 'Hide Voice Recorder'
+                      : '🎤 Start Voice Input'}
+                  </button>
+                </div>
+              </div>
+              {/* Language Preferences - Simple and Reliable */}
+              <div className="mt-4">
+                <div className="p-4 bg-white rounded-lg border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+  🌍 Select Output Language
+  <span className="text-xs text-gray-500 block font-normal">
+    Your content will be generated in this language (speak in any language - we'll auto-detect)
+  </span>
+</label>
+                  <select
+                    value={outputLanguage}
+                    onClick={() => {
+                      console.log('🎯 DROPDOWN CLICKED!') // ← Add this test
+                    }}
+                    onChange={(e) => {
+                      const newLanguage = e.target.value
+                      console.log('🔄 Language changed to:', newLanguage)
+
+                      // Update state immediately
+                      setOutputLanguage(newLanguage)
+                      localStorage.setItem(
+                        'preferred_output_language',
+                        newLanguage
+                      )
+                      // Debug the save conditions
+                      console.log('🔍 Save conditions:', {
+                        hasUser: !!user?.id,
+                        hasSupabase: !!supabase,
+                        userId: user?.id,
+                      })
+
+                      // Save to database
+                      if (user?.id && supabase) {
+                        console.log('💾 Starting database save...')
+
+                        // First, try to update existing record
+                        supabase
+                          .from('user_language_preferences')
+                          .update({
+                            preferred_output_language: newLanguage,
+                            updated_at: new Date().toISOString(),
+                          })
+                          .eq('user_id', user.id)
+                          .then(
+                            async ({
+                              error: updateError,
+                              count,
+                            }: {
+                              error: any
+                              count: any
+                            }) => {
+                              console.log('🔄 Update result:', {
+                                updateError,
+                                count,
+                              })
+
+                              if (updateError || count === 0) {
+                                // If update failed or no rows affected, insert new record
+                                console.log(
+                                  '🔄 Update failed, trying insert...'
+                                )
+
+                                const { error: insertError } = await supabase
+                                  .from('user_language_preferences')
+                                  .insert({
+                                    user_id: user.id,
+                                    preferred_input_language: 'auto',
+                                    preferred_output_language: newLanguage,
+                                    platform_language_map: {
+                                      etsy: 'en',
+                                      amazon: 'en',
+                                      shopify: 'en',
+                                      'amazon-es': 'es',
+                                      'amazon-fr': 'fr',
+                                    },
+                                    created_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString(),
+                                  })
+
+                                if (insertError) {
+                                  console.error(
+                                    '❌ Insert failed:',
+                                    insertError
+                                  )
+                                  addNotification(
+                                    'Language set locally only',
+                                    'info'
+                                  )
+                                } else {
+                                  console.log('✅ New language record created!')
+                                  addNotification(
+                                    `✅ Default language saved as ${SUPPORTED_LANGUAGES[newLanguage]?.name}`,
+                                    'success'
+                                  )
+                                }
+                              } else {
+                                console.log(
+                                  '✅ Language preference updated in database!'
+                                )
+                                addNotification(
+                                  `✅ Default language saved as ${SUPPORTED_LANGUAGES[newLanguage]?.name}`,
+                                  'success'
+                                )
+                              }
+                            }
+                          )
+                      } else {
+                        console.log('❌ Cannot save - missing user or supabase')
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500"
+                    style={{
+                      backgroundColor: 'white',
+                      border: '3px solid red',
+                    }}
+                  >
+                    {Object.entries(SUPPORTED_LANGUAGES).map(([code, lang]) => (
+                      <option key={code} value={code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="text-sm text-blue-800">
+                      <strong>How it works:</strong> Speak in any language (we
+                      auto-detect), but all generated content will be in{' '}
+                      <span className="font-semibold">
+                        {SUPPORTED_LANGUAGES[outputLanguage]?.name ||
+                          outputLanguage.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Image Upload Section */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Product Images - Professional Processing & Storage
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <label className="flex items-center space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={imageProcessingEnabled}
-                        onChange={(e) =>
-                          setImageProcessingEnabled(e.target.checked)
+              {/* Voice Recorder - Only show when toggled */}
+              {showVoiceRecorder && (
+                <div className="mt-4">
+                  {supabase ? (
+                    <MultilingualVoiceRecorder
+                      key={`voice-recorder-${voiceRecorderKey}`}
+                      supabase={supabase}
+                      onContentGenerated={async (result) => {
+                        console.log('🎤 Voice content received:', result)
+                        await updateFormWithVoiceContent(result)
+                        // Update usage statistics
+                        if (result.detectedLanguage && result.targetLanguage) {
+                          await updateUsageStats(
+                            result.detectedLanguage,
+                            result.targetLanguage,
+                            result.wasTranslated || false,
+                            platform
+                          )
                         }
-                        className="rounded border-gray-300"
-                      />
-                      <span className="text-gray-600">
-                        Auto Background Removal
-                      </span>
-                    </label>
-                  </div>
+                      }}
+                      onTranscriptionComplete={setTranscription}
+                      onProcessingChange={(isProcessing) => {
+                        console.log(
+                          '🎤 Processing state changed:',
+                          isProcessing
+                        )
+                      }}
+                    />
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded-lg animate-pulse">
+                      <div className="h-32 bg-gray-200 rounded"></div>
+                    </div>
+                  )}
                 </div>
-
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-slate-400 transition-colors">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="image-upload"
-                    disabled={processedImages.length >= 5}
-                  />
-                  <label
-                    htmlFor="image-upload"
-                    className={`cursor-pointer ${
-                      processedImages.length >= 5
-                        ? 'cursor-not-allowed opacity-50'
-                        : ''
-                    }`}
-                  >
-                    <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">
-                      {processedImages.length >= 5
-                        ? 'Maximum 5 images reached'
-                        : 'Upload product images for professional processing'}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-2">
-                      PNG, JPG, JPEG up to 10MB each
-                    </p>
+              )}
+              {/* ADD THIS NEW SECTION - Transcription Display */}
+              {transcription && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    🎤 Original Voice Transcription
                   </label>
+                  <div className="text-gray-900 whitespace-pre-wrap">
+                    {transcription}
+                  </div>
+                  {isVoiceContentAvailable && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      ✅ Translated to {outputLanguage.toUpperCase()} and filled
+                      in the form fields below
+                    </p>
+                  )}
+                </div>
+              )}
+              {/* Voice Status */}
+              {isVoiceContentAvailable && (
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-green-800 font-medium">
+                      ✅ Voice content generated and ready!
+                    </span>
+                  </div>
+                  <p className="text-green-700 text-sm mt-1">
+                    Product name and content have been filled. You can now add
+                    images and finalize.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Input Section */}
+              <div className="space-y-6">
+                <div>
+                  <label
+                    htmlFor="productName"
+                    className="block text-sm font-semibold text-gray-700 mb-3"
+                  >
+                    Product Name
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="text"
+                    id="productName"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    placeholder={
+                      isVoiceContentAvailable
+                        ? 'Filled by voice input'
+                        : 'e.g., Wireless Bluetooth Headphones'
+                    }
+                    className={`w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-slate-100 focus:border-slate-500 transition-all duration-200 text-gray-900 placeholder-gray-500 ${
+                      isVoiceContentAvailable
+                        ? 'bg-green-50 border-green-300'
+                        : 'border-gray-200'
+                    }`}
+                  />
+                  {isVoiceContentAvailable && (
+                    <p className="text-green-600 text-sm mt-1">
+                      ✅ Filled by voice input
+                    </p>
+                  )}
                 </div>
 
-                {/* Complete Image Processing Display */}
-                {processedImages.length > 0 && (
-                  <div className="mt-6 space-y-4">
-                    {processedImages.map((image, index) => (
-                      <div
-                        key={index}
-                        className="bg-gray-50 rounded-xl p-4 border border-gray-200"
-                      >
-                        {/* Header with controls */}
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-gray-900">
-                            Image {index + 1}
-                            {image.isProcessing && (
-                              <span className="ml-2 text-sm text-blue-600">
-                                Processing...
-                              </span>
-                            )}
-                            {image.error && (
-                              <span className="ml-2 text-sm text-red-600">
-                                Error
-                              </span>
-                            )}
-                            {image.isStored && (
-                              <span className="ml-2 text-sm text-green-600">
-                                ✓ Saved
-                              </span>
-                            )}
-                          </h4>
-                          <div className="flex space-x-2">
-                            {!image.isProcessing && (
-                              <>
-                                <button
-                                  onClick={() => reprocessImage(index)}
-                                  className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-                                  title="Reprocess image"
-                                >
-                                  <RefreshCw className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    setShowBeforeAfter(
-                                      showBeforeAfter === index ? null : index
-                                    )
-                                  }
-                                  className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-                                  title="Toggle before/after view"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => removeImage(index)}
-                                  className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                                  title="Remove image"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </>
-                            )}
-                          </div>
+                <div>
+                  <label
+                    htmlFor="features"
+                    className="block text-sm font-semibold text-gray-700 mb-3"
+                  >
+                    Key Features & Benefits
+                  </label>
+                  <textarea
+                    id="features"
+                    value={features}
+                    onChange={(e) => setFeatures(e.target.value)}
+                    placeholder={
+                      isVoiceContentAvailable
+                        ? 'Enhanced from voice input'
+                        : 'e.g., Noise cancelling, 20-hour battery life, premium leather padding...'
+                    }
+                    rows={5}
+                    className={`w-full px-4 py-4 border-2 rounded-xl focus:ring-4 focus:ring-slate-100 focus:border-slate-500 transition-all duration-200 resize-none text-gray-900 placeholder-gray-500 ${
+                      isVoiceContentAvailable
+                        ? 'bg-green-50 border-green-300'
+                        : 'border-gray-200'
+                    }`}
+                  />
+                </div>
+
+                {/* 🚀 NEW: Content Section Selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      📝 Content Sections to Generate
+                    </label>
+                    <button
+                      onClick={() =>
+                        setShowContentSections(!showContentSections)
+                      }
+                      className="flex items-center space-x-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span>{showContentSections ? 'Hide' : 'Customize'}</span>
+                    </button>
+                  </div>
+
+                  {/* Quick Summary */}
+                  <div className="mb-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                          <FileText className="h-4 w-4 text-white" />
                         </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">
+                            {getSelectedSectionCount() === 6
+                              ? 'Complete Content Package'
+                              : `${getSelectedSectionCount()} Content Sections`}
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {getSelectedSectionCount() === 6
+                              ? 'All sections selected - full package generation'
+                              : `Generating ${getSelectedSectionCount()} of 6 available sections`}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={toggleAllSections}
+                        className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                      >
+                        {Object.values(selectedSections).every(Boolean)
+                          ? 'Deselect All'
+                          : 'Select All'}
+                      </button>
+                    </div>
+                  </div>
 
-                        {/* Error Display */}
-                        {image.error && (
-                          <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <p className="text-red-600 text-sm">
-                              ❌ {image.error}
-                            </p>
-                          </div>
-                        )}
+                  {/* Expandable Content Sections */}
+                  {showContentSections && (
+                    <div className="space-y-3 bg-white rounded-xl border border-gray-200 p-6">
+                      <h5 className="font-semibold text-gray-900 mb-4">
+                        Choose what to generate:
+                      </h5>
 
-                        {/* Processing State */}
-                        {image.isProcessing && (
-                          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                              <p className="text-blue-600 text-sm">
-                                Processing image...
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Image Preview */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Original Image */}
-                          <div>
-                            <h5 className="text-sm font-medium text-gray-700 mb-2">
-                              Original
-                            </h5>
-                            <div className="relative group">
-                              <img
-                                src={image.originalPreview}
-                                alt={`Original ${index + 1}`}
-                                className="w-full h-48 object-cover rounded-lg border border-gray-200"
-                              />
-                              <div className="absolute top-2 left-2">
-                                <span className="bg-black/70 text-white px-2 py-1 rounded text-xs">
-                                  Original
-                                </span>
+                      {[
+                        {
+                          key: 'title' as keyof ContentSections,
+                          label: 'Product Title/Headline',
+                          description: 'SEO-optimized main title',
+                          icon: Target,
+                          color: 'from-blue-500 to-blue-600',
+                        },
+                        {
+                          key: 'sellingPoints' as keyof ContentSections,
+                          label: 'Key Selling Points',
+                          description:
+                            '5-7 bullet points highlighting benefits',
+                          icon: Sparkles,
+                          color: 'from-green-500 to-green-600',
+                        },
+                        {
+                          key: 'description' as keyof ContentSections,
+                          label: 'Detailed Product Description',
+                          description:
+                            'Comprehensive description with benefits',
+                          icon: FileText,
+                          color: 'from-purple-500 to-purple-600',
+                        },
+                        {
+                          key: 'instagramCaption' as keyof ContentSections,
+                          label: 'Instagram Caption',
+                          description: 'Social media caption with hashtags',
+                          icon: Share2,
+                          color: 'from-pink-500 to-pink-600',
+                        },
+                        {
+                          key: 'blogIntro' as keyof ContentSections,
+                          label: 'Blog Introduction',
+                          description: 'Compelling blog post introduction',
+                          icon: MessageSquare,
+                          color: 'from-orange-500 to-orange-600',
+                        },
+                        {
+                          key: 'callToAction' as keyof ContentSections,
+                          label: 'Call-to-Action',
+                          description: 'Platform-specific conversion focus',
+                          icon: Target,
+                          color: 'from-red-500 to-red-600',
+                        },
+                      ].map((section) => {
+                        const Icon = section.icon
+                        return (
+                          <div
+                            key={section.key}
+                            className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3 flex-1">
+                              <div
+                                className={`w-8 h-8 bg-gradient-to-r ${section.color} rounded-lg flex items-center justify-center`}
+                              >
+                                <Icon className="h-4 w-4 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">
+                                  {section.label}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {section.description}
+                                </div>
                               </div>
                             </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedSections[section.key]}
+                                onChange={() => toggleSection(section.key)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                          </div>
+                        )
+                      })}
+
+                      {getSelectedSectionCount() === 0 && (
+                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <p className="text-amber-800 text-sm">
+                            ⚠️ Please select at least one content section to
+                            generate.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Image Upload Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Product Images - Professional Processing & Storage
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <label className="flex items-center space-x-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={imageProcessingEnabled}
+                          onChange={(e) =>
+                            setImageProcessingEnabled(e.target.checked)
+                          }
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-gray-600">
+                          Auto Background Removal
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-slate-400 transition-colors">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="image-upload"
+                      disabled={processedImages.length >= 5}
+                    />
+                    <label
+                      htmlFor="image-upload"
+                      className={`cursor-pointer ${
+                        processedImages.length >= 5
+                          ? 'cursor-not-allowed opacity-50'
+                          : ''
+                      }`}
+                    >
+                      <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">
+                        {processedImages.length >= 5
+                          ? 'Maximum 5 images reached'
+                          : 'Upload product images for professional processing'}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        PNG, JPG, JPEG up to 10MB each
+                      </p>
+                    </label>
+                  </div>
+
+                  {/* Complete Image Processing Display */}
+                  {processedImages.length > 0 && (
+                    <div className="mt-6 space-y-4">
+                      {processedImages.map((image, index) => (
+                        <div
+                          key={index}
+                          className="bg-gray-50 rounded-xl p-4 border border-gray-200"
+                        >
+                          {/* Header with controls */}
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium text-gray-900">
+                              Image {index + 1}
+                              {image.isProcessing && (
+                                <span className="ml-2 text-sm text-blue-600">
+                                  Processing...
+                                </span>
+                              )}
+                              {image.error && (
+                                <span className="ml-2 text-sm text-red-600">
+                                  Error
+                                </span>
+                              )}
+                              {image.isStored && (
+                                <span className="ml-2 text-sm text-green-600">
+                                  ✓ Saved
+                                </span>
+                              )}
+                            </h4>
+                            <div className="flex space-x-2">
+                              {!image.isProcessing && (
+                                <>
+                                  <button
+                                    onClick={() => reprocessImage(index)}
+                                    className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                                    title="Reprocess image"
+                                  >
+                                    <RefreshCw className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      setShowBeforeAfter(
+                                        showBeforeAfter === index ? null : index
+                                      )
+                                    }
+                                    className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                                    title="Toggle before/after view"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => removeImage(index)}
+                                    className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                    title="Remove image"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Processed Image */}
-                          {image.processedPreview && !image.isProcessing && (
+                          {/* Error Display */}
+                          {image.error && (
+                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <p className="text-red-600 text-sm">
+                                ❌ {image.error}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Processing State */}
+                          {image.isProcessing && (
+                            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                <p className="text-blue-600 text-sm">
+                                  Processing image...
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Image Preview */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Original Image */}
                             <div>
                               <h5 className="text-sm font-medium text-gray-700 mb-2">
-                                Processed{' '}
-                                {imageProcessingEnabled
-                                  ? '(Background Removed)'
-                                  : ''}
+                                Original
                               </h5>
                               <div className="relative group">
                                 <img
-                                  src={image.processedPreview}
-                                  alt={`Processed ${index + 1}`}
-                                  className="w-full h-48 object-cover rounded-lg border border-gray-200 bg-white"
-                                  style={{ backgroundColor: '#f9fafb' }}
+                                  src={image.originalPreview}
+                                  alt={`Original ${index + 1}`}
+                                  className="w-full h-48 object-cover rounded-lg border border-gray-200"
                                 />
                                 <div className="absolute top-2 left-2">
-                                  <span className="bg-green-600 text-white px-2 py-1 rounded text-xs">
-                                    ✓ Processed
+                                  <span className="bg-black/70 text-white px-2 py-1 rounded text-xs">
+                                    Original
                                   </span>
                                 </div>
                               </div>
                             </div>
+
+                            {/* Processed Image */}
+                            {image.processedPreview && !image.isProcessing && (
+                              <div>
+                                <h5 className="text-sm font-medium text-gray-700 mb-2">
+                                  Processed{' '}
+                                  {imageProcessingEnabled
+                                    ? '(Background Removed)'
+                                    : ''}
+                                </h5>
+                                <div className="relative group">
+                                  <img
+                                    src={image.processedPreview}
+                                    alt={`Processed ${index + 1}`}
+                                    className="w-full h-48 object-cover rounded-lg border border-gray-200 bg-white"
+                                    style={{ backgroundColor: '#f9fafb' }}
+                                  />
+                                  <div className="absolute top-2 left-2">
+                                    <span className="bg-green-600 text-white px-2 py-1 rounded text-xs">
+                                      ✓ Processed
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Platform Optimized Versions */}
+                          {image.platforms.amazon && !image.isProcessing && (
+                            <div className="mt-4">
+                              <h5 className="text-sm font-medium text-gray-700 mb-3">
+                                Platform-Optimized Versions
+                              </h5>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {Object.entries(image.platforms).map(
+                                  ([platformName, imageUrl]) => {
+                                    if (!imageUrl) return null
+
+                                    const platformConfig = platforms.find(
+                                      (p) => p.value === platformName
+                                    )
+                                    const platformLabel =
+                                      platformConfig?.label || platformName
+                                    const platformSize =
+                                      platformConfig?.imageSize || ''
+
+                                    return (
+                                      <div
+                                        key={platformName}
+                                        className="text-center"
+                                      >
+                                        <div className="relative group">
+                                          <img
+                                            src={imageUrl}
+                                            alt={`${platformName} optimized`}
+                                            className="w-full h-24 object-cover rounded-lg border border-gray-200 bg-white"
+                                          />
+                                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg"></div>
+                                          <div className="absolute bottom-1 left-1 right-1">
+                                            <span className="bg-black/70 text-white px-1 py-0.5 rounded text-xs block text-center">
+                                              {platformLabel}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                          {platformSize}
+                                        </p>
+                                        <button
+                                          onClick={() =>
+                                            downloadProcessedImage(
+                                              image,
+                                              platformName as keyof ProcessedImage['platforms']
+                                            )
+                                          }
+                                          className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                        >
+                                          Download
+                                        </button>
+                                      </div>
+                                    )
+                                  }
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Storage Status */}
+                          {image.isStored && image.publicUrls && (
+                            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <span className="text-green-800 text-sm font-medium">
+                                  Images saved to your cloud storage
+                                </span>
+                              </div>
+                            </div>
                           )}
                         </div>
+                      ))}
 
-                        {/* Platform Optimized Versions */}
-                        {image.platforms.amazon && !image.isProcessing && (
-                          <div className="mt-4">
-                            <h5 className="text-sm font-medium text-gray-700 mb-3">
-                              Platform-Optimized Versions
-                            </h5>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                              {Object.entries(image.platforms).map(
-                                ([platformName, imageUrl]) => {
-                                  if (!imageUrl) return null
-
-                                  const platformConfig = platforms.find(
-                                    (p) => p.value === platformName
-                                  )
-                                  const platformLabel =
-                                    platformConfig?.label || platformName
-                                  const platformSize =
-                                    platformConfig?.imageSize || ''
-
-                                  return (
-                                    <div
-                                      key={platformName}
-                                      className="text-center"
-                                    >
-                                      <div className="relative group">
-                                        <img
-                                          src={imageUrl}
-                                          alt={`${platformName} optimized`}
-                                          className="w-full h-24 object-cover rounded-lg border border-gray-200 bg-white"
-                                        />
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg"></div>
-                                        <div className="absolute bottom-1 left-1 right-1">
-                                          <span className="bg-black/70 text-white px-1 py-0.5 rounded text-xs block text-center">
-                                            {platformLabel}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <p className="text-xs text-gray-500 mt-1">
-                                        {platformSize}
-                                      </p>
-                                      <button
-                                        onClick={() =>
-                                          downloadProcessedImage(
-                                            image,
-                                            platformName as keyof ProcessedImage['platforms']
-                                          )
-                                        }
-                                        className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
-                                      >
-                                        Download
-                                      </button>
-                                    </div>
-                                  )
-                                }
+                      {/* Bulk Actions */}
+                      {processedImages.length > 1 && (
+                        <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                          <h5 className="font-medium text-gray-900 mb-3">
+                            Bulk Actions
+                          </h5>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() =>
+                                processedImages.forEach((_, index) =>
+                                  reprocessImage(index)
+                                )
+                              }
+                              className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                              disabled={processedImages.some(
+                                (img) => img.isProcessing
                               )}
-                            </div>
-                          </div>
-                        )}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Reprocess All
+                            </button>
 
-                        {/* Storage Status */}
-                        {image.isStored && image.publicUrls && (
-                          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-green-800 text-sm font-medium">
-                                Images saved to your cloud storage
-                              </span>
-                            </div>
+                            {processedImages.some(
+                              (img) => img.platforms.amazon && !img.isStored
+                            ) && (
+                              <button
+                                onClick={() => storeImagesToSupabase()}
+                                disabled={storingImages}
+                                className="flex items-center px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                              >
+                                <Save className="h-4 w-4 mr-1" />
+                                {storingImages
+                                  ? 'Saving...'
+                                  : 'Save All Images'}
+                              </button>
+                            )}
                           </div>
-                        )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Platform Selection */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Target Platform
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {platforms.map((p) => (
+                      <div
+                        key={p.value}
+                        className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:shadow-md ${
+                          platform === p.value
+                            ? 'border-slate-500 bg-slate-50 ring-4 ring-slate-100 shadow-md'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                        onClick={() => setPlatform(p.value)}
+                      >
+                        <div className="text-center">
+                          <div className="text-lg font-medium text-gray-900">
+                            {p.label}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {p.description}
+                          </div>
+                        </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
 
-                    {/* Bulk Actions */}
-                    {processedImages.length > 1 && (
-                      <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
-                        <h5 className="font-medium text-gray-900 mb-3">
-                          Bulk Actions
-                        </h5>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() =>
-                              processedImages.forEach((_, index) =>
-                                reprocessImage(index)
-                              )
-                            }
-                            className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            disabled={processedImages.some(
-                              (img) => img.isProcessing
-                            )}
-                          >
-                            <RefreshCw className="h-4 w-4 mr-1" />
-                            Reprocess All
-                          </button>
+              {/* Output Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {getSelectedSectionCount() === 6
+                        ? 'Complete Content Package'
+                        : `Custom Content (${getSelectedSectionCount()} sections)`}
+                    </h3>
+                  </div>
+                  {generatedContent && (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={copyToClipboard}
+                        className="flex items-center px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                      >
+                        {copied ? (
+                          <CheckCircle className="mr-1 h-4 w-4" />
+                        ) : (
+                          <Copy className="mr-1 h-4 w-4" />
+                        )}
+                        {copied ? 'Copied!' : 'Copy All'}
+                      </button>
+                      <button
+                        onClick={downloadContent}
+                        className="flex items-center px-4 py-2 text-sm bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
+                      >
+                        <Download className="mr-1 h-4 w-4" />
+                        Download
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-                          {processedImages.some(
-                            (img) => img.platforms.amazon && !img.isStored
-                          ) && (
-                            <button
-                              onClick={() => storeImagesToSupabase()}
-                              disabled={storingImages}
-                              className="flex items-center px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                            >
-                              <Save className="h-4 w-4 mr-1" />
-                              {storingImages ? 'Saving...' : 'Save All Images'}
-                            </button>
+                <div className="bg-gray-50 rounded-xl p-6 border-2 border-dashed border-gray-200 h-[900px] overflow-y-auto flex flex-col">
+                  {' '}
+                  {generatedContent ? (
+                    <>
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex-shrink-0">
+                        <p className="text-sm text-blue-700">
+                          <span className="font-semibold">✏️ Tip:</span> Click
+                          anywhere in the text below to edit. Your changes save
+                          automatically.
+                        </p>
+                      </div>
+                      <textarea
+                        value={generatedContent}
+                        onChange={(e) => {
+                          setGeneratedContent(e.target.value)
+                          setAutoSaveStatus('idle') // Reset status only when user edits
+                        }}
+                        className="flex-1 w-full resize-none rounded-lg border border-gray-300 p-4 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 hover:border-indigo-300 transition-colors cursor-text"
+                        placeholder="Edit your generated content here..."
+                      />
+
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center space-x-2 text-xs text-gray-500">
+                          {autoSaveStatus === 'saving' && (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-600"></div>
+                              <span>Saving...</span>
+                            </>
+                          )}
+                          {autoSaveStatus === 'saved' && (
+                            <>
+                              <CheckCircle className="h-3 w-3 text-green-600" />
+                              <span className="text-green-600">
+                                Saved automatically
+                              </span>
+                            </>
+                          )}
+                          {autoSaveStatus === 'error' && (
+                            <>
+                              <X className="h-3 w-3 text-red-600" />
+                              <span className="text-red-600">
+                                Auto-save failed
+                              </span>
+                            </>
                           )}
                         </div>
+                        <span className="text-xs text-gray-400">
+                          💡 Tip: Click to edit • Auto-saves every 2 seconds
+                        </span>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Platform Selection */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Target Platform
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {platforms.map((p) => (
-                    <div
-                      key={p.value}
-                      className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all duration-200 hover:shadow-md ${
-                        platform === p.value
-                          ? 'border-slate-500 bg-slate-50 ring-4 ring-slate-100 shadow-md'
-                          : 'border-gray-200 hover:border-gray-300 bg-white'
-                      }`}
-                      onClick={() => setPlatform(p.value)}
-                    >
-                      <div className="text-center">
-                        <div className="text-lg font-medium text-gray-900">
-                          {p.label}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {p.description}
-                        </div>
-                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                      <Upload className="h-12 w-12 mb-4" />
+                      <p className="text-center">
+                        {loading
+                          ? `AI is creating your ${getSelectedSectionCount() === 6 ? 'complete content package' : 'custom content'}...`
+                          : `Your ${getSelectedSectionCount() === 6 ? 'complete content package' : 'custom content'} will appear here`}
+                      </p>
+                      {!loading && getSelectedSectionCount() > 0 && (
+                        <p className="text-sm text-gray-500 mt-2">
+                          Selected:{' '}
+                          {Object.entries(selectedSections)
+                            .filter(([_, selected]) => selected)
+                            .map(([key, _]) =>
+                              key
+                                .replace(/([A-Z])/g, ' $1')
+                                .replace(/^./, (str) => str.toUpperCase())
+                            )
+                            .join(', ')}
+                        </p>
+                      )}
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Output Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {getSelectedSectionCount() === 6
-                    ? 'Complete Content Package'
-                    : `Custom Content (${getSelectedSectionCount()} sections)`}
-                </h3>
-                {generatedContent && (
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={copyToClipboard}
-                      className="flex items-center px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                    >
-                      {copied ? (
-                        <CheckCircle className="mr-1 h-4 w-4" />
-                      ) : (
-                        <Copy className="mr-1 h-4 w-4" />
-                      )}
-                      {copied ? 'Copied!' : 'Copy All'}
-                    </button>
-                    <button
-                      onClick={downloadContent}
-                      className="flex items-center px-4 py-2 text-sm bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
-                    >
-                      <Download className="mr-1 h-4 w-4" />
-                      Download
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-gray-50 rounded-xl p-6 border-2 border-dashed border-gray-200 h-[650px] overflow-y-auto">
-                {generatedContent ? (
+            {/* Generate button with usage validation */}
+            <div className="mt-8 flex flex-col items-center space-y-4">
+              <button
+                onClick={handleGenerate}
+                disabled={
+                  loading ||
+                  !user ||
+                  hasGeneratedFinalContent ||
+                  (!isAdmin && !canGenerate()) ||
+                  getSelectedSectionCount() === 0
+                }
+                className={`flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
+                  loading ||
+                  !user ||
+                  hasGeneratedFinalContent ||
+                  (!isAdmin && !canGenerate()) ||
+                  getSelectedSectionCount() === 0
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-slate-600 to-gray-700 hover:from-slate-700 hover:to-gray-800 transform hover:scale-105 shadow-lg hover:shadow-xl'
+                }`}
+              >
+                {loading ? (
                   <>
-                    <textarea
-                      value={generatedContent}
-                      onChange={(e) => {
-                        setGeneratedContent(e.target.value)
-                        setAutoSaveStatus('idle') // Reset status only when user edits
-                      }}
-                      className="w-full h-[550px] resize-vertical rounded-lg border border-gray-300 p-4 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                      placeholder="Edit your generated content here..."
-                    />
-                    <div className="flex items-center mt-2 text-xs text-gray-500">
-                      {autoSaveStatus === 'saving' && <span>Saving...</span>}
-                      {autoSaveStatus === 'saved' && (
-                        <span className="text-green-600">Saved</span>
-                      )}
-                      {autoSaveStatus === 'error' && (
-                        <span className="text-red-600">Auto-save failed</span>
-                      )}
-                    </div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                    {getSelectedSectionCount() === 6
+                      ? 'Generating Complete Package...'
+                      : `Generating ${getSelectedSectionCount()} Sections...`}
+                  </>
+                ) : hasGeneratedFinalContent ? (
+                  <>
+                    <CheckCircle className="mr-3 h-5 w-5" />
+                    Content Generated! Check Dashboard
+                  </>
+                ) : !isAdmin && !canGenerate() ? (
+                  <>
+                    <AlertTriangle className="mr-3 h-5 w-5" />
+                    Monthly Limit Reached ({actualCurrentUsage}/
+                    {actualMonthlyLimit}) - Upgrade to Continue
+                  </>
+                ) : getSelectedSectionCount() === 0 ? (
+                  <>
+                    <AlertTriangle className="mr-3 h-5 w-5" />
+                    Select Content Sections First
                   </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-gray-400">
-                    <Upload className="h-12 w-12 mb-4" />
-                    <p className="text-center">
-                      {loading
-                        ? `AI is creating your ${getSelectedSectionCount() === 6 ? 'complete content package' : 'custom content'}...`
-                        : `Your ${getSelectedSectionCount() === 6 ? 'complete content package' : 'custom content'} will appear here`}
-                    </p>
-                    {!loading && getSelectedSectionCount() > 0 && (
-                      <p className="text-sm text-gray-500 mt-2">
-                        Selected:{' '}
-                        {Object.entries(selectedSections)
-                          .filter(([_, selected]) => selected)
-                          .map(([key, _]) =>
-                            key
-                              .replace(/([A-Z])/g, ' $1')
-                              .replace(/^./, (str) => str.toUpperCase())
-                          )
-                          .join(', ')}
-                      </p>
+                  <>
+                    <Wand2 className="mr-3 h-5 w-5" />
+                    {getSelectedSectionCount() === 6
+                      ? 'Generate Complete Content Package'
+                      : `Generate ${getSelectedSectionCount()} Content Sections`}
+                    {isVoiceContentAvailable && (
+                      <span className="text-xs ml-2">
+                        (with Voice + Images)
+                      </span>
                     )}
-                  </div>
+                  </>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Generate button with usage validation */}
-          <div className="mt-8 flex flex-col items-center space-y-4">
-            <button
-              onClick={handleGenerate}
-              disabled={
-                loading ||
-                !user ||
-                hasGeneratedFinalContent ||
-                (!isAdmin && !canGenerate()) ||
-                getSelectedSectionCount() === 0
-              }
-              className={`flex items-center justify-center px-8 py-4 rounded-xl font-semibold text-white transition-all duration-200 ${
-                loading ||
-                !user ||
-                hasGeneratedFinalContent ||
-                (!isAdmin && !canGenerate()) ||
-                getSelectedSectionCount() === 0
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-slate-600 to-gray-700 hover:from-slate-700 hover:to-gray-800 transform hover:scale-105 shadow-lg hover:shadow-xl'
-              }`}
-            >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                  {getSelectedSectionCount() === 6
-                    ? 'Generating Complete Package...'
-                    : `Generating ${getSelectedSectionCount()} Sections...`}
-                </>
-              ) : hasGeneratedFinalContent ? (
-                <>
-                  <CheckCircle className="mr-3 h-5 w-5" />
-                  Content Generated! Check Dashboard
-                </>
-              ) : !isAdmin && !canGenerate() ? (
-                <>
-                  <AlertTriangle className="mr-3 h-5 w-5" />
-                  Monthly Limit Reached ({actualCurrentUsage}/
-                  {actualMonthlyLimit}) - Upgrade to Continue
-                </>
-              ) : getSelectedSectionCount() === 0 ? (
-                <>
-                  <AlertTriangle className="mr-3 h-5 w-5" />
-                  Select Content Sections First
-                </>
-              ) : (
-                <>
-                  <Wand2 className="mr-3 h-5 w-5" />
-                  {getSelectedSectionCount() === 6
-                    ? 'Generate Complete Content Package'
-                    : `Generate ${getSelectedSectionCount()} Content Sections`}
-                  {isVoiceContentAvailable && (
-                    <span className="text-xs ml-2">(with Voice + Images)</span>
-                  )}
-                </>
-              )}
-            </button>
-
-            {/* Usage status display */}
-            {!isAdmin && (
-              <div className="text-center">
-                <p className="text-sm text-gray-600">
-                  {actualCurrentUsage}/{actualMonthlyLimit} generations used
-                  this month
-                </p>
-                {remainingGenerations <= 3 && remainingGenerations > 0 && (
-                  <p className="text-xs text-orange-600 mt-1">
-                    Only {remainingGenerations} generations remaining
-                  </p>
-                )}
-              </div>
-            )}
-
-            {hasGeneratedFinalContent && (
-              <button
-                onClick={handleStartNewProduct}
-                className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-              >
-                Start New Product
               </button>
+
+              {/* Usage status display */}
+              {!isAdmin && (
+                <div className="text-center">
+                  <p className="text-sm text-gray-600">
+                    {actualCurrentUsage}/{actualMonthlyLimit} generations used
+                    this month
+                  </p>
+                  {remainingGenerations <= 3 && remainingGenerations > 0 && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      Only {remainingGenerations} generations remaining
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {hasGeneratedFinalContent && (
+                <button
+                  onClick={handleStartNewProduct}
+                  className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                >
+                  Start New Product
+                </button>
+              )}
+            </div>
+
+            {/* Marketplace Integration Section */}
+            {generatedContent && user && (
+              <div className="mt-8 space-y-6">
+                <div className="border-t border-gray-200 pt-8">
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                      🚀 Publish to Marketplaces
+                    </h2>
+                    <p className="text-gray-600">
+                      Connect your accounts and publish instantly to Amazon,
+                      Shopify, and more
+                    </p>
+                  </div>
+
+                  <MarketplaceConnections
+                    userId={user.id}
+                    onConnectionChange={(platform, connected) => {
+                      if (platform === 'amazon') {
+                        setAmazonConnected(connected)
+                      }
+                      console.log(`${platform} connection changed:`, connected)
+                    }}
+                  />
+
+                  <UnifiedPublisher
+                    productContent={{
+                      id: lastGeneratedContentId || '',
+                      product_name: productName,
+                      features: features,
+                      platform: platform,
+                      content: generatedContent,
+                    }}
+                    images={processedImages
+                      .map(
+                        (img) =>
+                          img.publicUrls?.processed?.shopify ||
+                          img.platforms?.amazon
+                      )
+                      .filter(
+                        (url): url is string =>
+                          Boolean(url) && !url.startsWith('data:')
+                      )}
+                    onPublishSuccess={handlePublishSuccess}
+                    user={user}
+                  />
+                </div>
+              </div>
             )}
           </div>
-
-          {/* Marketplace Integration Section */}
-          {generatedContent && user && (
-            <div className="mt-8 space-y-6">
-              <div className="border-t border-gray-200 pt-8">
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    🚀 Publish to Marketplaces
-                  </h2>
-                  <p className="text-gray-600">
-                    Connect your accounts and publish instantly to Amazon,
-                    Shopify, and more
-                  </p>
-                </div>
-
-                <MarketplaceConnections
-                  userId={user.id}
-                  onConnectionChange={(platform, connected) => {
-                    if (platform === 'amazon') {
-                      setAmazonConnected(connected)
-                    }
-                    console.log(`${platform} connection changed:`, connected)
-                  }}
-                />
-
-                <UnifiedPublisher
-                  productContent={{
-                    id: lastGeneratedContentId || '',
-                    product_name: productName,
-                    features: features,
-                    platform: platform,
-                    content: generatedContent,
-                  }}
-                  images={processedImages
-                    .map(
-                      (img) =>
-                        img.publicUrls?.processed?.shopify ||
-                        img.platforms?.amazon
-                    )
-                    .filter(
-                      (url): url is string =>
-                        Boolean(url) && !url.startsWith('data:')
-                    )}
-                  onPublishSuccess={handlePublishSuccess}
-                  user={user}
-                />
-              </div>
-            </div>
-          )}
         </div>
       </div>
-    </div>
+    </ProductFormOnboarding>
   )
 }

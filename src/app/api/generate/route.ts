@@ -3,6 +3,8 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getServerStripe } from '@/lib/supabase'
 import OpenAI from 'openai'
+import { normalizeLanguageCode } from '@/utils/languageDetection'
+import { SUPPORTED_LANGUAGES } from '@/config/languages'
 
 // 🚀 OPTIMIZED: Enhanced OpenAI configuration for better performance and reliability
 const openai = new OpenAI({
@@ -75,6 +77,13 @@ export async function POST(req: NextRequest) {
       // 🚀 NEW: Content section selection
       selectedSections,
     } = requestBody
+
+    // ADD HERE - Language parameters
+    const targetLanguage = requestBody.targetLanguage || 'en'
+    const sourceLanguage = requestBody.sourceLanguage || 'auto'
+
+    // Validate and normalize language codes
+    const normalizedTargetLang = normalizeLanguageCode(targetLanguage) || 'en'
 
     console.log('1. Request data:', {
       productName,
@@ -248,7 +257,8 @@ export async function POST(req: NextRequest) {
         hasImages,
         hasProcessedImages,
         voiceTranscription,
-        existingContent
+        existingContent,
+        normalizedTargetLang
       )
 
       const isVoiceEnhancement = !!existingContent && !!voiceTranscription
@@ -275,8 +285,16 @@ export async function POST(req: NextRequest) {
             {
               role: 'system',
               content: isVoiceEnhancement
-                ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. Create compelling, conversion-focused content efficiently.'
-                : 'You are an expert copywriter specializing in e-commerce content optimization. Create compelling, conversion-focused content efficiently.',
+                ? `You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms${
+                    normalizedTargetLang !== 'en'
+                      ? ` in ${SUPPORTED_LANGUAGES[normalizedTargetLang]?.name || normalizedTargetLang}`
+                      : ''
+                  }. Create compelling, conversion-focused content efficiently.`
+                : `You are an expert copywriter specializing in e-commerce content optimization${
+                    normalizedTargetLang !== 'en'
+                      ? ` in ${SUPPORTED_LANGUAGES[normalizedTargetLang]?.name || normalizedTargetLang}`
+                      : ''
+                  }. Create compelling, conversion-focused content efficiently.`,
             },
             {
               role: 'user',
@@ -367,6 +385,16 @@ export async function POST(req: NextRequest) {
             sectionsCount: selectedSectionCount,
             isFullPackage: selectedSectionCount === 6,
           },
+          // ADD THESE LANGUAGE FIELDS:
+          language: normalizedTargetLang,
+          wasMultilingual: normalizedTargetLang !== 'en',
+          languageInfo: {
+            source: sourceLanguage,
+            target: normalizedTargetLang,
+            languageName:
+              SUPPORTED_LANGUAGES[normalizedTargetLang]?.name ||
+              normalizedTargetLang,
+          },
           jobInfo: {
             isBackgroundJob: !!isBackgroundJob,
             processedBy: 'background-processor',
@@ -415,6 +443,15 @@ export async function POST(req: NextRequest) {
             selectedSections: contentSections,
             sectionsCount: selectedSectionCount,
             isFullPackage: selectedSectionCount === 6,
+          },
+          language: normalizedTargetLang,
+          wasMultilingual: normalizedTargetLang !== 'en',
+          languageInfo: {
+            source: sourceLanguage,
+            target: normalizedTargetLang,
+            languageName:
+              SUPPORTED_LANGUAGES[normalizedTargetLang]?.name ||
+              normalizedTargetLang,
           },
           jobInfo: {
             isBackgroundJob: !!isBackgroundJob,
@@ -505,7 +542,8 @@ export async function POST(req: NextRequest) {
       hasImages,
       hasProcessedImages,
       voiceTranscription,
-      existingContent
+      existingContent,
+      normalizedTargetLang
     )
 
     const isVoiceEnhancement = !!existingContent && !!voiceTranscription
@@ -534,8 +572,16 @@ export async function POST(req: NextRequest) {
           {
             role: 'system',
             content: isVoiceEnhancement
-              ? 'You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms. Create compelling, conversion-focused content efficiently.'
-              : 'You are an expert copywriter specializing in e-commerce content optimization. Create compelling, conversion-focused content efficiently.',
+              ? `You are an expert copywriter specializing in enhancing voice-generated content for e-commerce platforms${
+                  normalizedTargetLang !== 'en'
+                    ? ` in ${SUPPORTED_LANGUAGES[normalizedTargetLang]?.name || normalizedTargetLang}`
+                    : ''
+                }. Create compelling, conversion-focused content efficiently.`
+              : `You are an expert copywriter specializing in e-commerce content optimization${
+                  normalizedTargetLang !== 'en'
+                    ? ` in ${SUPPORTED_LANGUAGES[normalizedTargetLang]?.name || normalizedTargetLang}`
+                    : ''
+                }. Create compelling, conversion-focused content efficiently.`,
           },
           {
             role: 'user',
@@ -655,6 +701,16 @@ export async function POST(req: NextRequest) {
         isFullPackage: selectedSectionCount === 6,
         tokensUsed: maxTokens,
       },
+      // ADD THESE LANGUAGE FIELDS:
+      language: normalizedTargetLang,
+      wasMultilingual: normalizedTargetLang !== 'en',
+      languageInfo: {
+        source: sourceLanguage,
+        target: normalizedTargetLang,
+        languageName:
+          SUPPORTED_LANGUAGES[normalizedTargetLang]?.name ||
+          normalizedTargetLang,
+      },
       jobInfo: {
         isBackgroundJob: !!isBackgroundJob,
         processedBy: isBackgroundJob ? 'background-processor' : 'user-request',
@@ -714,7 +770,8 @@ function createPrompt(
   hasImages?: boolean,
   hasProcessedImages?: boolean,
   voiceTranscription?: string,
-  existingContent?: string
+  existingContent?: string,
+  targetLanguage?: string
 ): string {
   const platformInstructions = {
     amazon: {
@@ -792,7 +849,11 @@ ${existingContent}
 
 === PRODUCT DETAILS ===
 Product Name: ${productName}
-Key Features: ${features}`
+Key Features: ${features}${
+      targetLanguage && targetLanguage !== 'en'
+        ? `\n\n🌍 IMPORTANT: Generate ALL enhanced content in ${SUPPORTED_LANGUAGES[targetLanguage]?.name || targetLanguage}. Every section must be written in this language.`
+        : ''
+    }`
 
     if (hasImages && imageAnalysis) {
       prompt += `
@@ -882,7 +943,11 @@ ${
   let prompt = `Create content for the following product:
 
 Product Name: ${productName}
-Key Features: ${features}`
+Key Features: ${features}${
+    targetLanguage && targetLanguage !== 'en'
+      ? `\n\n🌍 IMPORTANT: Generate ALL content in ${SUPPORTED_LANGUAGES[targetLanguage]?.name || targetLanguage}. Every section must be written in this language.`
+      : ''
+  }`
 
   if (voiceTranscription && !existingContent) {
     prompt += `

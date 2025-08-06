@@ -6,6 +6,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Mic, Square, Play, Pause, RotateCcw, Loader2 } from 'lucide-react'
+import { useLanguage } from '@/contexts/LanguageContext'
+import { useVoiceLanguageIntent } from '@/hooks/useVoiceLanguageIntent'
+import {
+  detectLanguageIntent,
+  extractProductInfoWithoutLanguageInstructions,
+} from '@/utils/languageDetection'
 
 interface VoiceResult {
   transcription: string
@@ -15,6 +21,9 @@ interface VoiceResult {
   confidence?: number
   productName?: string
   generatedContent?: string
+  // ADD THESE:
+  intentLanguage?: string | null
+  voiceIntent?: any
 }
 
 interface MultilingualVoiceRecorderProps {
@@ -62,6 +71,9 @@ export default function MultilingualVoiceRecorder({
   // 🔧 FIX 1: Add processing timeout and component mount tracking
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const componentMountedRef = useRef(true)
+  const { outputLanguage, setOutputLanguage } = useLanguage()
+  const { detectIntent, intent, applyIntent, getCleanText } =
+    useVoiceLanguageIntent()
 
   // 🔧 FIX 2: Enhanced cleanup function (CRITICAL)
   // 🔧 ENHANCED: Better performCleanup function
@@ -434,8 +446,8 @@ export default function MultilingualVoiceRecorder({
       const formData = new FormData()
       formData.append('audio', blobToProcess, `recording-${Date.now()}.webm`)
       formData.append('contentType', contentType || 'product')
-      formData.append('language', 'auto')
-      formData.append('targetLanguage', 'en')
+      formData.append('language', 'auto') // We'll use auto-detect for input
+      formData.append('targetLanguage', outputLanguage || 'en')
 
       // 🚨 EMERGENCY FIX: Replace the auth section in processVoiceToContent (VoiceRecorder.tsx)
       // This bypasses Supabase auth entirely and uses cookie-based auth
@@ -567,6 +579,8 @@ export default function MultilingualVoiceRecorder({
 
       if (result.transcription) {
         setTranscription(result.transcription)
+        // Detect language intent from transcription
+        await detectIntent(result.transcription)
         if (onTranscriptionComplete) {
           onTranscriptionComplete(result.transcription)
         }
@@ -581,6 +595,9 @@ export default function MultilingualVoiceRecorder({
         confidence: result.confidence,
         productName: result.productName,
         generatedContent: result.generatedContent,
+        // ADD THIS: Pass the intent language if detected
+        intentLanguage: intent?.requestedLanguage || null,
+        voiceIntent: intent || null,
       })
 
       console.log(
@@ -665,14 +682,14 @@ export default function MultilingualVoiceRecorder({
                   ({Math.round(detectionResult.confidence * 100)}% confidence)
                 </span>
               </div>
-              {detectionResult.wasTranslated && (
-                <div className="flex items-center space-x-2">
-                  <span className="font-medium">🔄 Status:</span>
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                    Translated to English
-                  </span>
-                </div>
-              )}
+              <div className="flex items-center space-x-2">
+                <span className="font-medium">🔄 Status:</span>
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+                  {detectionResult.wasTranslated
+                    ? `Translated to ${outputLanguage ? outputLanguage.toUpperCase() : 'ENGLISH'}`
+                    : `Transcribed in ${detectionResult.language.charAt(0).toUpperCase() + detectionResult.language.slice(1)}`}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -683,6 +700,28 @@ export default function MultilingualVoiceRecorder({
               📝 Transcription
             </h4>
             <p className="text-gray-700 italic">"{transcription}"</p>
+          </div>
+        )}
+        {/* ADD THE NEW INTENT DETECTION UI HERE (after line 619) */}
+        {intent && intent.requestedLanguage && (
+          <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 mt-4">
+            <h4 className="font-semibold text-gray-900 mb-2">
+              🎯 Language Request Detected
+            </h4>
+            <p className="text-gray-700">
+              Output will be in{' '}
+              <strong>{intent.requestedLanguage.toUpperCase()}</strong>
+              {intent.confidence < 0.8 &&
+                ' (confidence: ' + Math.round(intent.confidence * 100) + '%)'}
+            </p>
+            {intent && (
+              <button
+                onClick={applyIntent}
+                className="mt-2 text-blue-600 hover:text-blue-700 font-medium text-sm"
+              >
+                Apply this language
+              </button>
+            )}
           </div>
         )}
 

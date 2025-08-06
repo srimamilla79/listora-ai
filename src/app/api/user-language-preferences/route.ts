@@ -1,6 +1,11 @@
 // src/app/api/user-language-preferences/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import { isValidLanguageCode } from '@/config/languages'
+import {
+  validateLanguagePair,
+  validatePlatformLanguage,
+} from '@/utils/languageValidation'
 
 const supabaseAdmin = createServiceRoleClient()
 
@@ -49,8 +54,16 @@ export async function GET(request: NextRequest) {
         amazon: 'en',
         'amazon-es': 'es',
         'amazon-fr': 'fr',
+        'amazon-de': 'de',
+        'amazon-it': 'it',
+        'amazon-jp': 'ja',
+        'amazon-in': 'en',
+        ebay: 'en',
         etsy: 'en',
         shopify: 'en',
+        instagram: 'en',
+        walmart: 'en',
+        custom: 'en',
       },
       content_generation_stats: {
         total_generations: 0,
@@ -107,6 +120,54 @@ export async function POST(request: NextRequest) {
 
     console.log('💾 Updating language preferences for user:', user.id, body)
 
+    // Validate language codes
+    if (
+      preferred_input_language &&
+      !isValidLanguageCode(preferred_input_language)
+    ) {
+      return NextResponse.json(
+        { error: `Invalid input language code: ${preferred_input_language}` },
+        { status: 400 }
+      )
+    }
+
+    if (
+      preferred_output_language &&
+      !isValidLanguageCode(preferred_output_language)
+    ) {
+      return NextResponse.json(
+        { error: `Invalid output language code: ${preferred_output_language}` },
+        { status: 400 }
+      )
+    }
+
+    // Validate platform languages
+    if (platform_language_map) {
+      for (const [platform, language] of Object.entries(
+        platform_language_map
+      )) {
+        if (!isValidLanguageCode(language as string)) {
+          return NextResponse.json(
+            {
+              error: `Invalid language code for platform ${platform}: ${language}`,
+            },
+            { status: 400 }
+          )
+        }
+
+        const validation = validatePlatformLanguage(
+          platform,
+          language as string
+        )
+        if (validation.warnings.length > 0) {
+          console.warn(
+            `Platform ${platform} validation warnings:`,
+            validation.warnings
+          )
+        }
+      }
+    }
+
     // Check if preferences exist
     const { data: existing } = await supabaseAdmin
       .from('user_language_preferences')
@@ -149,8 +210,16 @@ export async function POST(request: NextRequest) {
             amazon: 'en',
             'amazon-es': 'es',
             'amazon-fr': 'fr',
+            'amazon-de': 'de',
+            'amazon-it': 'it',
+            'amazon-jp': 'ja',
+            'amazon-in': 'en',
+            ebay: 'en',
             etsy: 'en',
             shopify: 'en',
+            instagram: 'en',
+            walmart: 'en',
+            custom: 'en',
           },
         })
         .select()
@@ -218,6 +287,31 @@ export async function PUT(request: NextRequest) {
       was_translated,
       platform,
     })
+
+    // Validate language codes in usage update
+    if (detected_language && !isValidLanguageCode(detected_language)) {
+      console.warn(
+        `Invalid detected language: ${detected_language}, using 'unknown'`
+      )
+    }
+
+    if (output_language && !isValidLanguageCode(output_language)) {
+      return NextResponse.json(
+        { error: `Invalid output language code: ${output_language}` },
+        { status: 400 }
+      )
+    }
+
+    // Validate language pair if both are provided
+    if (detected_language && output_language) {
+      const validation = validateLanguagePair({
+        source: detected_language,
+        target: output_language,
+      })
+      if (validation.warnings.length > 0) {
+        console.warn('Language pair warnings:', validation.warnings)
+      }
+    }
 
     // Update usage statistics using database function
     const { error } = await supabaseAdmin.rpc('update_language_usage_stats', {

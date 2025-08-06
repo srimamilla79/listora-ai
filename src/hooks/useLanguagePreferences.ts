@@ -1,6 +1,8 @@
 // src/hooks/useLanguagePreferences.ts
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import { isValidLanguageCode, SUPPORTED_LANGUAGES } from '@/config/languages'
+import { getMarketplaceConfig } from '@/config/marketplaces'
 
 interface LanguagePreferences {
   preferred_input_language: string
@@ -66,6 +68,7 @@ export const useLanguagePreferences = () => {
       )
 
       // Set defaults if loading fails
+      // Set defaults if loading fails
       setPreferences({
         preferred_input_language: 'auto',
         preferred_output_language: 'en',
@@ -73,8 +76,16 @@ export const useLanguagePreferences = () => {
           amazon: 'en',
           'amazon-es': 'es',
           'amazon-fr': 'fr',
+          'amazon-de': 'de',
+          'amazon-it': 'it',
+          'amazon-jp': 'ja',
+          'amazon-in': 'en',
+          ebay: 'en',
           etsy: 'en',
           shopify: 'en',
+          instagram: 'en',
+          walmart: 'en',
+          custom: 'en',
         },
         content_generation_stats: {
           total_generations: 0,
@@ -92,6 +103,37 @@ export const useLanguagePreferences = () => {
   // Save preferences
   const savePreferences = async (updates: Partial<LanguagePreferences>) => {
     try {
+      // Validate language codes before saving
+      if (
+        updates.preferred_input_language &&
+        !isValidLanguageCode(updates.preferred_input_language)
+      ) {
+        throw new Error(
+          `Invalid input language code: ${updates.preferred_input_language}`
+        )
+      }
+
+      if (
+        updates.preferred_output_language &&
+        !isValidLanguageCode(updates.preferred_output_language)
+      ) {
+        throw new Error(
+          `Invalid output language code: ${updates.preferred_output_language}`
+        )
+      }
+
+      if (updates.platform_language_map) {
+        for (const [platform, language] of Object.entries(
+          updates.platform_language_map
+        )) {
+          if (!isValidLanguageCode(language)) {
+            throw new Error(
+              `Invalid language code for ${platform}: ${language}`
+            )
+          }
+        }
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -233,6 +275,40 @@ export const useLanguagePreferences = () => {
     const [input, output] = mostUsed[0].split('->')
     return { input, output }
   }
+  // Get supported languages for a platform
+  const getSupportedLanguagesForPlatform = (platform: string): string[] => {
+    const config = getMarketplaceConfig(platform)
+    if (!config) return ['en']
+
+    if (config.supportedLanguages === 'all') {
+      return Object.keys(SUPPORTED_LANGUAGES).filter((code) => code !== 'auto')
+    }
+
+    return config.supportedLanguages as string[]
+  }
+
+  // Check if a language is supported by platform
+  const isLanguageSupportedByPlatform = (
+    platform: string,
+    language: string
+  ): boolean => {
+    const supported = getSupportedLanguagesForPlatform(platform)
+    return supported.includes(language)
+  }
+
+  // Get platform-specific language or fall back to default
+  const getEffectiveLanguageForPlatform = (platform: string): string => {
+    const platformLang = getLanguageForPlatform(platform)
+
+    // Validate if the language is still supported by the platform
+    if (isLanguageSupportedByPlatform(platform, platformLang)) {
+      return platformLang
+    }
+
+    // Fall back to platform default
+    const config = getMarketplaceConfig(platform)
+    return config?.defaultLanguage || 'en'
+  }
 
   // Initialize on mount
   useEffect(() => {
@@ -250,5 +326,8 @@ export const useLanguagePreferences = () => {
     getLanguageForPlatform,
     getMostUsedLanguagePair,
     refreshPreferences: loadPreferences,
+    getSupportedLanguagesForPlatform,
+    isLanguageSupportedByPlatform,
+    getEffectiveLanguageForPlatform,
   }
 }

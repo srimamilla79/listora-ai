@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
 import OpenAI from 'openai'
+import {
+  detectLanguageIntent,
+  extractProductInfoWithoutLanguageInstructions,
+} from '@/utils/languageDetection'
+import { normalizeLanguageCode } from '@/utils/languageDetection'
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -144,9 +149,42 @@ export async function POST(request: NextRequest) {
       textLength: transcriptionResult.text.length,
       wasTranslated: transcriptionResult.wasTranslated,
     })
+    // Language intent detection with error handling
+    let languageIntent: {
+      requestedLanguage: string | null
+      confidence: number
+      cleanedText: string
+    } = {
+      requestedLanguage: null,
+      confidence: 0,
+      cleanedText: transcriptionResult.text,
+    }
+    let cleanedText = transcriptionResult.text
+    let extractedProductName = null
+
+    try {
+      languageIntent = await detectLanguageIntent(transcriptionResult.text)
+      console.log('Language intent detected:', languageIntent)
+
+      // Extract clean product info without language instructions
+      const extractionResult = extractProductInfoWithoutLanguageInstructions(
+        transcriptionResult.text,
+        languageIntent
+      )
+      cleanedText = extractionResult.cleanedText
+      extractedProductName = extractionResult.productName
+    } catch (error) {
+      console.error('Language detection error:', error)
+      // Continue with original transcription if language detection fails
+    }
+
+    // Use cleaned text for product name extraction if we detected language intent
+    const textForExtraction = languageIntent.requestedLanguage
+      ? cleanedText
+      : transcriptionResult.text
 
     // Extract product name (simple text parsing, no AI)
-    const productName = extractProductNameOptimized(transcriptionResult.text)
+    const productName = extractProductNameOptimized(textForExtraction)
 
     const endTime = Date.now()
     console.log(`⚡ Voice-to-form processing time: ${endTime - startTime}ms`)
@@ -155,11 +193,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       transcription: transcriptionResult.text,
-      productName,
+      productName: extractedProductName || productName,
       detectedLanguage: transcriptionResult.detectedLanguage,
       confidence: transcriptionResult.confidence,
       wasTranslated: transcriptionResult.wasTranslated,
       targetLanguage: targetLanguage,
+      intentLanguage: languageIntent.requestedLanguage,
+      cleanedTranscription: cleanedText || transcriptionResult.text,
       message: `Voice successfully processed! ${
         transcriptionResult.wasTranslated
           ? `(Translated from ${transcriptionResult.detectedLanguage} to ${targetLanguage})`
@@ -172,6 +212,7 @@ export async function POST(request: NextRequest) {
         selectedLanguage,
         targetLanguage,
         detectedLanguage: transcriptionResult.detectedLanguage,
+        intentLanguage: languageIntent.requestedLanguage,
       },
     })
   } catch (error) {

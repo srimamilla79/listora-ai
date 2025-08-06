@@ -1,4 +1,4 @@
-// src/app/(dashboard)/dashboard/page.tsx - ENHANCED WITH MODERN DESIGN
+// src/app/(dashboard)/dashboard/page.tsx - COMPLETE WITH WALMART SUPPORT
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -70,6 +70,7 @@ interface DashboardStats {
   etsy: number
   shopify: number
   instagram: number
+  walmart: number // Added Walmart
   withImages: number
 }
 
@@ -120,7 +121,7 @@ export default function EnhancedDashboardPage() {
     []
   )
 
-  // 🚀 OPTIMIZED: Memoized stats calculation
+  // 🚀 OPTIMIZED: Memoized stats calculation with Walmart
   const stats = useMemo((): DashboardStats => {
     if (products.length === 0) {
       return {
@@ -129,6 +130,7 @@ export default function EnhancedDashboardPage() {
         etsy: 0,
         shopify: 0,
         instagram: 0,
+        walmart: 0, // Added Walmart
         withImages: 0,
       }
     }
@@ -139,6 +141,7 @@ export default function EnhancedDashboardPage() {
       etsy: products.filter((p) => p.platform === 'etsy').length,
       shopify: products.filter((p) => p.platform === 'shopify').length,
       instagram: products.filter((p) => p.platform === 'instagram').length,
+      walmart: products.filter((p) => p.platform === 'walmart').length, // Added Walmart
       withImages: products.filter((p) => p.has_images).length,
     }
   }, [products])
@@ -564,16 +567,17 @@ export default function EnhancedDashboardPage() {
     setImageFilter('all')
   }, [])
 
-  // 🚀 OPTIMIZED: Memoized platform badge
+  // 🚀 OPTIMIZED: Memoized platform badge - WITH WALMART
   const getPlatformBadge = useCallback((platform: string) => {
     const badges = {
       amazon: { label: '🛒 Amazon', color: 'bg-orange-100 text-orange-800' },
       etsy: { label: '🎨 Etsy', color: 'bg-pink-100 text-pink-800' },
-      shopify: { label: '🏪 Shopify', color: 'bg-green-100 text-green-800' },
+      shopify: { label: '🛍️ Shopify', color: 'bg-green-100 text-green-800' },
       instagram: {
         label: '📱 Instagram',
         color: 'bg-purple-100 text-purple-800',
       },
+      walmart: { label: '🏪 Walmart', color: 'bg-blue-100 text-blue-800' }, // Added Walmart
     }
     return (
       badges[platform as keyof typeof badges] || {
@@ -676,8 +680,8 @@ export default function EnhancedDashboardPage() {
             </div>
           </div>
 
-          {/* Enhanced Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 lg:gap-6 mb-8">
+          {/* Enhanced Stats Cards - WITH WALMART */}
+          <div className="grid grid-cols-2 lg:grid-cols-7 gap-4 lg:gap-6 mb-8">
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-lg">
@@ -729,7 +733,7 @@ export default function EnhancedDashboardPage() {
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mr-3 shadow-lg text-2xl">
-                  🏪
+                  🛍️
                 </div>
                 <div>
                   <p className="text-xs lg:text-sm text-gray-600 font-medium">
@@ -758,6 +762,23 @@ export default function EnhancedDashboardPage() {
               </div>
             </div>
 
+            {/* WALMART STAT CARD */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center mr-3 shadow-lg text-2xl">
+                  🏪
+                </div>
+                <div>
+                  <p className="text-xs lg:text-sm text-gray-600 font-medium">
+                    Walmart
+                  </p>
+                  <p className="text-lg lg:text-2xl font-bold text-blue-600">
+                    {stats.walmart}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center mr-3 shadow-lg">
@@ -775,7 +796,7 @@ export default function EnhancedDashboardPage() {
             </div>
           </div>
 
-          {/* Enhanced Search and Filter */}
+          {/* Enhanced Search and Filter - WITH WALMART */}
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 mb-6 shadow-xl border border-white/50">
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
               <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
@@ -797,8 +818,9 @@ export default function EnhancedDashboardPage() {
                   <option value="all">All Platforms</option>
                   <option value="amazon">🛒 Amazon</option>
                   <option value="etsy">🎨 Etsy</option>
-                  <option value="shopify">🏪 Shopify</option>
+                  <option value="shopify">🛍️ Shopify</option>
                   <option value="instagram">📱 Instagram</option>
+                  <option value="walmart">🏪 Walmart</option>
                 </select>
                 <select
                   value={imageFilter}

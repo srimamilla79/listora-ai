@@ -2,35 +2,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import OpenAI from 'openai'
+import { SUPPORTED_LANGUAGES } from '@/config/languages'
+import { normalizeLanguageCode } from '@/utils/languageDetection'
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 })
-
-// 🌍 MULTILINGUAL: Supported languages with their codes and names
-const SUPPORTED_LANGUAGES = {
-  auto: { name: 'Auto-detect', code: undefined },
-  en: { name: 'English', code: 'en' },
-  es: { name: 'Spanish', code: 'es' },
-  fr: { name: 'French', code: 'fr' },
-  de: { name: 'German', code: 'de' },
-  it: { name: 'Italian', code: 'it' },
-  pt: { name: 'Portuguese', code: 'pt' },
-  ru: { name: 'Russian', code: 'ru' },
-  ja: { name: 'Japanese', code: 'ja' },
-  ko: { name: 'Korean', code: 'ko' },
-  zh: { name: 'Chinese', code: 'zh' },
-  ar: { name: 'Arabic', code: 'ar' },
-  hi: { name: 'Hindi', code: 'hi' },
-  nl: { name: 'Dutch', code: 'nl' },
-  pl: { name: 'Polish', code: 'pl' },
-  tr: { name: 'Turkish', code: 'tr' },
-  sv: { name: 'Swedish', code: 'sv' },
-  da: { name: 'Danish', code: 'da' },
-  no: { name: 'Norwegian', code: 'no' },
-  fi: { name: 'Finnish', code: 'fi' },
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +38,8 @@ export async function POST(request: NextRequest) {
       (formDataResult.get('language') as string) || 'auto'
     const targetLanguage =
       (formDataResult.get('targetLanguage') as string) || 'en'
+    // Normalize target language
+    const normalizedLang = normalizeLanguageCode(targetLanguage) || 'en'
 
     if (!audioFile) {
       return NextResponse.json(
@@ -126,6 +106,13 @@ export async function POST(request: NextRequest) {
       targetLanguage: targetLanguage,
       generatedContent,
       productName,
+      // ADD THESE:
+      language: normalizedLang,
+      languageInfo: {
+        target: normalizedLang,
+        languageName:
+          SUPPORTED_LANGUAGES[normalizedLang]?.name || normalizedLang,
+      },
       message: `Voice successfully converted to content! ${
         transcriptionResult.wasTranslated
           ? `(Translated from ${transcriptionResult.detectedLanguage} to ${targetLanguage})`
@@ -288,7 +275,11 @@ async function generateContentMultilingual(
     messages: [
       {
         role: 'system',
-        content: `You are an expert multilingual e-commerce copywriter. ${languageInstruction} ${
+        content: `You are an expert copywriter specializing in e-commerce content creation${
+          targetLanguage && targetLanguage !== 'en'
+            ? ` in ${SUPPORTED_LANGUAGES[targetLanguage]?.name || targetLanguage}`
+            : ''
+        }. Create compelling, conversion-focused content based on voice descriptions. ${
           detectedLanguage && detectedLanguage !== targetLanguage
             ? `The original input was in ${detectedLanguage} but has been translated.`
             : ''
@@ -311,10 +302,7 @@ async function generateContentMultilingual(
 
 // 🌍 HELPER: Get language name from code
 function getLanguageName(code: string): string {
-  const language = Object.entries(SUPPORTED_LANGUAGES).find(
-    ([key, value]) => key === code || value.code === code
-  )
-  return language ? language[1].name : code
+  return SUPPORTED_LANGUAGES[code]?.name || code
 }
 
 // 🌍 ENHANCED: Multilingual content prompt templates

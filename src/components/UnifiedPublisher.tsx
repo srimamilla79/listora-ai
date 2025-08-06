@@ -77,6 +77,13 @@ export default function UnifiedPublisher({
       color: 'blue',
       connected: false,
     },
+    {
+      id: 'walmart',
+      name: 'Walmart',
+      icon: '🛒',
+      color: 'darkblue',
+      connected: false,
+    },
   ])
 
   const [selectedPlatform, setSelectedPlatform] = useState<string>('')
@@ -176,9 +183,10 @@ export default function UnifiedPublisher({
       console.log('🔍 UnifiedPublisher: Running database queries...')
 
       // 🔧 SIMPLIFIED queries with longer timeouts
-      let amazonConnections = []
-      let shopifyConnections = []
-      let ebayConnections = []
+      let amazonConnections: any[] = []
+      let shopifyConnections: any[] = []
+      let ebayConnections: any[] = []
+      let walmartConnections: any[] = []
 
       // Parallel queries with 5-second timeout each
       const queryPromises = [
@@ -208,6 +216,15 @@ export default function UnifiedPublisher({
           .eq('status', 'active')
           .then((result: any) => ({ type: 'ebay', result }))
           .catch((error: any) => ({ type: 'ebay', error })),
+
+        // Walmart query
+        supabase
+          .from('walmart_connections')
+          .select('*')
+          .eq('user_id', passedUser.id)
+          .eq('status', 'active')
+          .then((result: any) => ({ type: 'walmart', result }))
+          .catch((error: any) => ({ type: 'walmart', error })),
       ]
 
       // Wait for all queries with overall timeout
@@ -250,6 +267,16 @@ export default function UnifiedPublisher({
                 )
               } else if (type === 'ebay') {
                 ebayConnections = result.data || []
+                console.log(
+                  '🔍 UnifiedPublisher: eBay data found:',
+                  ebayConnections
+                )
+              } else if (type === 'walmart') {
+                walmartConnections = result.data || []
+                console.log(
+                  '🔍 UnifiedPublisher: Walmart data found:',
+                  walmartConnections
+                )
               }
             }
           }
@@ -270,6 +297,10 @@ export default function UnifiedPublisher({
         ebayConnections.find(
           (conn: any) => conn.access_token && conn.access_token.trim() !== ''
         ) || null
+      const validWalmartConnection =
+        walmartConnections.find(
+          (conn: any) => conn.access_token && conn.access_token.trim() !== ''
+        ) || null
 
       console.log('🔍 UnifiedPublisher: Final connection status:')
       console.log(
@@ -284,6 +315,10 @@ export default function UnifiedPublisher({
         '🔍 UnifiedPublisher: Valid eBay connection:',
         !!validEbayConnection
       )
+      console.log(
+        '🔍 UnifiedPublisher: Valid Walmart connection:',
+        !!validWalmartConnection
+      )
 
       // Update platforms with connection status
       const updatedPlatforms = platforms.map((platform) => {
@@ -295,6 +330,8 @@ export default function UnifiedPublisher({
           isConnected = !!validShopifyConnection
         } else if (platform.id === 'ebay') {
           isConnected = !!validEbayConnection?.access_token
+        } else if (platform.id === 'walmart') {
+          isConnected = !!validWalmartConnection?.access_token
         }
 
         console.log(
@@ -533,8 +570,9 @@ export default function UnifiedPublisher({
       const successMessage =
         selectedPlatform === 'ebay'
           ? `✅ Successfully listed on eBay! Item ID: ${result.data?.itemId || result.data?.listingId || 'Processing'}`
-          : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.productId || result.listingId || result.id || 'Unknown'}`
-
+          : selectedPlatform === 'walmart'
+            ? `✅ Successfully submitted to Walmart! Feed ID: ${result.data?.feedId || 'Processing'}`
+            : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.productId || result.listingId || result.id || 'Unknown'}`
       setPublishSuccess(successMessage)
 
       setPublishedProducts((prev) => ({
@@ -1430,6 +1468,12 @@ export default function UnifiedPublisher({
                             } else if (selectedPlatform === 'ebay') {
                               window.open(
                                 'https://www.ebay.com/sh/ovw',
+                                '_blank'
+                              )
+                            } else if (selectedPlatform === 'walmart') {
+                              // For Walmart, open the feed status page since items process asynchronously
+                              window.open(
+                                'https://seller.walmart.com/items/uploads',
                                 '_blank'
                               )
                             }
