@@ -346,6 +346,15 @@ export async function POST(request: NextRequest) {
       userMessage = errorDetails.message
     } else if (missingFields.length > 0) {
       userMessage = `eBay requires the following information that could not be found in your product description:\n\n${missingFields.map((field) => `• ${field}`).join('\n')}\n\nPlease update your product description to include these details and try again.`
+    } else if (
+      err.message.includes('Invalid refresh token') ||
+      err.message.includes('expired refresh token')
+    ) {
+      userMessage =
+        'Your eBay connection has expired. Please reconnect your eBay account in Settings.'
+    } else if (err.message.includes('Invalid eBay credentials')) {
+      userMessage =
+        'eBay authentication failed. Please check your eBay API credentials.'
     } else if (err.message) {
       userMessage = err.message
     }
@@ -2669,22 +2678,40 @@ async function refreshTokenIfNeeded(
   const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000)
 
   if (expiresAt <= oneHourFromNow && connection.refresh_token) {
-    console.log('🔄 Refreshing eBay token...')
-    const newToken = await refreshEbayToken(connection.refresh_token)
+    console.log('🔄 Refreshing eBay token...', {
+      expiresAt: connection.expires_at,
+      connectionId: connection.id,
+      hasRefreshToken: !!connection.refresh_token,
+    })
 
-    await supabase
-      .from('ebay_connections')
-      .update({
-        access_token: newToken.access_token,
-        expires_at: new Date(
-          Date.now() + newToken.expires_in * 1000
-        ).toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', connection.id)
+    try {
+      const newToken = await refreshEbayToken(connection.refresh_token)
 
-    console.log('✅ eBay token refreshed successfully')
-    return newToken.access_token
+      await supabase
+        .from('ebay_connections')
+        .update({
+          access_token: newToken.access_token,
+          expires_at: new Date(
+            Date.now() + newToken.expires_in * 1000
+          ).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', connection.id)
+
+      console.log('✅ eBay token refreshed successfully')
+      return newToken.access_token
+    } catch (error) {
+      // If refresh fails, mark connection as needs reconnection
+      await supabase
+        .from('ebay_connections')
+        .update({
+          status: 'needs_reconnection',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', connection.id)
+
+      throw error
+    }
   }
 
   return connection.access_token
@@ -2700,21 +2727,64 @@ async function refreshEbayToken(refreshToken: string) {
     `${process.env.EBAY_APP_ID}:${process.env.EBAY_CERT_ID}`
   ).toString('base64')
 
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${credentials}`,
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: refreshToken,
-    }),
+  console.log('🔄 Attempting eBay token refresh:', {
+    environment: process.env.EBAY_ENVIRONMENT,
+    tokenUrl,
+    hasAppId: !!process.env.EBAY_APP_ID,
+    hasCertId: !!process.env.EBAY_CERT_ID,
   })
 
-  if (!response.ok) {
-    throw new Error('Failed to refresh eBay token')
-  }
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${credentials}`,
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    })
 
-  return await response.json()
+    const responseText = await response.text()
+
+    if (!response.ok) {
+      console.error('❌ eBay token refresh failed:', {
+        status: response.status,
+        error: responseText,
+        environment: process.env.EBAY_ENVIRONMENT,
+      })
+
+      // Parse eBay error response
+      let errorMessage = 'Failed to refresh eBay token'
+      try {
+        const errorData = JSON.parse(responseText)
+        if (errorData.error_description) {
+          errorMessage = errorData.error_description
+        } else if (errorData.error) {
+          errorMessage = `eBay OAuth Error: ${errorData.error}`
+        }
+      } catch (e) {
+        // Not JSON, use status-based message
+        if (response.status === 401) {
+          errorMessage = 'Invalid eBay credentials or expired refresh token'
+        } else if (response.status === 400) {
+          errorMessage =
+            'Invalid refresh token - user needs to reconnect eBay account'
+        } else {
+          errorMessage = `eBay token refresh failed: ${response.status}`
+        }
+      }
+
+      throw new Error(errorMessage)
+    }
+
+    const tokenData = JSON.parse(responseText)
+    console.log('✅ eBay token refreshed successfully')
+    return tokenData
+  } catch (error) {
+    console.error('❌ eBay token refresh error:', error)
+    throw error
+  }
 }
