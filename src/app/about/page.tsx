@@ -380,6 +380,15 @@ export default function EnhancedAboutUsPage() {
 
       {/* Enhanced Hero Section - dark background */}
       <section className="relative pt-24 pb-32 overflow-hidden">
+        {/* Dark overlays for matching home page darkness */}
+        <div className="absolute inset-0 -z-10">
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-black/50" />
+
+          {/* Gradient overlay for smooth transition */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent" />
+        </div>
+
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             {/* Multilingual Highlight - updated for dark background */}

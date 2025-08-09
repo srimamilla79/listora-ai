@@ -50,6 +50,9 @@ export default function HomePage() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [activePlatform, setActivePlatform] = useState(0)
   const [activeLanguage, setActiveLanguage] = useState(0)
+  const [showVideoModal, setShowVideoModal] = useState(false)
+  const [showFloatingButton, setShowFloatingButton] = useState(false)
+  const [isFloatingMinimized, setIsFloatingMinimized] = useState(false)
 
   // Enhanced typing effect
   const sampleContent =
@@ -57,6 +60,11 @@ export default function HomePage() {
 
   // Language examples for showcase
   const languageExamples = [
+    {
+      flag: '🇺🇸',
+      name: 'English',
+      text: 'Premium wireless headphones...',
+    },
     {
       flag: '🇪🇸',
       name: 'Spanish',
@@ -66,7 +74,6 @@ export default function HomePage() {
     { flag: '🇩🇪', name: 'German', text: 'Premium kabellose Kopfhörer...' },
     { flag: '🇮🇳', name: 'Hindi', text: 'प्रीमियम वायरलेस हेडफोन्स...' },
     { flag: '🇨🇳', name: 'Chinese', text: '高级无线耳机...' },
-    { flag: '🇯🇵', name: 'Japanese', text: 'プレミアムワイヤレスヘッドホン...' },
   ]
 
   // Platform showcase with eBay
@@ -124,6 +131,14 @@ export default function HomePage() {
       setActiveLanguage((prev) => (prev + 1) % languageExamples.length)
     }, 3000)
     return () => clearInterval(timer)
+  }, [])
+
+  // Show floating button after 5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowFloatingButton(true)
+    }, 5000)
+    return () => clearTimeout(timer)
   }, [])
 
   const features = [
@@ -746,6 +761,29 @@ export default function HomePage() {
             transform: translateX(-100%);
           }
         }
+
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
+          }
+          70% {
+            box-shadow: 0 0 0 10px rgba(79, 70, 229, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+          }
+        }
+
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
       `}</style>
       {/* Enhanced Header with Professional Typography */}
       <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
@@ -823,11 +861,44 @@ export default function HomePage() {
           </div>
         </div>
       </header>
-      {/* Enhanced Hero Section with Stripe-style Background */}
+      {/* Enhanced Hero Section with Video Background */}
       <section className="relative pt-24 pb-32 overflow-hidden">
-        {/* Hero gradient overlay */}
+        {/* Video Background */}
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-50/10 to-transparent" />
+          {/* Ambient Background Video */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          >
+            <source
+              src="https://www.youtube.com/embed/ylFBALC6vI4"
+              type="video/mp4"
+            />
+            {/* Fallback to gradient background if video fails */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `
+                  linear-gradient(180deg, 
+                    #0a2540 0%, 
+                    #0a2540 20%, 
+                    #0e2a47 40%, 
+                    #1a3a5c 60%, 
+                    #ffffff 100%
+                  )
+                `,
+              }}
+            />
+          </video>
+
+          {/* Dark overlay for text readability */}
+          <div className="absolute inset-0 bg-black/50" />
+
+          {/* Gradient overlay for smooth transition */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent" />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -842,13 +913,13 @@ export default function HomePage() {
 
             {/* Enhanced Title with Professional Typography */}
             <h1 className="text-display-title mb-8 leading-tight">
-              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                 Multilingual Content Automation Platform
               </span>
               <br />
               <span
                 className="text-section-title text-white drop-shadow-lg"
-                style={{ textShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+                style={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
               >
                 🌍 Speak in 99+ Languages → Get Professional Content
               </span>
@@ -857,25 +928,25 @@ export default function HomePage() {
             {/* Enhanced Subtitle */}
             <p
               className="text-body-comfortable text-white/90 mb-12 max-w-4xl mx-auto leading-relaxed drop-shadow-lg"
-              style={{ textShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+              style={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
             >
               The world's first AI that combines
-              <span className="font-semibold text-blue-200">
+              <span className="font-semibold text-blue-300">
                 {' '}
                 multilingual voice recognition (99+ languages)
               </span>
               , OpenAI Vision analysis, bulk CSV processing, and
-              <span className="font-semibold text-orange-200">
+              <span className="font-semibold text-orange-300">
                 {' '}
                 Amazon optimization
               </span>
               ,
-              <span className="font-semibold text-green-200">
+              <span className="font-semibold text-green-300">
                 {' '}
                 direct Shopify publishing
               </span>
               , and
-              <span className="font-semibold text-blue-200">
+              <span className="font-semibold text-blue-300">
                 {' '}
                 revolutionary eBay direct listing
               </span>
@@ -990,7 +1061,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Enhanced CTAs - Updated for dark background */}
+            {/* Enhanced CTAs with Video Background - Updated */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
               <button
                 onClick={handleSignup}
@@ -1000,15 +1071,17 @@ export default function HomePage() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </button>
               <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white px-8 py-3 rounded-lg text-form-label font-medium transition-all border border-white/30 flex items-center"
+                onClick={() => setShowVideoModal(true)}
+                className="relative bg-gradient-to-r from-indigo-600/90 to-purple-600/90 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-lg text-form-label font-medium transition-all border-2 border-white/30 flex items-center group shadow-2xl backdrop-blur-sm"
               >
-                {isPlaying ? (
-                  <Pause className="h-4 w-4 mr-2" />
-                ) : (
-                  <Play className="h-4 w-4 mr-2" />
-                )}
-                Watch Demo
+                <div className="absolute inset-0 bg-white/10 rounded-lg animate-pulse" />
+                <Play className="h-5 w-5 mr-2 relative z-10 group-hover:scale-110 transition-transform" />
+                <span className="relative z-10 font-semibold">
+                  Watch Quick Demo
+                </span>
+                <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full relative z-10">
+                  3 min
+                </span>
               </button>
             </div>
 
@@ -1367,7 +1440,7 @@ export default function HomePage() {
                       <span className="text-display-lg font-bold text-gray-900 text-3xl md:text-4xl">
                         {plan.price}
                       </span>
-                      {plan.period !== 'forever' && (
+                      {plan.period !== 'forever' && plan.period !== '' && (
                         <span className="text-body-md text-gray-500 ml-2 text-lg md:text-xl">
                           /{plan.period}
                         </span>
@@ -1564,14 +1637,101 @@ export default function HomePage() {
                   </Link>
                 </li>
               </ul>
-            </div>{' '}
-          </div>{' '}
+            </div>
+          </div>
           {/* Bottom Bar */}
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
             <p>&copy; 2025 Listora AI. All rights reserved.</p>
           </div>
-        </div>{' '}
-      </footer>{' '}
+        </div>
+      </footer>
+
+      {/* Video Modal */}
+      {showVideoModal && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowVideoModal(false)}
+        >
+          <div
+            className="relative bg-white rounded-xl p-2 max-w-4xl w-full max-h-[80vh] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowVideoModal(false)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <div className="aspect-video">
+              <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube.com/embed/ylFBALC6vI4?autoplay=1"
+                title="Listora AI Demo"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Smart Video Button */}
+      {showFloatingButton && (
+        <div
+          className={`fixed z-40 transition-all duration-300 ${
+            isFloatingMinimized ? 'bottom-4 right-4' : 'bottom-8 right-8'
+          }`}
+          style={{
+            animation: !isFloatingMinimized ? 'slideIn 0.5s ease-out' : 'none',
+          }}
+        >
+          {!isFloatingMinimized ? (
+            <div className="relative">
+              {/* Pulse animation ring */}
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{ animation: 'pulse 2s infinite' }}
+              />
+
+              {/* Main button */}
+              <button
+                onClick={() => setShowVideoModal(true)}
+                className="relative bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-full shadow-lg transition-all transform hover:scale-105 flex items-center space-x-2 group"
+              >
+                <div className="relative">
+                  <Play className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                </div>
+                <span className="font-medium">Watch Quick Demo</span>
+                <div className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                  <span>🔥 New</span>
+                </div>
+              </button>
+
+              {/* Minimize button */}
+              <button
+                onClick={() => setIsFloatingMinimized(true)}
+                className="absolute -top-2 -right-2 bg-gray-800 hover:bg-gray-700 text-white rounded-full p-1 shadow-md transition-all transform hover:scale-110"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            /* Minimized state */
+            <button
+              onClick={() => setIsFloatingMinimized(false)}
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-4 rounded-full shadow-lg transition-all transform hover:scale-110 relative group"
+            >
+              <Play className="h-6 w-6" />
+              <span className="absolute -top-8 right-0 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                Watch Demo
+              </span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
