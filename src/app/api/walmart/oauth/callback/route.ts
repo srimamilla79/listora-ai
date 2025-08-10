@@ -1,5 +1,5 @@
 // src/app/api/walmart/oauth/callback/route.ts
-// Walmart OAuth callback handler
+// ENHANCED VERSION with state validation and proper sellerId handling
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -29,11 +29,19 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const state = searchParams.get('state')
     const error = searchParams.get('error')
+    const sellerId = searchParams.get('sellerId') // Walmart provides this
+    const type = searchParams.get('type') // Should be 'auth'
+    const clientId = searchParams.get('clientId') // Walmart returns this
 
     console.log('🛒 Walmart OAuth callback received')
-    console.log('📋 Code present:', !!code)
-    console.log('🔐 State:', state)
-    console.log('❌ Error:', error)
+    console.log('📋 Parameters:', {
+      hasCode: !!code,
+      state: state,
+      sellerId: sellerId,
+      type: type,
+      clientId: clientId,
+      error: error,
+    })
 
     // Handle OAuth errors
     if (error) {
@@ -63,10 +71,39 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Validate state to prevent CSRF attacks
+    const { data: oauthState, error: stateError } = await supabase
+      .from('oauth_states')
+      .select('*')
+      .eq('state', state)
+      .eq('platform', 'walmart')
+      .eq('user_id', userId)
+      .single()
+
+    if (stateError || !oauthState) {
+      console.error('❌ Invalid or expired state:', stateError)
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/generate?error=walmart_oauth_invalid&message=Invalid or expired session`
+      )
+    }
+
+    // Check if state is expired
+    if (new Date(oauthState.expires_at) < new Date()) {
+      console.error('❌ State expired')
+      return NextResponse.redirect(
+        `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/generate?error=walmart_oauth_expired&message=Session expired, please try again`
+      )
+    }
+
+    // Delete used state
+    await supabase.from('oauth_states').delete().eq('id', oauthState.id)
+
+    console.log('✅ State validated successfully')
     console.log('👤 User ID from state:', userId)
+    console.log('🏪 Seller ID from Walmart:', sellerId)
 
     // Exchange authorization code for access token
-    const tokenResponse = await exchangeCodeForToken(code)
+    const tokenResponse = await exchangeCodeForToken(code, sellerId || '')
 
     if (!tokenResponse.access_token) {
       throw new Error('No access token received from Walmart')
@@ -75,22 +112,46 @@ export async function GET(request: NextRequest) {
     console.log('✅ Access token received from Walmart')
     console.log('⏰ Token expires in:', tokenResponse.expires_in, 'seconds')
 
-    // Get seller information using the access token
-    const sellerInfo = await getSellerInfo(tokenResponse.access_token)
+    // Get or enhance seller information
+    let sellerInfo: WalmartSellerInfo
 
-    console.log('👤 Seller info retrieved:', {
+    if (sellerId) {
+      // Use the seller ID provided by Walmart
+      sellerInfo = {
+        sellerId: sellerId,
+        sellerName: 'Walmart Seller',
+        marketplaceId: 'WALMART_US',
+        status: 'active',
+      }
+
+      // Try to get more seller details
+      try {
+        const detailedInfo = await getSellerInfo(
+          tokenResponse.access_token,
+          sellerId
+        )
+        sellerInfo = { ...sellerInfo, ...detailedInfo }
+      } catch (error) {
+        console.log('⚠️ Could not fetch detailed seller info, using basic info')
+      }
+    } else {
+      // Fallback: Get seller info from API
+      sellerInfo = await getSellerInfo(tokenResponse.access_token, '')
+    }
+
+    console.log('👤 Seller info:', {
       sellerId: sellerInfo.sellerId,
       sellerName: sellerInfo.sellerName,
       status: sellerInfo.status,
     })
 
-    // Calculate token expiration
+    // Calculate token expiration (5 minutes buffer for safety)
     const expiresAt = new Date(
-      Date.now() + tokenResponse.expires_in * 1000
+      Date.now() + (tokenResponse.expires_in - 300) * 1000
     ).toISOString()
 
-    // Save or update connection in database
-    const { data: existingConnection, error: checkError } = await supabase
+    // Check if connection already exists
+    const { data: existingConnection } = await supabase
       .from('walmart_connections')
       .select('id')
       .eq('user_id', userId)
@@ -106,6 +167,7 @@ export async function GET(request: NextRequest) {
           refresh_token: tokenResponse.refresh_token || null,
           token_expires_at: expiresAt,
           seller_info: sellerInfo,
+          seller_id: sellerInfo.sellerId, // Store seller ID separately for easy querying
           status: 'active',
           last_used_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -128,6 +190,7 @@ export async function GET(request: NextRequest) {
           refresh_token: tokenResponse.refresh_token || null,
           token_expires_at: expiresAt,
           seller_info: sellerInfo,
+          seller_id: sellerInfo.sellerId, // Store seller ID separately
           status: 'active',
           last_used_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
@@ -143,7 +206,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Redirect to success page
-    const successUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/generate?success=walmart_connected&seller=${encodeURIComponent(sellerInfo.sellerName || sellerInfo.sellerId)}`
+    const successUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/generate?success=walmart_connected&seller=${encodeURIComponent(sellerInfo.sellerName || sellerInfo.sellerId)}&sellerId=${sellerInfo.sellerId}`
 
     console.log('🎉 Walmart OAuth completed successfully')
     return NextResponse.redirect(successUrl)
@@ -160,13 +223,17 @@ export async function GET(request: NextRequest) {
 
 // Exchange authorization code for access token
 async function exchangeCodeForToken(
-  code: string
+  code: string,
+  sellerId: string
 ): Promise<WalmartTokenResponse> {
   try {
     const clientId = process.env.WALMART_CLIENT_ID!
     const clientSecret = process.env.WALMART_CLIENT_SECRET!
-    const redirectUri = process.env.WALMART_REDIRECT_URI!
+    const redirectUri =
+      process.env.WALMART_REDIRECT_URI ||
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/walmart/oauth/callback`
     const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
+    const partnerId = sellerId || process.env.WALMART_PARTNER_ID || ''
 
     // Walmart token endpoint
     const tokenUrl =
@@ -175,6 +242,7 @@ async function exchangeCodeForToken(
         : 'https://marketplace.walmartapis.com/v3/token'
 
     console.log('🔄 Exchanging code for token at:', tokenUrl)
+    console.log('🔑 Using Partner/Seller ID:', partnerId)
 
     // Basic auth credentials
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
@@ -184,9 +252,13 @@ async function exchangeCodeForToken(
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
         Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
+        'WM_PARTNER.ID': partnerId, // Use sellerId as partner ID
+        WM_MARKET: 'us', // Add market
+        'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        'WM_SVC.NAME': 'Walmart Marketplace',
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
@@ -214,9 +286,13 @@ async function exchangeCodeForToken(
 }
 
 // Get seller information from Walmart API
-async function getSellerInfo(accessToken: string): Promise<WalmartSellerInfo> {
+async function getSellerInfo(
+  accessToken: string,
+  sellerId: string
+): Promise<WalmartSellerInfo> {
   try {
     const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
+    const partnerId = sellerId || process.env.WALMART_PARTNER_ID || ''
 
     // Walmart seller info endpoint
     const sellerUrl =
@@ -231,6 +307,8 @@ async function getSellerInfo(accessToken: string): Promise<WalmartSellerInfo> {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'WM_SEC.ACCESS_TOKEN': accessToken,
+        'WM_PARTNER.ID': partnerId,
+        WM_MARKET: 'us',
         'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
         Accept: 'application/json',
       },
@@ -242,7 +320,7 @@ async function getSellerInfo(accessToken: string): Promise<WalmartSellerInfo> {
 
       // Return basic info even if seller API fails
       return {
-        sellerId: 'Unknown',
+        sellerId: sellerId || 'Unknown',
         sellerName: 'Walmart Seller',
         status: 'connected',
       }
@@ -252,7 +330,7 @@ async function getSellerInfo(accessToken: string): Promise<WalmartSellerInfo> {
     console.log('✅ Seller info retrieved successfully')
 
     return {
-      sellerId: sellerData.sellerId || sellerData.id || 'Unknown',
+      sellerId: sellerData.sellerId || sellerData.id || sellerId || 'Unknown',
       sellerName: sellerData.sellerName || sellerData.name || 'Walmart Seller',
       marketplaceId: sellerData.marketplaceId || 'WALMART_US',
       status: sellerData.status || 'connected',
@@ -262,7 +340,7 @@ async function getSellerInfo(accessToken: string): Promise<WalmartSellerInfo> {
 
     // Return basic info on error
     return {
-      sellerId: 'Unknown',
+      sellerId: sellerId || 'Unknown',
       sellerName: 'Walmart Seller',
       status: 'connected',
     }

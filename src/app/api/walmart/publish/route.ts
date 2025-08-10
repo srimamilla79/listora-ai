@@ -1,6 +1,14 @@
-// src/app/api/walmart/publish/route.ts - Fixed to save to published_products table
+// src/app/api/walmart/publish/route.ts - Updated with rate limiting and latest spec version
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
+import {
+  rateLimiter,
+  walmartApiCall,
+  validateFeedFileSize,
+} from '@/lib/walmart-rate-limiter'
+
+// Latest MP_ITEM spec version as of documentation
+const ITEM_SPEC_VERSION = '5.0.20250605-14_26_25'
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +17,19 @@ export async function POST(request: NextRequest) {
     const { productContent, images, publishingOptions, userId } =
       await request.json()
     const supabase = await createServerSideClient()
+
+    // Check rate limit ONCE at the beginning
+    const canProceed = await rateLimiter.checkRateLimit('feeds:submit:MP_ITEM')
+    if (!canProceed) {
+      const remaining = rateLimiter.getRemainingTokens('feeds:submit:MP_ITEM')
+      return NextResponse.json(
+        {
+          error: `Rate limit exceeded. ${remaining} requests remaining. Please wait before trying again.`,
+          remainingTokens: remaining,
+        },
+        { status: 429 }
+      )
+    }
 
     // Get Walmart connection
     const { data: connections, error: connectionError } = await supabase
@@ -30,16 +51,18 @@ export async function POST(request: NextRequest) {
     }
 
     const connection = connections[0]
+    const sellerId = connection.seller_id || connection.seller_info?.sellerId
     console.log('✅ Walmart connection found:', connection.id)
+    console.log('🏪 Seller ID:', sellerId)
 
-    // Check if token needs refresh
+    // Check if token needs refresh (5 minute buffer)
     const accessToken = await refreshTokenIfNeeded(connection, supabase)
     console.log('🔐 Using access token:', accessToken.substring(0, 20) + '...')
 
     // Generate SKU
     const sku = publishingOptions.sku || `LISTORA-WM-${Date.now()}`
 
-    // Create simple XML feed for item
+    // Create XML feed with latest spec version and multiple images support
     const itemXml = createItemXml({
       sku,
       title: productContent.product_name || 'Product',
@@ -48,19 +71,37 @@ export async function POST(request: NextRequest) {
         productContent.features ||
         'High quality product',
       price: parseFloat(publishingOptions.price),
-      brand: 'Generic',
-      imageUrl: images?.[0] || '',
+      brand: publishingOptions.brand || 'Generic',
+      images: images || [],
       quantity: parseInt(publishingOptions.quantity) || 1,
+      specVersion: ITEM_SPEC_VERSION,
     })
 
-    console.log('📄 Creating Walmart item via Feed API')
+    // Validate file size before submission
+    const xmlSizeBytes = new TextEncoder().encode(itemXml).length
+    if (!validateFeedFileSize('MP_ITEM', xmlSizeBytes)) {
+      return NextResponse.json(
+        {
+          error:
+            'XML file size exceeds 26MB limit. Please reduce content size.',
+        },
+        { status: 413 }
+      )
+    }
 
-    // Submit feed to Walmart
-    const feedResult = await submitWalmartFeed(itemXml, accessToken)
+    console.log('📄 Creating Walmart item via Feed API')
+    console.log(`📏 XML size: ${(xmlSizeBytes / 1024).toFixed(2)} KB`)
+
+    // Submit feed to Walmart with rate limiting
+    const feedResult = await submitWalmartFeedWithRateLimit(
+      itemXml,
+      accessToken,
+      sellerId
+    )
 
     console.log('✅ Walmart feed submitted:', feedResult.feedId)
 
-    // Save to walmart_listings table (for backward compatibility)
+    // Save to walmart_listings table
     const { data: walmartListing } = await supabase
       .from('walmart_listings')
       .insert({
@@ -80,15 +121,19 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    // IMPORTANT: Also save to the unified published_products table
+    // Generate GTIN if not already defined
+    const gtin =
+      '00' + sku.replace(/\D/g, '').padStart(12, '0').substring(0, 12)
+
+    // Save to unified published_products table
     const { data: publishedProduct, error: publishError } = await supabase
       .from('published_products')
       .insert({
         user_id: userId,
         content_id: productContent.id,
-        platform: 'walmart', // Important: set platform to 'walmart'
+        platform: 'walmart',
         platform_product_id: feedResult.feedId,
-        platform_url: null, // Will be updated once feed is processed
+        platform_url: null,
         title: productContent.product_name || 'Untitled Product',
         description: productContent.content || productContent.features || '',
         price: parseFloat(publishingOptions.price) || 0,
@@ -99,9 +144,12 @@ export async function POST(request: NextRequest) {
           feedId: feedResult.feedId,
           status: feedResult.status || 'SUBMITTED',
           walmartListingId: walmartListing?.id,
+          specVersion: ITEM_SPEC_VERSION,
+          sellerId: sellerId,
+          gtin: gtin, // ADD THIS LINE - This enables the search functionality
           ...feedResult,
         },
-        status: 'pending', // Will update to 'published' once feed is processed
+        status: 'pending',
         published_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         last_synced_at: new Date().toISOString(),
@@ -111,7 +159,6 @@ export async function POST(request: NextRequest) {
 
     if (publishError) {
       console.error('❌ Error saving to published_products:', publishError)
-      // Don't fail the request, but log the error
     } else {
       console.log('✅ Saved to published_products table:', publishedProduct?.id)
     }
@@ -125,7 +172,8 @@ export async function POST(request: NextRequest) {
         status: 'SUBMITTED',
         message:
           'Item submitted to Walmart. Processing may take a few minutes.',
-        publishedProductId: publishedProduct?.id, // Include the published product ID
+        publishedProductId: publishedProduct?.id,
+        remainingTokens: rateLimiter.getRemainingTokens('feeds:submit:MP_ITEM'),
       },
       message:
         'Successfully submitted to Walmart! Check your Seller Center for status updates.',
@@ -140,46 +188,72 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Create simple XML for item
+// Updated createItemXml with latest spec version
 function createItemXml(data: any): string {
+  // Build secondary images XML if we have more than 1 image
+  let secondaryImagesXml = ''
+  if (data.images && data.images.length > 1) {
+    secondaryImagesXml = '<productSecondaryImageURL>'
+    // Add up to 8 additional images (Walmart supports 9 total: 1 main + 8 secondary)
+    for (let i = 1; i < Math.min(data.images.length, 9); i++) {
+      if (data.images[i]) {
+        secondaryImagesXml += `
+        <productSecondaryImageURLValue>${data.images[i]}</productSecondaryImageURLValue>`
+      }
+    }
+    secondaryImagesXml += `
+      </productSecondaryImageURL>`
+  }
+
+  // Using latest spec version structure
   return `<?xml version="1.0" encoding="UTF-8"?>
-<MPItemFeed xmlns="http://walmart.com/">
+<MPItemFeed xmlns="http://walmart.com/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <MPItemFeedHeader>
+    <version>${data.specVersion}</version>
+    <requestId>request-${Date.now()}</requestId>
+    <requestBatchId>batch-${Date.now()}</requestBatchId>
+    <feedDate>${new Date().toISOString()}</feedDate>
+  </MPItemFeedHeader>
   <MPItem>
-    <sku>${data.sku}</sku>
-    <Product>
-      <productName>${escapeXml(data.title)}</productName>
-      <shortDescription>${escapeXml(data.description.substring(0, 200))}</shortDescription>
-      <brand>${data.brand}</brand>
-      <mainImageUrl>${data.imageUrl}</mainImageUrl>
-    </Product>
-    <price>
-      <amount>${data.price}</amount>
-      <currency>USD</currency>
-    </price>
-    <shippingWeight>
-      <value>1</value>
-      <unit>LB</unit>
-    </shippingWeight>
+    <sku>${escapeXml(data.sku)}</sku>
     <productIdentifiers>
       <productIdType>SKU</productIdType>
-      <productId>${data.sku}</productId>
+      <productId>${escapeXml(data.sku)}</productId>
     </productIdentifiers>
-    <category>
-      <Clothing>
-        <ClothingCategory>
-          <gender>Unisex</gender>
-        </ClothingCategory>
-      </Clothing>
-    </category>
-    <quantity>
-      <amount>${data.quantity}</amount>
-    </quantity>
+    <MPProduct>
+      <productName>${escapeXml(data.title)}</productName>
+      <shortDescription>${escapeXml(data.description.substring(0, 200))}</shortDescription>
+      <brand>${escapeXml(data.brand)}</brand>
+      <mainImageUrl>${data.images?.[0] || ''}</mainImageUrl>
+      ${secondaryImagesXml}
+      <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
+      <msrp>${data.price}</msrp>
+      <category>
+        <categoryPath>Home/Furniture/Living Room Furniture</categoryPath>
+      </category>
+    </MPProduct>
+    <MPOffer>
+      <price>${data.price}</price>
+      <shippingWeight>
+        <value>1</value>
+        <unit>LB</unit>
+      </shippingWeight>
+      <productTaxCode>2038710</productTaxCode>
+      <MinimumAdvertisedPrice>${data.price}</MinimumAdvertisedPrice>
+    </MPOffer>
+    <MPLogistics>
+      <fulfillmentLagTime>1</fulfillmentLagTime>
+    </MPLogistics>
   </MPItem>
 </MPItemFeed>`
 }
 
-// Submit feed to Walmart
-async function submitWalmartFeed(xmlContent: string, accessToken: string) {
+// Submit feed WITHOUT rate limiting check (already checked above)
+async function submitWalmartFeedWithRateLimit(
+  xmlContent: string,
+  accessToken: string,
+  sellerId?: string
+): Promise<any> {
   const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
   const baseUrl =
     environment === 'sandbox'
@@ -190,11 +264,15 @@ async function submitWalmartFeed(xmlContent: string, accessToken: string) {
 
   console.log('📤 Submitting feed to:', feedUrl)
 
+  // Don't check rate limit here - already checked in main function
+  // Just make the API call and update from response headers
   const response = await fetch(feedUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'WM_SEC.ACCESS_TOKEN': accessToken,
+      'WM_PARTNER.ID': sellerId || process.env.WALMART_PARTNER_ID || '',
+      WM_MARKET: 'us',
       'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
       'WM_SVC.NAME': 'Walmart Marketplace',
       'Content-Type': 'application/xml',
@@ -203,31 +281,31 @@ async function submitWalmartFeed(xmlContent: string, accessToken: string) {
     body: xmlContent,
   })
 
-  const responseText = await response.text()
-  console.log(
-    '📨 Feed API Response:',
-    response.status,
-    responseText.substring(0, 200)
-  )
+  // Update rate limits from response headers
+  rateLimiter.updateFromHeaders('feeds:submit:MP_ITEM', response.headers)
 
-  if (!response.ok) {
-    throw new Error(`Feed submission failed: ${responseText}`)
+  if (response.status === 429) {
+    throw new Error('Rate limit exceeded by Walmart')
   }
 
-  try {
-    return JSON.parse(responseText)
-  } catch {
-    // If response is not JSON, return basic success
-    return {
-      feedId: `FEED-${Date.now()}`,
-      status: 'SUBMITTED',
-      message: responseText,
-    }
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Feed submission failed: ${errorText}`)
+  }
+
+  const result = await response.json()
+
+  // Ensure we have a valid feed response
+  return {
+    feedId: result.feedId || `FEED-${Date.now()}`,
+    status: result.status || 'SUBMITTED',
+    ...result,
   }
 }
 
 // XML escape function
 function escapeXml(unsafe: string): string {
+  if (!unsafe) return ''
   return unsafe
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -236,24 +314,28 @@ function escapeXml(unsafe: string): string {
     .replace(/'/g, '&apos;')
 }
 
-// Token refresh function
+// Updated token refresh with 5-minute buffer
 async function refreshTokenIfNeeded(
   connection: any,
   supabase: any
 ): Promise<string> {
   const expiresAt = new Date(connection.token_expires_at)
-  const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000)
+  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000) // 5-minute buffer
 
-  if (expiresAt <= oneHourFromNow && connection.refresh_token) {
-    console.log('🔄 Refreshing Walmart token...')
-    const newToken = await refreshWalmartToken(connection.refresh_token)
+  if (expiresAt <= fiveMinutesFromNow && connection.refresh_token) {
+    console.log('🔄 Refreshing Walmart token (expires within 5 minutes)...')
+
+    const newToken = await refreshWalmartToken(
+      connection.refresh_token,
+      connection.seller_id
+    )
 
     await supabase
       .from('walmart_connections')
       .update({
         access_token: newToken.access_token,
         token_expires_at: new Date(
-          Date.now() + newToken.expires_in * 1000
+          Date.now() + (newToken.expires_in - 300) * 1000
         ).toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -266,18 +348,19 @@ async function refreshTokenIfNeeded(
   return connection.access_token
 }
 
-async function refreshWalmartToken(refreshToken: string) {
+async function refreshWalmartToken(refreshToken: string, sellerId?: string) {
   const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
-  const tokenUrl = 'https://sandbox.walmartapis.com/v3/token'
+  const tokenUrl =
+    environment === 'sandbox'
+      ? 'https://sandbox.walmartapis.com/v3/token'
+      : 'https://marketplace.walmartapis.com/v3/token'
 
   const clientId = process.env.WALMART_CLIENT_ID!
   const clientSecret = process.env.WALMART_CLIENT_SECRET!
-  const partnerId = process.env.WALMART_PARTNER_ID!
+  const partnerId = sellerId || process.env.WALMART_PARTNER_ID!
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
     'base64'
   )
-
-  console.log(`🔄 Refreshing token with ${environment} endpoint...`)
 
   const response = await fetch(tokenUrl, {
     method: 'POST',
@@ -285,45 +368,18 @@ async function refreshWalmartToken(refreshToken: string) {
       Authorization: `Basic ${credentials}`,
       'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'application/json',
+      'WM_PARTNER.ID': partnerId,
+      WM_MARKET: 'us',
       'WM_QOS.CORRELATION_ID': Date.now().toString(),
       'WM_SVC.NAME': 'Listora AI',
-      'WM_PARTNER.ID': partnerId,
     },
     body: `grant_type=refresh_token&refresh_token=${refreshToken}`,
   })
 
-  const responseText = await response.text()
-  console.log('📨 Token refresh response status:', response.status)
-
   if (!response.ok) {
-    console.error(`❌ Token refresh failed:`, responseText)
-    throw new Error('Failed to refresh Walmart token')
+    const errorText = await response.text()
+    throw new Error(`Token refresh failed: ${errorText}`)
   }
 
-  const tokenData = JSON.parse(responseText)
-  console.log(`✅ Token refreshed successfully`)
-
-  return tokenData
-}
-
-// Optional: Add a function to check feed status and update the published_products table
-export async function updateFeedStatus(feedId: string, userId: string) {
-  const supabase = await createServerSideClient()
-
-  // This would be called by a webhook or polling mechanism
-  // to update the status once Walmart processes the feed
-
-  const { data: product } = await supabase
-    .from('published_products')
-    .update({
-      status: 'published',
-      platform_url: `https://www.walmart.com/seller/${feedId}`, // Update with actual URL
-      updated_at: new Date().toISOString(),
-      last_synced_at: new Date().toISOString(),
-    })
-    .eq('platform_product_id', feedId)
-    .eq('user_id', userId)
-    .single()
-
-  return product
+  return await response.json()
 }

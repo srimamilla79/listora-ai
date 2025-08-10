@@ -154,7 +154,6 @@ const DEFAULT_CONTENT_SECTIONS: ContentSections = {
   blogIntro: true,
   callToAction: true,
 }
-
 interface ProcessedImage {
   original: File
   processed?: string
@@ -169,6 +168,7 @@ interface ProcessedImage {
     instagram: string
     walmart: string
     custom: string
+    ebay: string // ADD THIS LINE
   }
   isStored?: boolean
   publicUrls?: {
@@ -180,6 +180,7 @@ interface ProcessedImage {
       instagram?: string
       walmart?: string
       custom?: string
+      ebay?: string // ADD THIS LINE
     }
   }
 }
@@ -287,6 +288,8 @@ export default function ProductForm({
   const [selectedSections, setSelectedSections] = useState<ContentSections>(
     DEFAULT_CONTENT_SECTIONS
   )
+  // ADD THIS NEW STATE for image updates
+  const [imageUpdateTrigger, setImageUpdateTrigger] = useState(0)
   const [showContentSections, setShowContentSections] = useState(false)
 
   // Smart promotion features
@@ -1125,7 +1128,6 @@ export default function ProductForm({
       canvas.width = img.width
       canvas.height = img.height
       ctx.drawImage(img, 0, 0)
-
       const platformSizes = {
         amazon: resizeImage(canvas, 1000, 1000),
         shopify: resizeImage(canvas, 1024, 1024),
@@ -1133,6 +1135,7 @@ export default function ProductForm({
         instagram: resizeImage(canvas, 1080, 1080),
         walmart: resizeImage(canvas, 1000, 1000),
         custom: resizeImage(canvas, 1200, 1200),
+        ebay: resizeImage(canvas, 1000, 1000), // ADD THIS LINE
       }
 
       setProcessedImages((prev) =>
@@ -1149,6 +1152,7 @@ export default function ProductForm({
             : img
         )
       )
+      setImageUpdateTrigger((prev) => prev + 1)
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Processing failed'
@@ -1192,6 +1196,7 @@ export default function ProductForm({
           instagram: '',
           walmart: '',
           custom: '',
+          ebay: '', // ADD THIS LINE
         },
         isStored: false,
       }))
@@ -1202,6 +1207,11 @@ export default function ProductForm({
         const imageIndex = processedImages.length + i
         setTimeout(() => processImage(newFiles[i], imageIndex), i * 200)
       }
+
+      // ADD THIS: Trigger update after images are processed
+      setTimeout(() => {
+        setImageUpdateTrigger((prev) => prev + 1)
+      }, 2000) // Increased delay to ensure processing completes
     }
   }
 
@@ -2198,11 +2208,12 @@ export default function ProductForm({
               <div className="mt-4">
                 <div className="p-4 bg-white rounded-lg border border-gray-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-  🌍 Select Output Language
-  <span className="text-xs text-gray-500 block font-normal">
-    Your content will be generated in this language (speak in any language - we'll auto-detect)
-  </span>
-</label>
+                    🌍 Select Output Language
+                    <span className="text-xs text-gray-500 block font-normal">
+                      Your content will be generated in this language (speak in
+                      any language - we'll auto-detect)
+                    </span>
+                  </label>
                   <select
                     value={outputLanguage}
                     onClick={() => {
@@ -3153,27 +3164,58 @@ export default function ProductForm({
                     }}
                   />
 
-                  <UnifiedPublisher
-                    productContent={{
-                      id: lastGeneratedContentId || '',
-                      product_name: productName,
-                      features: features,
-                      platform: platform,
-                      content: generatedContent,
-                    }}
-                    images={processedImages
-                      .map(
-                        (img) =>
-                          img.publicUrls?.processed?.shopify ||
-                          img.platforms?.amazon
-                      )
-                      .filter(
-                        (url): url is string =>
-                          Boolean(url) && !url.startsWith('data:')
-                      )}
-                    onPublishSuccess={handlePublishSuccess}
-                    user={user}
-                  />
+                  {lastGeneratedContentId && (
+                    <UnifiedPublisher
+                      productContent={{
+                        id: lastGeneratedContentId || '',
+                        product_name: productName,
+                        features: features,
+                        platform: platform,
+                        content: generatedContent,
+                      }}
+                      images={processedImages
+                        .map((img) => {
+                          // FIX 2: Check all platforms and use appropriate image
+                          // First try cloud-stored URLs
+                          if (img.publicUrls?.processed) {
+                            return (
+                              img.publicUrls.processed[
+                                platform as keyof typeof img.publicUrls.processed
+                              ] ||
+                              img.publicUrls.processed.shopify ||
+                              img.publicUrls.processed.ebay ||
+                              img.publicUrls.processed.amazon ||
+                              img.publicUrls.processed.walmart
+                            )
+                          }
+                          // Then try locally processed platform-specific images
+                          if (img.platforms) {
+                            return (
+                              img.platforms[
+                                platform as keyof typeof img.platforms
+                              ] ||
+                              img.platforms.amazon ||
+                              img.platforms.shopify ||
+                              img.platforms.ebay ||
+                              img.platforms.walmart
+                            )
+                          }
+                          // Finally fallback to any available preview
+                          return img.processedPreview || img.originalPreview
+                        })
+                        .filter(
+                          (url): url is string =>
+                            Boolean(url) &&
+                            typeof url === 'string' &&
+                            (url.startsWith('http') ||
+                              url.startsWith('blob:') ||
+                              url.startsWith('/'))
+                        )}
+                      imageUpdateTrigger={imageUpdateTrigger}
+                      onPublishSuccess={handlePublishSuccess}
+                      user={user}
+                    />
+                  )}
                 </div>
               </div>
             )}

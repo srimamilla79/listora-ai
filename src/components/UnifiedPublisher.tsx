@@ -47,6 +47,7 @@ interface UnifiedPublisherProps {
   images?: string[]
   onPublishSuccess?: (result: any) => void
   user?: any
+  imageUpdateTrigger?: number // ADD THIS LINE
 }
 
 export default function UnifiedPublisher({
@@ -54,6 +55,7 @@ export default function UnifiedPublisher({
   images = [],
   onPublishSuccess,
   user: passedUser,
+  imageUpdateTrigger, // ADD THIS LINE
 }: UnifiedPublisherProps) {
   const [platforms, setPlatforms] = useState<Platform[]>([
     {
@@ -108,6 +110,19 @@ export default function UnifiedPublisher({
     productType: '',
   })
 
+  // ADD THIS: State to track current images
+  const [currentImages, setCurrentImages] = useState(images)
+
+  // ADD THIS: Update images when prop changes or trigger updates
+  useEffect(() => {
+    console.log('🔍 UnifiedPublisher - Images updated:', {
+      imagesLength: images.length,
+      imageUpdateTrigger,
+      images,
+    })
+    setCurrentImages(images)
+  }, [images, imageUpdateTrigger])
+
   // 🔧 GUARANTEED to finish in 3 seconds max
   useEffect(() => {
     // Always clear loading after 3 seconds regardless of what happens
@@ -152,6 +167,7 @@ export default function UnifiedPublisher({
 
   // 🔧 ROBUST connection loading with better error handling
   const loadPlatformConnections = async () => {
+    let loadingTimeout: NodeJS.Timeout | undefined // Add this line
     if (!passedUser?.id) {
       setLoading(false)
       return
@@ -181,6 +197,12 @@ export default function UnifiedPublisher({
       }
 
       console.log('🔍 UnifiedPublisher: Running database queries...')
+
+      // Add a timeout to prevent hanging
+      loadingTimeout = setTimeout(() => {
+        console.log('⚠️ UnifiedPublisher: Loading timeout - using empty state')
+        setLoading(false)
+      }, 5000)
 
       // 🔧 SIMPLIFIED queries with longer timeouts
       let amazonConnections: any[] = []
@@ -406,6 +428,7 @@ export default function UnifiedPublisher({
       )
       setSelectedPlatform('')
     } finally {
+      if (loadingTimeout) clearTimeout(loadingTimeout)
       setLoading(false)
       console.log('✅ UnifiedPublisher: Loading completed')
     }
@@ -494,6 +517,13 @@ export default function UnifiedPublisher({
   }
 
   const handlePublish = async () => {
+    console.log('🚀 handlePublish called with:', {
+      currentImages,
+      currentImagesLength: currentImages.length,
+      originalImages: images,
+      originalImagesLength: images.length,
+    })
+
     if (!selectedPlatform) {
       setPublishError('Please select a platform')
       return
@@ -516,6 +546,12 @@ export default function UnifiedPublisher({
       return
     }
 
+    // ADD THIS: Validate current images
+    if (!currentImages || currentImages.length === 0) {
+      setPublishError('Please upload at least one image before publishing')
+      return
+    }
+
     // Handle Amazon instructions generation (only method for Amazon)
     if (selectedPlatform === 'amazon') {
       await generateAmazonInstructions()
@@ -535,7 +571,7 @@ export default function UnifiedPublisher({
           features: productContent.features,
           content: productContent.content,
         },
-        images: images,
+        images: currentImages, // CHANGE THIS: use currentImages instead of images
         publishingOptions: {
           ...publishingOptions,
           price: parseFloat(publishingOptions.price),

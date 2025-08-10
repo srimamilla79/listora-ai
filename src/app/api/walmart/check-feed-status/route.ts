@@ -1,6 +1,7 @@
 // src/app/api/walmart/check-feed-status/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
+import { rateLimiter, walmartApiCall } from '@/lib/walmart-rate-limiter'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,23 +15,21 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log('🔍 Checking feed status for:', feedId)
+    // Skip rate limit check for feed status (5000/min is very high)
+    // Just track the response headers
 
     const supabase = await createServerSideClient()
 
-    // If userId is provided, use it. Otherwise, try to get from session
-    let finalUserId: string | null = userId
-    if (!finalUserId) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      finalUserId = session?.user?.id || null
-    }
+    // Get user ID from session if not provided
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const finalUserId: string | null = userId || session?.user?.id || null
 
     if (!finalUserId) {
       return NextResponse.json(
         { error: 'User ID is required' },
-        { status: 400 }
+        { status: 401 }
       )
     }
 
@@ -50,58 +49,115 @@ export async function GET(request: NextRequest) {
     }
 
     const connection = connections[0]
-    const accessToken = await refreshTokenIfNeeded(connection, supabase)
+    const accessToken = connection.access_token
+    const sellerId = connection.seller_id || connection.seller_info?.sellerId
 
-    // Check feed status with Walmart
+    // Get feed status from Walmart with rate limiting
     const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
     const baseUrl =
       environment === 'sandbox'
         ? 'https://sandbox.walmartapis.com'
         : 'https://marketplace.walmartapis.com'
 
-    const statusUrl = `${baseUrl}/v3/feeds/${feedId}?includeDetails=true`
+    // Add includeDetails=true and offset=0&limit=50 to get error details
+    const statusUrl = `${baseUrl}/v3/feeds/${feedId}?includeDetails=true&offset=0&limit=50`
 
-    console.log('📡 Fetching feed status from:', statusUrl)
+    console.log('📊 Checking feed status:', statusUrl)
 
-    const response = await fetch(statusUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'WM_SEC.ACCESS_TOKEN': accessToken,
-        'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random()
-          .toString(36)
-          .substring(7)}`,
-        'WM_SVC.NAME': 'Walmart Marketplace',
-        Accept: 'application/json',
-      },
-    })
+    // Use rate-limited API call with proper typing
+    const feedStatus = await walmartApiCall<any>(
+      statusUrl,
+      'feeds:status:single',
+      () =>
+        fetch(statusUrl, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'WM_SEC.ACCESS_TOKEN': accessToken,
+            'WM_PARTNER.ID': sellerId || process.env.WALMART_PARTNER_ID || '',
+            WM_MARKET: 'us',
+            'WM_QOS.CORRELATION_ID': Date.now().toString(),
+            'WM_SVC.NAME': 'Walmart Marketplace',
+            Accept: 'application/json',
+          },
+        })
+    )
 
-    const responseText = await response.text()
-    console.log('📨 Feed status response:', response.status)
-
-    if (!response.ok) {
-      console.error('❌ Failed to get feed status:', responseText)
-      return NextResponse.json(
-        { error: `Failed to get feed status: ${responseText}` },
-        { status: response.status }
+    // Log any errors for debugging
+    if (feedStatus.ingestionErrors?.ingestionError) {
+      console.log(
+        '❌ Feed errors found:',
+        JSON.stringify(feedStatus.ingestionErrors, null, 2)
       )
     }
 
-    let feedStatus
-    try {
-      feedStatus = JSON.parse(responseText)
-    } catch {
-      feedStatus = { message: responseText }
+    if (feedStatus.itemDetails?.itemIngestionStatus?.length > 0) {
+      console.log(
+        '📦 Item details:',
+        JSON.stringify(feedStatus.itemDetails, null, 2)
+      )
     }
 
-    console.log('✅ Feed status retrieved:', feedStatus)
+    // Add interpretation to make it easier to understand
+    const interpretation = {
+      message: '',
+      isComplete: false,
+      isError: false,
+      progress: 0,
+    }
 
-    // Interpret the status for better UX
-    const interpretation = interpretFeedStatus(feedStatus)
+    switch (feedStatus.feedStatus) {
+      case 'RECEIVED':
+        interpretation.message = 'Feed received and queued for processing'
+        interpretation.progress = 25
+        break
+      case 'INPROGRESS':
+        interpretation.message = 'Feed is currently being processed'
+        interpretation.progress = 50
+        break
+      case 'PROCESSED':
+        interpretation.message = 'Feed processed successfully'
+        interpretation.isComplete = true
+        interpretation.progress = 100
+        break
+      case 'ERROR':
+        interpretation.message = 'Feed processing failed'
+        interpretation.isComplete = true
+        interpretation.isError = true
+        interpretation.progress = 100
+        break
+      case 'PARTIAL_SUCCESS':
+        interpretation.message = 'Some items processed, some failed'
+        interpretation.isComplete = true
+        interpretation.progress = 100
+        break
+    }
+
+    // If there are specific errors, add them to the interpretation
+    if (feedStatus.ingestionErrors?.ingestionError?.length > 0) {
+      const errors = feedStatus.ingestionErrors.ingestionError
+      interpretation.message += `. Errors: ${errors
+        .map((e: any) => `${e.description} (${e.code})`)
+        .join(', ')}`
+    }
+
+    // Update published_products status if feed is complete
+    if (interpretation.isComplete && !interpretation.isError) {
+      await supabase
+        .from('published_products')
+        .update({
+          status: 'published',
+          last_synced_at: new Date().toISOString(),
+        })
+        .eq('platform_product_id', feedId)
+        .eq('user_id', finalUserId)
+    }
 
     return NextResponse.json({
-      feedId,
-      ...feedStatus,
+      ...(typeof feedStatus === 'object' && feedStatus !== null
+        ? feedStatus
+        : {}),
       interpretation,
+      remainingTokens: rateLimiter.getRemainingTokens('feeds:status:single'),
     })
   } catch (error) {
     console.error('❌ Feed status check error:', error)
@@ -110,114 +166,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-// Helper function to interpret feed status
-function interpretFeedStatus(feedStatus: any) {
-  const status = feedStatus.feedStatus || feedStatus.status
-
-  const interpretations: Record<string, any> = {
-    RECEIVED: {
-      message: 'Feed received and queued for processing',
-      isComplete: false,
-      isError: false,
-      progress: 25,
-    },
-    INPROGRESS: {
-      message: 'Feed is currently being processed',
-      isComplete: false,
-      isError: false,
-      progress: 50,
-    },
-    PROCESSED: {
-      message: 'Feed processed successfully',
-      isComplete: true,
-      isError: false,
-      progress: 100,
-    },
-    ERROR: {
-      message: 'Feed processing failed',
-      isComplete: true,
-      isError: true,
-      progress: 100,
-    },
-    PARTIAL_SUCCESS: {
-      message: 'Feed partially processed with some errors',
-      isComplete: true,
-      isError: false,
-      progress: 100,
-    },
-  }
-
-  return (
-    interpretations[status] || {
-      message: `Unknown status: ${status}`,
-      isComplete: false,
-      isError: false,
-      progress: 0,
-    }
-  )
-}
-
-// Token refresh function (same as other routes)
-async function refreshTokenIfNeeded(
-  connection: any,
-  supabase: any
-): Promise<string> {
-  const expiresAt = new Date(connection.token_expires_at)
-  const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000)
-
-  if (expiresAt <= oneHourFromNow && connection.refresh_token) {
-    console.log('🔄 Refreshing Walmart token...')
-
-    const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
-    const tokenUrl = 'https://sandbox.walmartapis.com/v3/token'
-
-    const clientId = process.env.WALMART_CLIENT_ID!
-    const clientSecret = process.env.WALMART_CLIENT_SECRET!
-    const partnerId = process.env.WALMART_PARTNER_ID!
-
-    if (!partnerId) {
-      throw new Error('WALMART_PARTNER_ID environment variable is not set')
-    }
-
-    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
-      'base64'
-    )
-
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-        'WM_QOS.CORRELATION_ID': Date.now().toString(),
-        'WM_SVC.NAME': 'Listora AI',
-        'WM_PARTNER.ID': partnerId,
-      },
-      body: `grant_type=refresh_token&refresh_token=${connection.refresh_token}`,
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Failed to refresh Walmart token: ${errorText}`)
-    }
-
-    const tokenData = await response.json()
-
-    await supabase
-      .from('walmart_connections')
-      .update({
-        access_token: tokenData.access_token,
-        token_expires_at: new Date(
-          Date.now() + tokenData.expires_in * 1000
-        ).toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', connection.id)
-
-    return tokenData.access_token
-  }
-
-  return connection.access_token
 }

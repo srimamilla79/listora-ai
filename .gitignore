@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Prevent unwanted files
+src/components/layout/UniversalHeader.tsx
+src/app/(dashboard)/support/
