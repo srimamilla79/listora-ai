@@ -339,17 +339,6 @@ async function publishToFacebook(options: PublishOptions) {
         message: caption,
         url: imageUrl,
         access_token: accessToken,
-        // Add call-to-action button if price exists
-        ...(productContent.price && {
-          call_to_action: {
-            type: 'SHOP_NOW',
-            value: {
-              link:
-                productContent.product_url ||
-                `https://listora.ai/products/${productContent.id}`,
-            },
-          },
-        }),
       }),
     }
   )
