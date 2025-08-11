@@ -1699,32 +1699,19 @@ export default function UnifiedPublisher({
                                 </div>
                               </div>
                             </label>
-                            <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                            <label className="flex items-center p-3 border rounded-lg bg-gray-50 cursor-not-allowed opacity-60">
                               <input
                                 type="checkbox"
-                                checked={publishingOptions.metaPlatforms.includes(
-                                  'marketplace'
-                                )}
-                                onChange={(e) => {
-                                  const platforms = e.target.checked
-                                    ? [
-                                        ...publishingOptions.metaPlatforms,
-                                        'marketplace',
-                                      ]
-                                    : publishingOptions.metaPlatforms.filter(
-                                        (p) => p !== 'marketplace'
-                                      )
-                                  setPublishingOptions((prev) => ({
-                                    ...prev,
-                                    metaPlatforms: platforms,
-                                  }))
-                                }}
-                                className="mr-2"
+                                checked={false}
+                                disabled={true}
+                                className="mr-2 cursor-not-allowed"
                               />
                               <div>
-                                <div className="font-medium">Marketplace</div>
-                                <div className="text-xs text-gray-500">
-                                  Product listing
+                                <div className="font-medium text-gray-500">
+                                  Marketplace
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                  Coming Soon
                                 </div>
                               </div>
                             </label>
