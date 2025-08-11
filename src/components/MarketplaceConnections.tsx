@@ -689,7 +689,7 @@ export default function MarketplaceConnections({
                           : isWalmart
                             ? 'Reach 120M+ monthly shoppers'
                             : isMeta
-                              ? 'Post to Facebook Pages and Instagram'
+                              ? 'Post to Facebook Pages, Instagram & Marketplace'
                               : ''}
                   </p>
 
