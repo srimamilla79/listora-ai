@@ -70,7 +70,8 @@ interface DashboardStats {
   etsy: number
   shopify: number
   instagram: number
-  walmart: number // Added Walmart
+  walmart: number
+  meta: number // ADD THIS LINE
   withImages: number
 }
 
@@ -120,6 +121,14 @@ export default function EnhancedDashboardPage() {
     },
     []
   )
+  // Helper function to normalize platform names
+  const normalizePlatform = useCallback((platform: string): string => {
+    // Convert old instagram entries to meta for display
+    if (platform === 'instagram') {
+      return 'meta'
+    }
+    return platform
+  }, [])
 
   // 🚀 OPTIMIZED: Memoized stats calculation with Walmart
   const stats = useMemo((): DashboardStats => {
@@ -130,7 +139,8 @@ export default function EnhancedDashboardPage() {
         etsy: 0,
         shopify: 0,
         instagram: 0,
-        walmart: 0, // Added Walmart
+        walmart: 0,
+        meta: 0, // ADD THIS LINE
         withImages: 0,
       }
     }
@@ -140,8 +150,11 @@ export default function EnhancedDashboardPage() {
       amazon: products.filter((p) => p.platform === 'amazon').length,
       etsy: products.filter((p) => p.platform === 'etsy').length,
       shopify: products.filter((p) => p.platform === 'shopify').length,
-      instagram: products.filter((p) => p.platform === 'instagram').length,
-      walmart: products.filter((p) => p.platform === 'walmart').length, // Added Walmart
+      instagram: 0, // Keep for backward compatibility but always 0
+      walmart: products.filter((p) => p.platform === 'walmart').length,
+      meta: products.filter(
+        (p) => p.platform === 'meta' || p.platform === 'instagram'
+      ).length, // Include old instagram entries
       withImages: products.filter((p) => p.has_images).length,
     }
   }, [products])
@@ -155,15 +168,25 @@ export default function EnhancedDashboardPage() {
       filtered = filtered.filter(
         (product) =>
           product.product_name.toLowerCase().includes(searchLower) ||
-          product.platform.toLowerCase().includes(searchLower) ||
+          normalizePlatform(product.platform)
+            .toLowerCase()
+            .includes(searchLower) ||
           (product.features || '').toLowerCase().includes(searchLower)
       )
     }
 
     if (platformFilter !== 'all') {
-      filtered = filtered.filter(
-        (product) => product.platform === platformFilter
-      )
+      // Special handling for meta filter to include old instagram entries
+      if (platformFilter === 'meta') {
+        filtered = filtered.filter(
+          (product) =>
+            product.platform === 'meta' || product.platform === 'instagram'
+        )
+      } else {
+        filtered = filtered.filter(
+          (product) => product.platform === platformFilter
+        )
+      }
     }
 
     if (imageFilter !== 'all') {
@@ -186,7 +209,14 @@ export default function EnhancedDashboardPage() {
       endIndex,
       currentProducts,
     }
-  }, [products, searchTerm, platformFilter, imageFilter, currentPage])
+  }, [
+    products,
+    searchTerm,
+    platformFilter,
+    imageFilter,
+    currentPage,
+    normalizePlatform,
+  ])
 
   // Add notification function
   const addNotification = useCallback(
@@ -577,7 +607,11 @@ export default function EnhancedDashboardPage() {
         label: '📱 Instagram',
         color: 'bg-purple-100 text-purple-800',
       },
-      walmart: { label: '🏪 Walmart', color: 'bg-blue-100 text-blue-800' }, // Added Walmart
+      walmart: { label: '🏪 Walmart', color: 'bg-blue-100 text-blue-800' },
+      meta: {
+        label: '📱 Meta',
+        color: 'bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800',
+      }, // ADD THIS LINE
     }
     return (
       badges[platform as keyof typeof badges] || {
@@ -681,7 +715,7 @@ export default function EnhancedDashboardPage() {
           </div>
 
           {/* Enhanced Stats Cards - WITH WALMART */}
-          <div className="grid grid-cols-2 lg:grid-cols-7 gap-4 lg:gap-6 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 lg:gap-6 mb-8">
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
               <div className="flex items-center">
                 <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-lg">
@@ -746,22 +780,6 @@ export default function EnhancedDashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center mr-3 shadow-lg text-2xl">
-                  📱
-                </div>
-                <div>
-                  <p className="text-xs lg:text-sm text-gray-600 font-medium">
-                    Instagram
-                  </p>
-                  <p className="text-lg lg:text-2xl font-bold text-purple-600">
-                    {stats.instagram}
-                  </p>
-                </div>
-              </div>
-            </div>
-
             {/* WALMART STAT CARD */}
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
               <div className="flex items-center">
@@ -774,6 +792,23 @@ export default function EnhancedDashboardPage() {
                   </p>
                   <p className="text-lg lg:text-2xl font-bold text-blue-600">
                     {stats.walmart}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* META STAT CARD - ADD THIS ENTIRE BLOCK */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 lg:p-6 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mr-3 shadow-lg text-2xl">
+                  📱
+                </div>
+                <div>
+                  <p className="text-xs lg:text-sm text-gray-600 font-medium">
+                    Meta (FB/IG)
+                  </p>
+                  <p className="text-lg lg:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    {stats.meta}
                   </p>
                 </div>
               </div>
@@ -819,8 +854,12 @@ export default function EnhancedDashboardPage() {
                   <option value="amazon">🛒 Amazon</option>
                   <option value="etsy">🎨 Etsy</option>
                   <option value="shopify">🛍️ Shopify</option>
-                  <option value="instagram">📱 Instagram</option>
                   <option value="walmart">🏪 Walmart</option>
+                  <option value="meta">📱 Meta (FB/IG)</option>
+                  {/* Add this only if you have legacy Instagram data */}
+                  {products.some((p) => p.platform === 'instagram') && (
+                    <option value="instagram">📱 Instagram (Legacy)</option>
+                  )}
                 </select>
                 <select
                   value={imageFilter}
@@ -883,7 +922,10 @@ export default function EnhancedDashboardPage() {
                   <tbody className="divide-y divide-gray-100">
                     {filteredAndPaginatedProducts.currentProducts.map(
                       (product) => {
-                        const badge = getPlatformBadge(product.platform)
+                        const normalizedPlatform = normalizePlatform(
+                          product.platform
+                        )
+                        const badge = getPlatformBadge(normalizedPlatform)
                         const imageUrls = generateImageUrls(product)
                         const hasImages = product.has_images
                         const firstImage = imageUrls.original[0]

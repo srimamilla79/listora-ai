@@ -1,4 +1,4 @@
-// src/components/MarketplaceConnections.tsx - TEMPORARY FIX VERSION - COMPLETE
+// src/components/MarketplaceConnections.tsx - WITH META INTEGRATION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -28,6 +28,8 @@ interface Connection {
     marketplace_id?: string
     environment?: string
     shop_id?: string
+    facebook_page_name?: string
+    instagram_username?: string
   }
   lastUsed?: string
   connectedAt?: string
@@ -63,6 +65,7 @@ export default function MarketplaceConnections({
       { platform: 'shopify', connected: false },
       { platform: 'ebay', connected: false },
       { platform: 'walmart', connected: false },
+      { platform: 'meta', connected: false },
     ]
   })
 
@@ -117,13 +120,15 @@ export default function MarketplaceConnections({
       const shopifyConnected = urlParams.get('shopify')
       const amazonConnected = urlParams.get('amazon')
       const ebayConnected = urlParams.get('ebay')
-      const walmartSuccess = urlParams.get('success') === 'walmart_connected' // ✅ Added Walmart
+      const walmartSuccess = urlParams.get('success') === 'walmart_connected'
+      const metaConnected = urlParams.get('meta') === 'connected'
 
       if (
         shopifyConnected === 'connected' ||
         amazonConnected === 'connected' ||
         ebayConnected === 'connected' ||
-        walmartSuccess // ✅ Added Walmart check
+        walmartSuccess ||
+        metaConnected
       ) {
         console.log('🔄 OAuth completion detected, refreshing connections...')
 
@@ -163,7 +168,7 @@ export default function MarketplaceConnections({
       const urlParams = new URLSearchParams(window.location.search)
       const walmartSuccess = urlParams.get('success') === 'walmart_connected'
       const shopifyCode = urlParams.get('code')
-      const ebayCode = urlParams.get('code') && urlParams.get('state') // eBay has both code and state
+      const ebayCode = urlParams.get('code') && urlParams.get('state')
 
       if (shopifyCode || ebayCode || walmartSuccess) {
         console.log('🔄 OAuth callback detected, clearing cache...')
@@ -217,82 +222,105 @@ export default function MarketplaceConnections({
       console.log('🔍 MarketplaceConnections: Running direct queries...')
 
       // Run all queries in parallel with simpler approach
-      const [amazonResult, shopifyResult, ebayResult, walmartResult] =
-        await Promise.all([
-          // Amazon query
-          supabase
-            .from('amazon_connections')
-            .select('access_token, seller_id, marketplace_id, created_at')
-            .eq('user_id', currentUserId)
-            .eq('status', 'active')
-            .then((result: any) => ({
-              success: !result.error,
-              data: result.data?.[0] || null,
-              error: result.error,
-            }))
-            .catch((err: any) => ({
-              success: false,
-              data: null,
-              error: err,
-            })),
+      const [
+        amazonResult,
+        shopifyResult,
+        ebayResult,
+        walmartResult,
+        metaResult,
+      ] = await Promise.all([
+        // Amazon query
+        supabase
+          .from('amazon_connections')
+          .select('access_token, seller_id, marketplace_id, created_at')
+          .eq('user_id', currentUserId)
+          .eq('status', 'active')
+          .then((result: any) => ({
+            success: !result.error,
+            data: result.data?.[0] || null,
+            error: result.error,
+          }))
+          .catch((err: any) => ({
+            success: false,
+            data: null,
+            error: err,
+          })),
 
-          // Shopify query - more permissive (no status filter)
-          supabase
-            .from('platform_connections')
-            .select('*')
-            .eq('user_id', currentUserId)
-            .eq('platform', 'shopify')
-            .then((result: any) => ({
-              success: !result.error,
-              data: result.data?.[0] || null,
-              error: result.error,
-            }))
-            .catch((err: any) => ({
-              success: false,
-              data: null,
-              error: err,
-            })),
+        // Shopify query - more permissive (no status filter)
+        supabase
+          .from('platform_connections')
+          .select('*')
+          .eq('user_id', currentUserId)
+          .eq('platform', 'shopify')
+          .then((result: any) => ({
+            success: !result.error,
+            data: result.data?.[0] || null,
+            error: result.error,
+          }))
+          .catch((err: any) => ({
+            success: false,
+            data: null,
+            error: err,
+          })),
 
-          // eBay query
-          supabase
-            .from('ebay_connections')
-            .select('access_token, seller_info, created_at')
-            .eq('user_id', currentUserId)
-            .eq('status', 'active')
-            .then((result: any) => ({
-              success: !result.error,
-              data: result.data?.[0] || null,
-              error: result.error,
-            }))
-            .catch((err: any) => ({
-              success: false,
-              data: null,
-              error: err,
-            })),
+        // eBay query
+        supabase
+          .from('ebay_connections')
+          .select('access_token, seller_info, created_at')
+          .eq('user_id', currentUserId)
+          .eq('status', 'active')
+          .then((result: any) => ({
+            success: !result.error,
+            data: result.data?.[0] || null,
+            error: result.error,
+          }))
+          .catch((err: any) => ({
+            success: false,
+            data: null,
+            error: err,
+          })),
 
-          // Walmart query
-          supabase
-            .from('walmart_connections')
-            .select('access_token, seller_info, created_at')
-            .eq('user_id', currentUserId)
-            .eq('status', 'active')
-            .then((result: any) => ({
-              success: !result.error,
-              data: result.data?.[0] || null,
-              error: result.error,
-            }))
-            .catch((err: any) => ({
-              success: false,
-              data: null,
-              error: err,
-            })),
-        ])
+        // Walmart query
+        supabase
+          .from('walmart_connections')
+          .select('access_token, seller_info, created_at')
+          .eq('user_id', currentUserId)
+          .eq('status', 'active')
+          .then((result: any) => ({
+            success: !result.error,
+            data: result.data?.[0] || null,
+            error: result.error,
+          }))
+          .catch((err: any) => ({
+            success: false,
+            data: null,
+            error: err,
+          })),
+
+        // Meta query
+        supabase
+          .from('meta_connections')
+          .select('id, facebook_page_name, instagram_username, created_at')
+          .eq('user_id', currentUserId)
+          .eq('status', 'connected')
+          .then((result: any) => ({
+            success: !result.error,
+            data: result.data?.[0] || null,
+            error: result.error,
+          }))
+          .catch((err: any) => ({
+            success: false,
+            data: null,
+            error: err,
+          })),
+      ])
 
       console.log('✅ All queries completed')
       console.log('🔍 Amazon result:', amazonResult)
       console.log('🔍 Shopify result:', shopifyResult)
       console.log('🔍 eBay result:', ebayResult)
       console.log('🔍 Walmart result:', walmartResult)
+      console.log('🔍 Meta result:', metaResult)
 
       // 🔧 FALLBACK: If Shopify main query failed, try alternative queries
       let shopifyData = shopifyResult.data
@@ -316,12 +344,14 @@ export default function MarketplaceConnections({
       const amazonData = amazonResult.data
       const ebayData = ebayResult.data
       const walmartData = walmartResult.data
+      const metaData = metaResult.data
 
       console.log('🔍 Final connection status:')
       console.log('🔍 Amazon connected:', !!amazonData?.access_token)
       console.log('🔍 Shopify connected:', !!shopifyData)
       console.log('🔍 eBay connected:', !!ebayData?.access_token)
       console.log('🔍 Walmart connected:', !!walmartData?.access_token)
+      console.log('🔍 Meta connected:', !!metaData)
 
       // 🔧 COMPLETE connection objects
       const updatedConnections = [
@@ -369,6 +399,15 @@ export default function MarketplaceConnections({
           },
           connectedAt: walmartData?.created_at,
         },
+        {
+          platform: 'meta',
+          connected: !!metaData,
+          storeInfo: {
+            facebook_page_name: metaData?.facebook_page_name || 'Facebook Page',
+            instagram_username: metaData?.instagram_username || '@username',
+          },
+          connectedAt: metaData?.created_at,
+        },
       ]
 
       setConnections(updatedConnections)
@@ -389,6 +428,7 @@ export default function MarketplaceConnections({
         onConnectionChange('shopify', !!shopifyData)
         onConnectionChange('ebay', !!ebayData?.access_token)
         onConnectionChange('walmart', !!walmartData?.access_token)
+        onConnectionChange('meta', !!metaData)
       }
     } catch (err) {
       const error = err as Error
@@ -401,13 +441,15 @@ export default function MarketplaceConnections({
         const amazonConnected = urlParams.get('amazon') === 'connected'
         const ebayConnected = urlParams.get('ebay') === 'connected'
         const walmartConnected =
-          urlParams.get('success') === 'walmart_connected' // ✅ Added
+          urlParams.get('success') === 'walmart_connected'
+        const metaConnected = urlParams.get('meta') === 'connected'
 
         if (
           shopifyConnected ||
           amazonConnected ||
           ebayConnected ||
-          walmartConnected
+          walmartConnected ||
+          metaConnected
         ) {
           console.log(
             '🔄 OAuth detected in URL, assuming connection successful'
@@ -419,7 +461,8 @@ export default function MarketplaceConnections({
               (conn.platform === 'amazon' && amazonConnected) ||
               (conn.platform === 'shopify' && shopifyConnected) ||
               (conn.platform === 'ebay' && ebayConnected) ||
-              (conn.platform === 'walmart' && walmartConnected) || // ✅ Added
+              (conn.platform === 'walmart' && walmartConnected) ||
+              (conn.platform === 'meta' && metaConnected) ||
               conn.connected,
           }))
 
@@ -467,6 +510,8 @@ export default function MarketplaceConnections({
       window.location.href = `/api/ebay/oauth?user_id=${currentUserId}`
     } else if (platform === 'walmart') {
       window.location.href = `/api/walmart/oauth?user_id=${currentUserId}`
+    } else if (platform === 'meta') {
+      window.location.href = `/api/meta/auth?user_id=${currentUserId}`
     }
   }
 
@@ -582,6 +627,7 @@ export default function MarketplaceConnections({
           const isShopify = connection.platform === 'shopify'
           const isEbay = connection.platform === 'ebay'
           const isWalmart = connection.platform === 'walmart'
+          const isMeta = connection.platform === 'meta'
 
           return (
             <div
@@ -598,7 +644,9 @@ export default function MarketplaceConnections({
                         ? '🔨'
                         : isWalmart
                           ? '🛒'
-                          : '🏪'}
+                          : isMeta
+                            ? '📱'
+                            : '🏪'}
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900">
@@ -610,7 +658,9 @@ export default function MarketplaceConnections({
                           ? 'eBay Store'
                           : isWalmart
                             ? 'Walmart Marketplace'
-                            : 'Marketplace'}
+                            : isMeta
+                              ? 'Facebook & Instagram'
+                              : 'Marketplace'}
                   </h4>
                   <div className="flex items-center space-x-2 mt-1">
                     {connection.connected ? (
@@ -638,7 +688,9 @@ export default function MarketplaceConnections({
                           ? "World's largest auction marketplace"
                           : isWalmart
                             ? 'Reach 120M+ monthly shoppers'
-                            : ''}
+                            : isMeta
+                              ? 'Post to Facebook Pages and Instagram'
+                              : ''}
                   </p>
 
                   {/* Feature tags */}
@@ -691,6 +743,18 @@ export default function MarketplaceConnections({
                           ✓ Trusted marketplace
                         </span>
                       </>
+                    ) : isMeta ? (
+                      <>
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                          ✓ Facebook Pages
+                        </span>
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                          ✓ Instagram Business
+                        </span>
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                          ✓ Cross-platform posting
+                        </span>
+                      </>
                     ) : null}
                   </div>
                 </div>
@@ -719,6 +783,14 @@ export default function MarketplaceConnections({
                           window.open('https://www.ebay.com/sh/ovw', '_blank')
                         } else if (isWalmart) {
                           window.open('https://seller.walmart.com/', '_blank')
+                        } else if (
+                          isMeta &&
+                          connection.storeInfo?.facebook_page_name
+                        ) {
+                          window.open(
+                            `https://facebook.com/${connection.storeInfo.facebook_page_name}`,
+                            '_blank'
+                          )
                         }
                       }}
                       className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors border border-gray-300 rounded-lg"
@@ -745,7 +817,9 @@ export default function MarketplaceConnections({
                             ? 'bg-blue-600 hover:bg-blue-700'
                             : isWalmart
                               ? 'bg-blue-800 hover:bg-blue-900'
-                              : 'bg-gray-600 hover:bg-gray-700'
+                              : isMeta
+                                ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
+                                : 'bg-gray-600 hover:bg-gray-700'
                     }`}
                   >
                     Connect{' '}
@@ -757,7 +831,9 @@ export default function MarketplaceConnections({
                           ? 'eBay'
                           : isWalmart
                             ? 'Walmart'
-                            : 'Platform'}
+                            : isMeta
+                              ? 'Meta'
+                              : 'Platform'}
                   </button>
                 )}
               </div>

@@ -1,4 +1,4 @@
-// src/components/UnifiedPublisher.tsx - ROCK SOLID VERSION - NO MORE SPINNING
+// src/components/UnifiedPublisher.tsx - WITH META INTEGRATION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -47,7 +47,7 @@ interface UnifiedPublisherProps {
   images?: string[]
   onPublishSuccess?: (result: any) => void
   user?: any
-  imageUpdateTrigger?: number // ADD THIS LINE
+  imageUpdateTrigger?: number
 }
 
 export default function UnifiedPublisher({
@@ -55,7 +55,7 @@ export default function UnifiedPublisher({
   images = [],
   onPublishSuccess,
   user: passedUser,
-  imageUpdateTrigger, // ADD THIS LINE
+  imageUpdateTrigger,
 }: UnifiedPublisherProps) {
   const [platforms, setPlatforms] = useState<Platform[]>([
     {
@@ -86,6 +86,13 @@ export default function UnifiedPublisher({
       color: 'darkblue',
       connected: false,
     },
+    {
+      id: 'meta',
+      name: 'Facebook & Instagram',
+      icon: '📱',
+      color: 'gradient',
+      connected: false,
+    },
   ])
 
   const [selectedPlatform, setSelectedPlatform] = useState<string>('')
@@ -108,12 +115,13 @@ export default function UnifiedPublisher({
     sku: '',
     condition: 'new',
     productType: '',
+    metaPlatforms: ['facebook', 'instagram'],
   })
 
-  // ADD THIS: State to track current images
+  // State to track current images
   const [currentImages, setCurrentImages] = useState(images)
 
-  // ADD THIS: Update images when prop changes or trigger updates
+  // Update images when prop changes or trigger updates
   useEffect(() => {
     console.log('🔍 UnifiedPublisher - Images updated:', {
       imagesLength: images.length,
@@ -147,11 +155,13 @@ export default function UnifiedPublisher({
       const shopifyConnected = urlParams.get('shopify')
       const amazonConnected = urlParams.get('amazon')
       const ebayConnected = urlParams.get('ebay')
+      const metaConnected = urlParams.get('meta')
 
       if (
         shopifyConnected === 'connected' ||
         amazonConnected === 'connected' ||
-        ebayConnected === 'connected'
+        ebayConnected === 'connected' ||
+        metaConnected === 'connected'
       ) {
         console.log(
           '🔄 UnifiedPublisher: OAuth completion detected, refreshing connections...'
@@ -167,7 +177,7 @@ export default function UnifiedPublisher({
 
   // 🔧 ROBUST connection loading with better error handling
   const loadPlatformConnections = async () => {
-    let loadingTimeout: NodeJS.Timeout | undefined // Add this line
+    let loadingTimeout: NodeJS.Timeout | undefined
     if (!passedUser?.id) {
       setLoading(false)
       return
@@ -209,6 +219,7 @@ export default function UnifiedPublisher({
       let shopifyConnections: any[] = []
       let ebayConnections: any[] = []
       let walmartConnections: any[] = []
+      let metaConnections: any[] = []
 
       // Parallel queries with 5-second timeout each
       const queryPromises = [
@@ -247,6 +258,15 @@ export default function UnifiedPublisher({
           .eq('status', 'active')
           .then((result: any) => ({ type: 'walmart', result }))
           .catch((error: any) => ({ type: 'walmart', error })),
+
+        // Meta query
+        supabase
+          .from('meta_connections')
+          .select('*')
+          .eq('user_id', passedUser.id)
+          .eq('status', 'connected')
+          .then((result: any) => ({ type: 'meta', result }))
+          .catch((error: any) => ({ type: 'meta', error })),
       ]
 
       // Wait for all queries with overall timeout
@@ -299,6 +319,12 @@ export default function UnifiedPublisher({
                   '🔍 UnifiedPublisher: Walmart data found:',
                   walmartConnections
                 )
+              } else if (type === 'meta') {
+                metaConnections = result.data || []
+                console.log(
+                  '🔍 UnifiedPublisher: Meta data found:',
+                  metaConnections
+                )
               }
             }
           }
@@ -323,6 +349,12 @@ export default function UnifiedPublisher({
         walmartConnections.find(
           (conn: any) => conn.access_token && conn.access_token.trim() !== ''
         ) || null
+      const validMetaConnection =
+        metaConnections.find(
+          (conn: any) =>
+            conn.facebook_page_access_token &&
+            conn.facebook_page_access_token.trim() !== ''
+        ) || null
 
       console.log('🔍 UnifiedPublisher: Final connection status:')
       console.log(
@@ -341,6 +373,10 @@ export default function UnifiedPublisher({
         '🔍 UnifiedPublisher: Valid Walmart connection:',
         !!validWalmartConnection
       )
+      console.log(
+        '🔍 UnifiedPublisher: Valid Meta connection:',
+        !!validMetaConnection
+      )
 
       // Update platforms with connection status
       const updatedPlatforms = platforms.map((platform) => {
@@ -354,6 +390,8 @@ export default function UnifiedPublisher({
           isConnected = !!validEbayConnection?.access_token
         } else if (platform.id === 'walmart') {
           isConnected = !!validWalmartConnection?.access_token
+        } else if (platform.id === 'meta') {
+          isConnected = !!validMetaConnection
         }
 
         console.log(
@@ -390,8 +428,14 @@ export default function UnifiedPublisher({
         const shopifyConnected = urlParams.get('shopify') === 'connected'
         const amazonConnected = urlParams.get('amazon') === 'connected'
         const ebayConnected = urlParams.get('ebay') === 'connected'
+        const metaConnected = urlParams.get('meta') === 'connected'
 
-        if (shopifyConnected || amazonConnected || ebayConnected) {
+        if (
+          shopifyConnected ||
+          amazonConnected ||
+          ebayConnected ||
+          metaConnected
+        ) {
           console.log(
             '🔄 UnifiedPublisher: OAuth detected in URL, assuming connection successful'
           )
@@ -401,7 +445,8 @@ export default function UnifiedPublisher({
             connected:
               (platform.id === 'amazon' && amazonConnected) ||
               (platform.id === 'shopify' && shopifyConnected) ||
-              (platform.id === 'ebay' && ebayConnected),
+              (platform.id === 'ebay' && ebayConnected) ||
+              (platform.id === 'meta' && metaConnected),
           }))
 
           setPlatforms(updatedPlatforms)
@@ -546,7 +591,7 @@ export default function UnifiedPublisher({
       return
     }
 
-    // ADD THIS: Validate current images
+    // Validate current images
     if (!currentImages || currentImages.length === 0) {
       setPublishError('Please upload at least one image before publishing')
       return
@@ -564,14 +609,14 @@ export default function UnifiedPublisher({
 
     try {
       let endpoint = `/api/${selectedPlatform}/publish`
-      let requestPayload = {
+      let requestPayload: any = {
         productContent: {
           id: productContent?.id,
           product_name: productContent.product_name,
           features: productContent.features,
           content: productContent.content,
         },
-        images: currentImages, // CHANGE THIS: use currentImages instead of images
+        images: currentImages,
         publishingOptions: {
           ...publishingOptions,
           price: parseFloat(publishingOptions.price),
@@ -580,6 +625,24 @@ export default function UnifiedPublisher({
         },
         platform: selectedPlatform,
         userId: passedUser?.id,
+      }
+
+      // Handle Meta publishing
+      if (selectedPlatform === 'meta') {
+        requestPayload = {
+          productContent: {
+            id: productContent?.id,
+            product_name: productContent.product_name,
+            features: productContent.features,
+            generated_content: productContent.content,
+          },
+          images: currentImages,
+          publishingOptions: {
+            platforms: publishingOptions.metaPlatforms,
+          },
+          userId: passedUser?.id,
+          platforms: publishingOptions.metaPlatforms,
+        }
       }
 
       console.log('🚀 Publishing request:', {
@@ -608,7 +671,9 @@ export default function UnifiedPublisher({
           ? `✅ Successfully listed on eBay! Item ID: ${result.data?.itemId || result.data?.listingId || 'Processing'}`
           : selectedPlatform === 'walmart'
             ? `✅ Successfully submitted to Walmart! Feed ID: ${result.data?.feedId || 'Processing'}`
-            : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.productId || result.listingId || result.id || 'Unknown'}`
+            : selectedPlatform === 'meta'
+              ? `✅ Successfully posted to ${publishingOptions.metaPlatforms.join(' and ')}!`
+              : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.productId || result.listingId || result.id || 'Unknown'}`
       setPublishSuccess(successMessage)
 
       setPublishedProducts((prev) => ({
@@ -1234,7 +1299,9 @@ export default function UnifiedPublisher({
                               ? 'Publish directly to your Shopify store'
                               : platform.id === 'ebay'
                                 ? "List on the world's largest auction marketplace"
-                                : 'Marketplace integration'}
+                                : platform.id === 'meta'
+                                  ? 'Post to Facebook Pages and Instagram Business accounts'
+                                  : 'Marketplace integration'}
                         </p>
                       </div>
                     </div>
@@ -1407,6 +1474,75 @@ export default function UnifiedPublisher({
                           </div>
                         </div>
                       )}
+
+                      {/* Meta Platform Selector */}
+                      {selectedPlatform === 'meta' && (
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <Globe className="h-4 w-4 inline mr-1 text-blue-600" />
+                            Select Platforms
+                          </label>
+                          <div className="flex space-x-4">
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={publishingOptions.metaPlatforms.includes(
+                                  'facebook'
+                                )}
+                                onChange={(e) => {
+                                  const platforms = e.target.checked
+                                    ? [
+                                        ...publishingOptions.metaPlatforms,
+                                        'facebook',
+                                      ]
+                                    : publishingOptions.metaPlatforms.filter(
+                                        (p) => p !== 'facebook'
+                                      )
+                                  setPublishingOptions((prev) => ({
+                                    ...prev,
+                                    metaPlatforms: platforms,
+                                  }))
+                                }}
+                                className="mr-2"
+                              />
+                              Facebook Page
+                            </label>
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={publishingOptions.metaPlatforms.includes(
+                                  'instagram'
+                                )}
+                                onChange={(e) => {
+                                  const platforms = e.target.checked
+                                    ? [
+                                        ...publishingOptions.metaPlatforms,
+                                        'instagram',
+                                      ]
+                                    : publishingOptions.metaPlatforms.filter(
+                                        (p) => p !== 'instagram'
+                                      )
+                                  setPublishingOptions((prev) => ({
+                                    ...prev,
+                                    metaPlatforms: platforms,
+                                  }))
+                                }}
+                                className="mr-2"
+                              />
+                              Instagram
+                            </label>
+                          </div>
+                          <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <p className="text-blue-800 text-sm font-medium">
+                              ✨ Cross-Platform Publishing
+                            </p>
+                            <p className="text-blue-700 text-xs mt-1">
+                              Post simultaneously to Facebook and Instagram with
+                              optimized captions.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1512,6 +1648,9 @@ export default function UnifiedPublisher({
                                 'https://seller.walmart.com/items/uploads',
                                 '_blank'
                               )
+                            } else if (selectedPlatform === 'meta') {
+                              // For Meta, open Facebook Page
+                              window.open('https://facebook.com', '_blank')
                             }
                           }}
                           className="w-full flex items-center justify-center px-6 py-4 rounded-lg font-medium text-lg transition-all bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -1569,7 +1708,9 @@ export default function UnifiedPublisher({
                           ? 'Generate Amazon Instructions'
                           : selectedPlatform === 'ebay'
                             ? 'List on eBay'
-                            : `Publish to ${selectedPlatformData?.name}`}
+                            : selectedPlatform === 'meta'
+                              ? 'Post to Social Media'
+                              : `Publish to ${selectedPlatformData?.name}`}
                       </>
                     )}
                   </button>

@@ -131,6 +131,12 @@ export default function PublishedProductsPage() {
 
   // Search for Walmart product
   const searchWalmartProduct = async (product: PublishedProduct) => {
+    // Skip search for non-Walmart products
+    if (product.platform !== 'walmart') {
+      console.log('Search only available for Walmart products')
+      return
+    }
+
     const walmartData = product.platform_data as any
     const gtin = walmartData?.gtin
 
@@ -547,6 +553,14 @@ export default function PublishedProductsPage() {
         borderColor: 'border-blue-300',
         lightBg: 'from-blue-600 to-indigo-600',
       },
+      meta: {
+        icon: '📱',
+        name: 'Facebook/Instagram',
+        color: 'text-blue-600',
+        bgColor: 'bg-gradient-to-r from-blue-50 to-purple-50',
+        borderColor: 'border-blue-200',
+        lightBg: 'from-blue-600 to-purple-600',
+      },
     }
 
     return (
@@ -851,6 +865,7 @@ export default function PublishedProductsPage() {
                   <option value="ebay">🔨 eBay</option>
                   <option value="etsy">🎨 Etsy</option>
                   <option value="walmart">🏪 Walmart</option>
+                  <option value="meta">📱 Meta (FB/IG)</option>
                 </select>
 
                 <select
@@ -1102,7 +1117,11 @@ export default function PublishedProductsPage() {
                               <a
                                 href={
                                   product.platform_url ||
-                                  `https://seller.walmart.com/items-and-inventory/manage-items?searchType=ALL_ITEMS&searchQuery=${product.sku}`
+                                  (product.platform === 'walmart'
+                                    ? `https://seller.walmart.com/items-and-inventory/manage-items?searchType=ALL_ITEMS&searchQuery=${product.sku}`
+                                    : product.platform === 'meta'
+                                      ? 'https://business.facebook.com/commerce/'
+                                      : '#')
                                 }
                                 target="_blank"
                                 rel="noopener noreferrer"

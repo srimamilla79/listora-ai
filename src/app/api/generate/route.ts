@@ -804,6 +804,12 @@ function createPrompt(
       instructions:
         'Create Walmart-optimized content emphasizing value, competitive pricing, and practical benefits. Include clear product specifications, everyday low price messaging, and family-friendly appeal. Focus on bulk options, fast shipping, and trusted quality at affordable prices.',
     },
+    meta: {
+      // ADD THIS ENTRY
+      title: 'Meta (Facebook & Instagram) Content Package',
+      instructions:
+        'Create engaging social commerce content optimized for Facebook and Instagram. Focus on visual storytelling, lifestyle benefits, and social proof. Include compelling captions with emojis, strategic hashtags, and clear CTAs for both platforms. Emphasize shareability, engagement, and community building.',
+    },
     custom: {
       title: 'Universal Product Content Package',
       instructions:
@@ -998,6 +1004,22 @@ WALMART-SPECIFIC REQUIREMENTS:
 - Focus on quantity, practicality, and cost-effectiveness
 - Compare favorably against competitors on price
 - Highlight fast, free shipping options`
+  }
+
+  if (platform === 'meta') {
+    // ADD THIS ENTIRE BLOCK
+    prompt += `
+
+META (FACEBOOK & INSTAGRAM) SPECIFIC REQUIREMENTS:
+- Create content that works seamlessly on both Facebook and Instagram
+- Use conversational, engaging tone that encourages interaction
+- Include relevant emojis throughout the content
+- Focus on lifestyle benefits and visual appeal
+- Create shareable content that encourages user-generated content
+- Include Instagram-specific hashtags (20-30) and Facebook-friendly tags (5-10)
+- Emphasize social proof and community aspects
+- Use storytelling to connect emotionally with audience
+- Include clear CTAs for both shopping and engagement`
   }
 
   if (platform === 'custom') {

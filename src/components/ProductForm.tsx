@@ -165,10 +165,10 @@ interface ProcessedImage {
     amazon: string
     shopify: string
     etsy: string
-    instagram: string
     walmart: string
     custom: string
-    ebay: string // ADD THIS LINE
+    ebay: string
+    meta: string
   }
   isStored?: boolean
   publicUrls?: {
@@ -177,14 +177,13 @@ interface ProcessedImage {
       amazon?: string
       shopify?: string
       etsy?: string
-      instagram?: string
       walmart?: string
       custom?: string
-      ebay?: string // ADD THIS LINE
+      ebay?: string
+      meta?: string
     }
   }
 }
-
 interface ToastNotification {
   id: string
   message: string
@@ -748,16 +747,16 @@ export default function ProductForm({
       imageSize: '1024x1024',
     },
     {
-      value: 'instagram',
-      label: '📱 Instagram',
-      description: 'Social-first + blog content',
-      imageSize: '1080x1080',
-    },
-    {
       value: 'walmart',
       label: '🏬 Walmart',
       description: 'Marketplace listing + competitive pricing',
       imageSize: '1000x1000',
+    },
+    {
+      value: 'meta',
+      label: '📱 Meta',
+      description: 'Facebook & Instagram social commerce',
+      imageSize: '1080x1080',
     },
     {
       value: 'custom',
@@ -963,19 +962,6 @@ export default function ProductForm({
               }
             })
         ),
-        instagram: await Promise.all(
-          processedImages
-            .map((img) => img.platforms.instagram)
-            .filter(Boolean)
-            .map(async (url) => {
-              try {
-                return await convertBlobToDataUrl(url)
-              } catch (error) {
-                console.error('❌ Failed to convert Instagram image:', error)
-                throw error
-              }
-            })
-        ),
         walmart: await Promise.all(
           processedImages
             .map((img) => img.platforms.walmart)
@@ -998,6 +984,32 @@ export default function ProductForm({
                 return await convertBlobToDataUrl(url)
               } catch (error) {
                 console.error('❌ Failed to convert Custom image:', error)
+                throw error
+              }
+            })
+        ),
+        ebay: await Promise.all(
+          processedImages
+            .map((img) => img.platforms.ebay)
+            .filter(Boolean)
+            .map(async (url) => {
+              try {
+                return await convertBlobToDataUrl(url)
+              } catch (error) {
+                console.error('❌ Failed to convert eBay image:', error)
+                throw error
+              }
+            })
+        ),
+        meta: await Promise.all(
+          processedImages
+            .map((img) => img.platforms.meta)
+            .filter(Boolean)
+            .map(async (url) => {
+              try {
+                return await convertBlobToDataUrl(url)
+              } catch (error) {
+                console.error('❌ Failed to convert Meta image:', error)
                 throw error
               }
             })
@@ -1132,10 +1144,10 @@ export default function ProductForm({
         amazon: resizeImage(canvas, 1000, 1000),
         shopify: resizeImage(canvas, 1024, 1024),
         etsy: resizeImage(canvas, 2000, 2000),
-        instagram: resizeImage(canvas, 1080, 1080),
         walmart: resizeImage(canvas, 1000, 1000),
         custom: resizeImage(canvas, 1200, 1200),
-        ebay: resizeImage(canvas, 1000, 1000), // ADD THIS LINE
+        ebay: resizeImage(canvas, 1000, 1000),
+        meta: resizeImage(canvas, 1080, 1080), // This will be used for both FB and IG
       }
 
       setProcessedImages((prev) =>
@@ -1193,10 +1205,10 @@ export default function ProductForm({
           amazon: '',
           shopify: '',
           etsy: '',
-          instagram: '',
           walmart: '',
           custom: '',
-          ebay: '', // ADD THIS LINE
+          ebay: '',
+          meta: '',
         },
         isStored: false,
       }))
