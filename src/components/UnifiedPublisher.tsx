@@ -1640,13 +1640,14 @@ export default function UnifiedPublisher({
                             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                               <h4 className="font-medium text-gray-900 mb-3 flex items-center">
                                 <Store className="h-4 w-4 mr-2" />
-                                Marketplace Details (Required)
+                                Marketplace Details
                               </h4>
 
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Category *
+                                    Category{' '}
+                                    <span className="text-red-500">*</span>
                                   </label>
                                   <select
                                     value={marketplaceDetails.category}
@@ -1657,6 +1658,7 @@ export default function UnifiedPublisher({
                                       })
                                     }
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                    required
                                   >
                                     <option value="">Select Category</option>
                                     <option value="apparel">
@@ -1683,7 +1685,10 @@ export default function UnifiedPublisher({
 
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Brand
+                                    Brand{' '}
+                                    <span className="text-gray-400 text-xs">
+                                      (optional)
+                                    </span>
                                   </label>
                                   <input
                                     type="text"
@@ -1702,7 +1707,8 @@ export default function UnifiedPublisher({
                                 <div className="col-span-2">
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
                                     <MapPin className="h-4 w-4 inline mr-1" />
-                                    Location (City, State/Province, Country) *
+                                    Location{' '}
+                                    <span className="text-red-500">*</span>
                                   </label>
                                   <div className="grid grid-cols-3 gap-2">
                                     <input
@@ -1759,31 +1765,74 @@ export default function UnifiedPublisher({
                                     />
                                   </div>
                                   <p className="text-xs text-gray-500 mt-1">
-                                    Enter your location for the marketplace
-                                    listing
+                                    Where is the item located? Buyers can filter
+                                    by location.
                                   </p>
                                 </div>
 
                                 <div>
                                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Shipping Price
+                                    Shipping{' '}
+                                    <span className="text-gray-400 text-xs">
+                                      (optional)
+                                    </span>
                                   </label>
-                                  <input
-                                    type="number"
-                                    value={marketplaceDetails.shippingPrice}
+                                  <select
+                                    value={
+                                      marketplaceDetails.shippingPrice === 0
+                                        ? 'free'
+                                        : 'paid'
+                                    }
                                     onChange={(e) =>
                                       setMarketplaceDetails({
                                         ...marketplaceDetails,
                                         shippingPrice:
-                                          parseFloat(e.target.value) || 0,
+                                          e.target.value === 'free'
+                                            ? 0
+                                            : marketplaceDetails.shippingPrice ||
+                                              5,
                                       })
                                     }
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    min="0"
-                                  />
+                                  >
+                                    <option value="free">Free Shipping</option>
+                                    <option value="paid">
+                                      Buyer Pays Shipping
+                                    </option>
+                                  </select>
                                 </div>
+
+                                {marketplaceDetails.shippingPrice > 0 && (
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Shipping Cost
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={marketplaceDetails.shippingPrice}
+                                      onChange={(e) =>
+                                        setMarketplaceDetails({
+                                          ...marketplaceDetails,
+                                          shippingPrice:
+                                            parseFloat(e.target.value) || 0,
+                                        })
+                                      }
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                      placeholder="5.00"
+                                      step="0.01"
+                                      min="0"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-xs text-blue-700">
+                                  <strong>Note:</strong> Price ($
+                                  {publishingOptions.price || '0'}) and
+                                  Condition ({publishingOptions.condition}) are
+                                  set in the main form above.
+                                </p>
                               </div>
                             </div>
                           )}
