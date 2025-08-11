@@ -356,7 +356,19 @@ async function publishToFacebook(options: PublishOptions) {
 
   const data = await response.json()
 
+  // ADD THIS DEBUG SECTION
   if (data.error) {
+    console.error(
+      'Facebook API full error:',
+      JSON.stringify(data.error, null, 2)
+    )
+    console.error('Request details:', {
+      pageId,
+      hasToken: !!accessToken,
+      tokenLength: accessToken?.length,
+      hasImage: !!imageUrl,
+      captionLength: caption?.length,
+    })
     throw new Error(data.error.message)
   }
 
