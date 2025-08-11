@@ -511,7 +511,14 @@ export default function UnifiedPublisher({
       'User ID:',
       passedUser.id
     )
-    window.location.href = `/api/${platformId}/oauth?user_id=${passedUser.id}`
+
+    // Meta uses different auth endpoint
+    const authUrl =
+      platformId === 'meta'
+        ? `/api/meta/auth?user_id=${passedUser.id}`
+        : `/api/${platformId}/oauth?user_id=${passedUser.id}`
+
+    window.location.href = authUrl
   }
 
   const generateAmazonInstructions = async () => {
