@@ -703,7 +703,7 @@ export default function UnifiedPublisher({
         platform: selectedPlatform,
       })
 
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${window.location.origin}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestPayload),
