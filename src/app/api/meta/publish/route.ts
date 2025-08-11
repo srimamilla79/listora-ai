@@ -292,21 +292,21 @@ function generateEnhancedCaption(productContent: any): string {
   const { product_name, generated_content, price, features, platform } =
     productContent
 
-  // Extract all sections from generated content - Fixed regex
+  // Fixed regex patterns to match the actual format
   const titleMatch = generated_content.match(
-    /(?:PRODUCT TITLE[^\n]*:|1\.\s*PRODUCT TITLE[^\n]*:)\s*([^\n]+)/i
+    /\*\*1\.\s*PRODUCT TITLE\/HEADLINE:\*\*\s*\n[^\n]*\n([^\n]+)/i
   )
   const sellingPointsMatch = generated_content.match(
-    /(?:KEY SELLING POINTS:|2\.\s*KEY SELLING POINTS:)([\s\S]*?)(?=\*\*\d+\.|$)/i
+    /\*\*2\.\s*KEY SELLING POINTS:\*\*\s*([\s\S]*?)(?=\*\*3\.|$)/i
   )
   const descriptionMatch = generated_content.match(
-    /(?:DETAILED PRODUCT DESCRIPTION:|3\.\s*DETAILED PRODUCT DESCRIPTION:)([\s\S]*?)(?=\*\*\d+\.|$)/i
+    /\*\*3\.\s*DETAILED PRODUCT DESCRIPTION:\*\*\s*([\s\S]*?)(?=\*\*4\.|$)/i
   )
   const blogIntroMatch = generated_content.match(
-    /(?:BLOG INTRO:|5\.\s*BLOG INTRO:)([\s\S]*?)(?=\*\*\d+\.|$)/i
+    /\*\*5\.\s*BLOG INTRO:\*\*\s*([\s\S]*?)(?=\*\*6\.|$)/i
   )
   const ctaMatch = generated_content.match(
-    /(?:CALL-TO-ACTION:|6\.\s*CALL-TO-ACTION:)[\s\S]*?Facebook:\s*([^\n]+)/i
+    /\*\*6\.\s*CALL-TO-ACTION:\*\*[\s\S]*?Facebook:\s*([^\n]+)/i
   )
 
   const fullTitle = titleMatch?.[1]?.trim() || product_name
@@ -315,7 +315,7 @@ function generateEnhancedCaption(productContent: any): string {
   const blogIntro = blogIntroMatch?.[1]?.trim() || ''
   const facebookCta = ctaMatch?.[1]?.trim() || 'Shop Now!'
 
-  // Build rich Facebook caption - START WITH TITLE
+  // Build rich Facebook caption - ENSURE TITLE IS FIRST
   let caption = `🌟 ${fullTitle.toUpperCase()} 🌟\n\n`
 
   // Rest of the function remains the same...
@@ -323,13 +323,11 @@ function generateEnhancedCaption(productContent: any): string {
     caption += `💰 Special Price: $${price} 💰\n\n`
   }
 
-  // Add compelling intro (first paragraph of blog intro or description)
   const introText = blogIntro.split('\n')[0] || description.split('.')[0]
   if (introText) {
     caption += `${introText.trim()}.\n\n`
   }
 
-  // Add key benefits with emojis
   if (sellingPoints.length > 0) {
     caption += `✨ WHY YOU'LL LOVE IT:\n\n`
     const benefitEmojis = ['✅', '⭐', '💪', '🎯', '🔥', '👟', '🏆']
@@ -340,7 +338,6 @@ function generateEnhancedCaption(productContent: any): string {
     caption += '\n'
   }
 
-  // Add a snippet from the detailed description for credibility
   if (description) {
     const descSnippet = description.split('.').slice(1, 3).join('.').trim()
     if (descSnippet) {
@@ -348,20 +345,14 @@ function generateEnhancedCaption(productContent: any): string {
     }
   }
 
-  // Add social proof elements
   caption += `🌟 Join thousands of satisfied customers\n`
   caption += `🚚 Free shipping on orders over $50\n`
   caption += `✔️ 30-day money-back guarantee\n\n`
-
-  // Add the specific Facebook CTA
   caption += `${facebookCta}\n\n`
-
-  // Add engagement prompts
   caption += `💬 Comment your favorite feature below!\n`
   caption += `📤 Share with someone who needs this!\n`
   caption += `👍 Like if you're ready to upgrade your gear!\n\n`
 
-  // Add relevant hashtags (fewer than Instagram)
   const hashtags = generateHashtags(productContent).slice(0, 15)
   caption += hashtags.join(' ')
 
@@ -371,26 +362,24 @@ function generateEnhancedCaption(productContent: any): string {
 function generateInstagramCaption(productContent: any): string {
   const { generated_content, product_name, price } = productContent
 
-  // Extract the full product title - Fixed regex to handle numbered format
+  // Fixed regex to match the actual format
   const titleMatch = generated_content.match(
-    /(?:PRODUCT TITLE[^\n]*:|1\.\s*PRODUCT TITLE[^\n]*:)\s*([^\n]+)/i
+    /\*\*1\.\s*PRODUCT TITLE\/HEADLINE:\*\*\s*\n[^\n]*\n([^\n]+)/i
   )
   const fullTitle = titleMatch?.[1]?.trim() || product_name
 
-  // Try to extract Instagram-specific caption
+  // Extract Instagram caption with fixed regex
   const instagramMatch = generated_content.match(
-    /(?:INSTAGRAM CAPTION:|4\.\s*INSTAGRAM CAPTION:)([\s\S]*?)(?=\*\*\d+\.|$)/i
+    /\*\*4\.\s*INSTAGRAM CAPTION:\*\*\s*([\s\S]*?)(?=\*\*5\.|$)/i
   )
 
   if (instagramMatch) {
     let caption = instagramMatch[1].trim()
 
-    // ALWAYS add the full title at the beginning
+    // ALWAYS add title first
     caption = `🌟 ${fullTitle.toUpperCase()} 🌟\n\n${caption}`
 
-    // Add price prominently if not already included
     if (price && price > 0 && !caption.includes('$')) {
-      // Insert price after title
       const lines = caption.split('\n')
       lines.splice(2, 0, `💰 Special Price: $${price} 💰\n`)
       caption = lines.join('\n')
@@ -399,7 +388,6 @@ function generateInstagramCaption(productContent: any): string {
     return caption
   }
 
-  // Fallback Instagram caption
   return generateFallbackInstagramCaption(productContent)
 }
 
