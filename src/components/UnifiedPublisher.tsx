@@ -109,6 +109,8 @@ export default function UnifiedPublisher({
   const [showInstructions, setShowInstructions] = useState(false)
   const [instructionData, setInstructionData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showMarketplacePermissionDialog, setShowMarketplacePermissionDialog] =
+    useState(false)
 
   const [publishingOptions, setPublishingOptions] = useState({
     price: '',
@@ -581,6 +583,7 @@ export default function UnifiedPublisher({
     }
   }
 
+  // In handlePublish function - REPLACE the entire function with this:
   const handlePublish = async () => {
     console.log('🚀 handlePublish called with:', {
       currentImages,
@@ -623,6 +626,51 @@ export default function UnifiedPublisher({
       return
     }
 
+    // 🆕 NEW: Special handling for Meta with marketplace
+    if (
+      selectedPlatform === 'meta' &&
+      publishingOptions.metaPlatforms.includes('marketplace')
+    ) {
+      // Validate marketplace requirements first
+      if (
+        !marketplaceDetails.location.city ||
+        !marketplaceDetails.location.state ||
+        !marketplaceDetails.location.country
+      ) {
+        setPublishError('Please enter your location for marketplace listing')
+        return
+      }
+      if (!marketplaceDetails.category) {
+        setPublishError('Please select a category for marketplace listing')
+        return
+      }
+
+      // 🆕 NEW: Check if user needs to reconnect for marketplace permissions
+      try {
+        const permissionCheckResponse = await fetch(
+          '/api/meta/check-permissions',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: passedUser?.id }),
+          }
+        )
+
+        if (permissionCheckResponse.ok) {
+          const permissionData = await permissionCheckResponse.json()
+
+          if (!permissionData.hasMarketplacePermissions) {
+            // 🆕 NEW: Show detailed error with action button
+            setPublishError(null) // Clear any existing error
+            setShowMarketplacePermissionDialog(true) // You'll need to add this state
+            return
+          }
+        }
+      } catch (permError) {
+        console.warn('Permission check failed, proceeding anyway:', permError)
+      }
+    }
+
     setIsPublishing(true)
     setPublishError(null)
     setPublishSuccess(null)
@@ -649,26 +697,6 @@ export default function UnifiedPublisher({
 
       // Handle Meta publishing
       if (selectedPlatform === 'meta') {
-        // Validate marketplace requirements if selected
-        if (publishingOptions.metaPlatforms.includes('marketplace')) {
-          if (
-            !marketplaceDetails.location.city ||
-            !marketplaceDetails.location.state ||
-            !marketplaceDetails.location.country
-          ) {
-            setPublishError(
-              'Please enter your location for marketplace listing'
-            )
-            setIsPublishing(false)
-            return
-          }
-          if (!marketplaceDetails.category) {
-            setPublishError('Please select a category for marketplace listing')
-            setIsPublishing(false)
-            return
-          }
-        }
-
         requestPayload = {
           productContent: {
             id: productContent?.id,
@@ -711,6 +739,16 @@ export default function UnifiedPublisher({
 
       if (!response.ok) {
         const errorData = await response.json()
+
+        // 🆕 NEW: Special handling for permission errors
+        if (response.status === 403 && errorData.permissions_required) {
+          setShowMarketplacePermissionDialog(true)
+          setPublishError(
+            'Facebook Marketplace requires additional permissions. Please reconnect your Facebook account.'
+          )
+          return
+        }
+
         throw new Error(
           errorData.error ||
             `Failed to publish to ${selectedPlatformData?.name}`
@@ -719,6 +757,64 @@ export default function UnifiedPublisher({
 
       const result = await response.json()
 
+      // 🆕 NEW: Handle partial success (e.g., posted to FB/IG but not marketplace)
+      if (result.data && Array.isArray(result.data)) {
+        const failures = result.data.filter((r: any) => r.error)
+        const successes = result.data.filter((r: any) => !r.error)
+
+        if (failures.length > 0 && successes.length > 0) {
+          // Partial success
+          const successPlatforms = successes
+            .map((s: any) =>
+              s.platform === 'facebook'
+                ? 'Facebook'
+                : s.platform === 'instagram'
+                  ? 'Instagram'
+                  : s.platform === 'marketplace'
+                    ? 'Marketplace'
+                    : s.platform
+            )
+            .join(', ')
+
+          const failedPlatforms = failures
+            .map((f: any) =>
+              f.platform === 'facebook'
+                ? 'Facebook'
+                : f.platform === 'instagram'
+                  ? 'Instagram'
+                  : f.platform === 'marketplace'
+                    ? 'Marketplace'
+                    : f.platform
+            )
+            .join(', ')
+
+          setPublishSuccess(`✅ Posted to ${successPlatforms}`)
+          setPublishError(
+            `⚠️ Failed to post to ${failedPlatforms}: ${failures[0].error}`
+          )
+
+          // Still mark as published for successful platforms
+          setPublishedProducts((prev) => ({
+            ...prev,
+            [selectedPlatform]: {
+              ...result,
+              publishedAt: new Date().toISOString(),
+              partial: true,
+            },
+          }))
+
+          if (onPublishSuccess) {
+            onPublishSuccess({ ...result, platform: selectedPlatform })
+          }
+
+          return
+        } else if (failures.length > 0 && successes.length === 0) {
+          // Complete failure
+          throw new Error(failures[0].error || 'All publishing attempts failed')
+        }
+      }
+
+      // Complete success
       const successMessage =
         selectedPlatform === 'ebay'
           ? `✅ Successfully listed on eBay! Item ID: ${result.data?.itemId || result.data?.listingId || 'Processing'}`
@@ -735,6 +831,7 @@ export default function UnifiedPublisher({
                   )
                   .join(', ')}!`
               : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.productId || result.listingId || result.id || 'Unknown'}`
+
       setPublishSuccess(successMessage)
 
       setPublishedProducts((prev) => ({
@@ -2028,6 +2125,61 @@ export default function UnifiedPublisher({
           </>
         )}
       </div>
+      {/* 🆕 ADD THE MARKETPLACE PERMISSION DIALOG HERE */}
+      {showMarketplacePermissionDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-3">
+              Facebook Marketplace Permissions Required
+            </h3>
+            <p className="text-gray-600 mb-4">
+              To list products on Facebook Marketplace, you need to reconnect
+              your Facebook account and approve additional permissions:
+            </p>
+            <ul className="list-disc list-inside text-sm text-gray-600 mb-4">
+              <li>Catalog Management</li>
+              <li>Commerce Account Access</li>
+              <li>Business Management</li>
+            </ul>
+            <p className="text-sm text-gray-500 mb-6">
+              Note: These permissions may require Facebook app review. In the
+              meantime, you can still post to Facebook Pages and Instagram.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  fetch('/api/meta/disconnect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: passedUser?.id }),
+                  }).then(() => {
+                    setTimeout(() => {
+                      handlePlatformConnect('meta')
+                    }, 500)
+                  })
+                }}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Reconnect Facebook
+              </button>
+              <button
+                onClick={() => {
+                  setShowMarketplacePermissionDialog(false)
+                  setPublishingOptions((prev) => ({
+                    ...prev,
+                    metaPlatforms: prev.metaPlatforms.filter(
+                      (p) => p !== 'marketplace'
+                    ),
+                  }))
+                }}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Continue Without Marketplace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

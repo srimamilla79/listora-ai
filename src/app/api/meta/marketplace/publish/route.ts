@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient()
 
-    // Get Meta connection with catalog
+    // Get Meta connection
     const { data: connection } = await supabase
       .from('meta_connections')
       .select('*')
@@ -56,11 +56,159 @@ export async function POST(request: NextRequest) {
       .eq('status', 'connected')
       .single()
 
-    if (!connection || !connection.facebook_catalog_id) {
+    if (!connection) {
       return NextResponse.json(
-        { error: 'No Facebook catalog found. Please set up commerce first.' },
+        { error: 'No Meta connection found' },
         { status: 404 }
       )
+    }
+
+    // Check permissions BEFORE attempting any marketplace operations
+    console.log('Checking Facebook permissions...')
+    try {
+      const permissionCheck = await fetch(
+        `https://graph.facebook.com/v18.0/me/permissions?access_token=${connection.facebook_page_access_token}`
+      )
+      const permissions = await permissionCheck.json()
+
+      console.log('Available permissions:', permissions.data)
+
+      // Check for required permissions
+      const requiredPermissions = ['pages_manage_posts', 'pages_show_list']
+      const hasBasicPermissions = requiredPermissions.every((perm) =>
+        permissions.data?.some(
+          (p: any) => p.permission === perm && p.status === 'granted'
+        )
+      )
+
+      // Check for commerce permissions (these might not be granted yet)
+      const commercePermissions = [
+        'commerce_account_read_settings',
+        'commerce_account_manage_orders',
+        'business_management',
+      ]
+      const hasCommercePermissions = commercePermissions.some((perm) =>
+        permissions.data?.some(
+          (p: any) => p.permission === perm && p.status === 'granted'
+        )
+      )
+
+      if (!hasBasicPermissions) {
+        return NextResponse.json(
+          {
+            error:
+              'Missing basic Facebook permissions. Please reconnect your Facebook account.',
+            permissions_required: requiredPermissions,
+            permissions_found:
+              permissions.data?.map((p: any) => p.permission) || [],
+          },
+          { status: 403 }
+        )
+      }
+
+      if (!hasCommercePermissions) {
+        console.warn(
+          'Commerce permissions not available, attempting basic marketplace listing...'
+        )
+
+        // For now, we'll proceed with a simplified approach
+        // that doesn't require catalog management
+        return await createSimplifiedMarketplaceListing({
+          connection,
+          productContent,
+          images,
+          publishOptions,
+          userId,
+          supabase,
+        })
+      }
+    } catch (permError) {
+      console.error('Permission check failed:', permError)
+      // Continue with simplified approach if permission check fails
+      return await createSimplifiedMarketplaceListing({
+        connection,
+        productContent,
+        images,
+        publishOptions,
+        userId,
+        supabase,
+      })
+    }
+
+    // Only attempt catalog operations if we have commerce permissions
+    // Check if catalog exists, create if needed
+    if (!connection.facebook_catalog_id) {
+      console.log('No catalog found, attempting to create one...')
+
+      try {
+        // First, check if user has a business account
+        const businessResponse = await fetch(
+          `https://graph.facebook.com/v18.0/me/businesses?access_token=${connection.facebook_page_access_token}`
+        )
+        const businesses = await businessResponse.json()
+
+        if (!businesses.data || businesses.data.length === 0) {
+          console.log('No business account found, using simplified approach')
+          return await createSimplifiedMarketplaceListing({
+            connection,
+            productContent,
+            images,
+            publishOptions,
+            userId,
+            supabase,
+          })
+        }
+
+        // Create catalog under the first business
+        const businessId = businesses.data[0].id
+        const catalogResponse = await fetch(
+          `https://graph.facebook.com/v18.0/${businessId}/owned_product_catalogs`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: 'Listora AI Products',
+              vertical: 'commerce',
+              access_token: connection.facebook_page_access_token,
+            }),
+          }
+        )
+
+        const catalog = await catalogResponse.json()
+
+        if (catalog.error) {
+          console.error('Catalog creation failed:', catalog.error)
+          return await createSimplifiedMarketplaceListing({
+            connection,
+            productContent,
+            images,
+            publishOptions,
+            userId,
+            supabase,
+          })
+        }
+
+        // Update connection with catalog ID
+        await supabase
+          .from('meta_connections')
+          .update({
+            facebook_catalog_id: catalog.id,
+            commerce_enabled: true,
+          })
+          .eq('user_id', userId)
+
+        connection.facebook_catalog_id = catalog.id
+      } catch (catalogError) {
+        console.error('Catalog creation error:', catalogError)
+        return await createSimplifiedMarketplaceListing({
+          connection,
+          productContent,
+          images,
+          publishOptions,
+          userId,
+          supabase,
+        })
+      }
     }
 
     // Extract product details from generated content
@@ -81,20 +229,23 @@ export async function POST(request: NextRequest) {
         category:
           publishOptions.category || detectProductCategory(productContent),
         image_url: images[0],
-        additional_image_urls: images.slice(1, 10), // Max 10 additional images
+        additional_image_urls: images.slice(1, 10),
         inventory: productContent.quantity || 1,
         currency: 'USD',
-        // Marketplace specific fields
-        marketplace_category: getMarketplaceCategory(productContent),
-        shipping: {
-          price: publishOptions.shippingPrice || 0,
-          country: publishOptions.location?.country || 'US',
-        },
       },
     })
 
     if (catalogProduct.error) {
-      throw new Error(catalogProduct.error.message)
+      console.error('Catalog product creation failed:', catalogProduct.error)
+      // Fallback to simplified approach
+      return await createSimplifiedMarketplaceListing({
+        connection,
+        productContent,
+        images,
+        publishOptions,
+        userId,
+        supabase,
+      })
     }
 
     // Step 2: Create Marketplace listing
@@ -106,26 +257,24 @@ export async function POST(request: NextRequest) {
       location: publishOptions.location,
     })
 
-    // Step 3: Create a promotional post (optional)
-    let postId = null
-    if (body.createPost) {
-      const post = await createMarketplacePost({
-        pageId: connection.facebook_page_id,
-        accessToken: connection.facebook_page_access_token,
-        product: productContent,
-        catalogProductId: catalogProduct.id,
-        images,
-      })
-      postId = post.id
+    if (marketplaceListing.error) {
+      console.error('Marketplace listing failed:', marketplaceListing.error)
+      return NextResponse.json(
+        {
+          error:
+            marketplaceListing.error.message ||
+            'Failed to create marketplace listing',
+        },
+        { status: 400 }
+      )
     }
 
-    // Step 4: Save to database
+    // Step 3: Save to database
     await supabase.from('marketplace_listings').insert({
       user_id: userId,
       content_id: productContent.id,
       catalog_product_id: catalogProduct.id,
       marketplace_listing_id: marketplaceListing.id,
-      facebook_post_id: postId,
       title: productDetails.title,
       description: productDetails.description,
       price: productContent.price,
@@ -144,7 +293,6 @@ export async function POST(request: NextRequest) {
       data: {
         catalogProductId: catalogProduct.id,
         marketplaceListingId: marketplaceListing.id,
-        postId: postId,
         listingUrl: marketplaceListing.url,
       },
       message: 'Successfully listed on Facebook Marketplace!',
@@ -157,6 +305,97 @@ export async function POST(request: NextRequest) {
           error instanceof Error
             ? error.message
             : 'Failed to publish to marketplace',
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// Simplified marketplace listing without catalog
+async function createSimplifiedMarketplaceListing(options: {
+  connection: any
+  productContent: MarketplaceProduct
+  images: string[]
+  publishOptions: any
+  userId: string
+  supabase: any
+}) {
+  const {
+    connection,
+    productContent,
+    images,
+    publishOptions,
+    userId,
+    supabase,
+  } = options
+
+  console.log('Using simplified marketplace approach (no catalog required)')
+
+  // Create a marketplace post with product details
+  const caption = generateMarketplaceCaption(productContent)
+
+  try {
+    // Post to Facebook with marketplace-style content
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${connection.facebook_page_id}/photos`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: caption,
+          url: images[0],
+          access_token: connection.facebook_page_access_token,
+        }),
+      }
+    )
+
+    const result = await response.json()
+
+    if (result.error) {
+      throw new Error(result.error.message)
+    }
+
+    // Get the post permalink
+    const postResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${result.id}?fields=permalink_url&access_token=${connection.facebook_page_access_token}`
+    )
+    const postData = await postResponse.json()
+
+    // Save simplified listing to database
+    await supabase.from('marketplace_listings').insert({
+      user_id: userId,
+      content_id: productContent.id,
+      facebook_post_id: result.id,
+      title: productContent.product_name,
+      description: productContent.features,
+      price: productContent.price,
+      quantity: productContent.quantity,
+      sku: productContent.sku || `LISTORA-${Date.now()}`,
+      condition: publishOptions.condition || 'new',
+      category: publishOptions.category,
+      images: images,
+      status: 'active',
+      listing_url: postData.permalink_url,
+      created_at: new Date().toISOString(),
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        postId: result.id,
+        listingUrl: postData.permalink_url,
+      },
+      message: 'Successfully posted marketplace-style listing to Facebook!',
+      note: 'This is a simplified listing. For full marketplace features, additional permissions are required.',
+    })
+  } catch (postError) {
+    console.error('Simplified listing failed:', postError)
+    return NextResponse.json(
+      {
+        error:
+          postError instanceof Error
+            ? postError.message
+            : 'Failed to create marketplace post',
       },
       { status: 500 }
     )
@@ -216,50 +455,22 @@ async function createMarketplaceListing(options: {
 
   const listing = await response.json()
 
-  // Get listing URL
-  if (listing.id) {
-    const urlResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${listing.id}?fields=url&access_token=${accessToken}`
-    )
-    const urlData = await urlResponse.json()
-    listing.url = urlData.url
+  // Get listing URL if successful
+  if (listing.id && !listing.error) {
+    try {
+      const urlResponse = await fetch(
+        `https://graph.facebook.com/v18.0/${listing.id}?fields=url&access_token=${accessToken}`
+      )
+      const urlData = await urlResponse.json()
+      listing.url =
+        urlData.url || `https://www.facebook.com/marketplace/item/${listing.id}`
+    } catch (urlError) {
+      console.error('Failed to get listing URL:', urlError)
+      listing.url = `https://www.facebook.com/marketplace/item/${listing.id}`
+    }
   }
 
   return listing
-}
-
-// Create promotional post for marketplace item
-async function createMarketplacePost(options: {
-  pageId: string
-  accessToken: string
-  product: any
-  catalogProductId: string
-  images: string[]
-}) {
-  const { pageId, accessToken, product, catalogProductId } = options
-
-  const caption = generateMarketplaceCaption(product)
-
-  const response = await fetch(
-    `https://graph.facebook.com/v18.0/${pageId}/feed`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: caption,
-        link: `https://www.facebook.com/marketplace/item/${catalogProductId}`,
-        call_to_action: {
-          type: 'SHOP_NOW',
-          value: {
-            link: `https://www.facebook.com/marketplace/item/${catalogProductId}`,
-          },
-        },
-        access_token: accessToken,
-      }),
-    }
-  )
-
-  return response.json()
 }
 
 // Extract structured details from generated content
@@ -267,13 +478,13 @@ function extractProductDetails(productContent: any) {
   const { generated_content, product_name } = productContent
 
   // Extract title
-  const titleMatch = generated_content.match(
+  const titleMatch = generated_content?.match(
     /\*\*1\.\s*PRODUCT TITLE\/HEADLINE:\*\*\s*\n[^\n]*\n([^\n]+)/i
   )
   const title = titleMatch?.[1]?.trim() || product_name
 
   // Extract description
-  const descMatch = generated_content.match(
+  const descMatch = generated_content?.match(
     /\*\*3\.\s*DETAILED PRODUCT DESCRIPTION:\*\*\s*([\s\S]*?)(?=\*\*4\.|$)/i
   )
   const description =
@@ -282,7 +493,7 @@ function extractProductDetails(productContent: any) {
   // Try to extract brand from title or features
   const brandMatch =
     title.match(/^(\w+)\s/) ||
-    productContent.features.match(/brand[:\s]+(\w+)/i)
+    productContent.features?.match(/brand[:\s]+(\w+)/i)
   const brand = brandMatch?.[1] || null
 
   return {
@@ -313,27 +524,6 @@ function detectProductCategory(product: any): string {
   return 'other'
 }
 
-// Get marketplace-specific category
-function getMarketplaceCategory(product: any): string {
-  const category = detectProductCategory(product)
-
-  // Map to Facebook Marketplace categories
-  const categoryMap: Record<string, string> = {
-    shoes_and_footwear: 'apparel',
-    clothing_and_accessories: 'apparel',
-    electronics: 'electronics',
-    furniture: 'home',
-    toys_and_games: 'family',
-    books_and_magazines: 'entertainment',
-    jewelry_and_watches: 'apparel',
-    health_and_beauty: 'health_beauty',
-    sports_and_outdoors: 'sports_outdoors',
-    other: 'misc',
-  }
-
-  return categoryMap[category] || 'misc'
-}
-
 // Generate marketplace-specific caption
 function generateMarketplaceCaption(product: any): string {
   const { product_name, price, features } = product
@@ -342,13 +532,15 @@ function generateMarketplaceCaption(product: any): string {
   caption += `💰 Price: $${price}\n\n`
 
   // Add key features
-  const featureList = features.split(/[,\n]/).filter(Boolean).slice(0, 3)
-  if (featureList.length > 0) {
-    caption += `✨ Features:\n`
-    featureList.forEach((feature: string) => {
-      caption += `• ${feature.trim()}\n`
-    })
-    caption += '\n'
+  if (features) {
+    const featureList = features.split(/[,\n]/).filter(Boolean).slice(0, 3)
+    if (featureList.length > 0) {
+      caption += `✨ Features:\n`
+      featureList.forEach((feature: string) => {
+        caption += `• ${feature.trim()}\n`
+      })
+      caption += '\n'
+    }
   }
 
   caption += `📍 Available for local pickup or shipping\n`

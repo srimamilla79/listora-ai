@@ -1,6 +1,10 @@
+// meta publish route.ts with facebook marketplace connections code
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
 import { cookies } from 'next/headers'
+
+// Replace your current POST function in /api/meta/publish/route.ts with this:
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +15,7 @@ export async function POST(request: NextRequest) {
       platforms,
       userId,
       publishType = 'post',
+      publishingOptions,
     } = body
 
     if (!userId || !productContent) {
@@ -39,87 +44,220 @@ export async function POST(request: NextRequest) {
     }
 
     const results = []
+    let marketplaceResult = null
 
-    // Check if commerce catalog exists (for shopping posts)
-    let catalogId = null
-    if (publishType === 'shopping' && connection.commerce_account_id) {
-      catalogId = await getOrCreateCatalog(
-        connection.commerce_account_id,
-        connection.facebook_page_access_token
+    // IMPORTANT: Separate social platforms from marketplace
+    const socialPlatforms = platforms.filter((p: string) => p !== 'marketplace')
+    const includesMarketplace = platforms.includes('marketplace')
+
+    // Handle marketplace SEPARATELY with error handling
+    if (includesMarketplace && publishingOptions?.marketplaceDetails) {
+      try {
+        console.log('Attempting marketplace listing...')
+
+        // Check if we have the required catalog permissions first
+        const permissionCheckResponse = await fetch(
+          `https://graph.facebook.com/v18.0/me/permissions?access_token=${connection.facebook_page_access_token}`
+        )
+        const permissions = await permissionCheckResponse.json()
+
+        const hasRequiredPermissions = permissions.data?.some(
+          (p: any) =>
+            p.permission === 'business_management' && p.status === 'granted'
+        )
+
+        if (!hasRequiredPermissions) {
+          console.warn('Missing required permissions for marketplace')
+          marketplaceResult = {
+            platform: 'marketplace',
+            error: 'Marketplace requires additional Facebook app permissions',
+            success: false,
+          }
+        } else {
+          // Only try marketplace if we have permissions
+          try {
+            const marketplaceResponse = await fetch(
+              `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/meta/marketplace/publish`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  productContent: {
+                    ...productContent,
+                    price:
+                      publishingOptions.marketplaceDetails.price ||
+                      productContent.price,
+                    quantity:
+                      publishingOptions.marketplaceDetails.quantity ||
+                      productContent.quantity,
+                  },
+                  images,
+                  userId,
+                  publishOptions: publishingOptions.marketplaceDetails,
+                  createPost: false,
+                }),
+              }
+            )
+
+            if (marketplaceResponse.ok) {
+              marketplaceResult = await marketplaceResponse.json()
+              results.push({ platform: 'marketplace', ...marketplaceResult })
+            } else {
+              const errorData = await marketplaceResponse.json()
+              console.error('Marketplace publish failed:', errorData)
+              marketplaceResult = {
+                platform: 'marketplace',
+                error: errorData.error || 'Marketplace listing failed',
+                success: false,
+              }
+            }
+          } catch (marketplaceError) {
+            console.error('Marketplace error:', marketplaceError)
+            marketplaceResult = {
+              platform: 'marketplace',
+              error: 'Marketplace service unavailable',
+              success: false,
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Marketplace check error:', error)
+        marketplaceResult = {
+          platform: 'marketplace',
+          error: 'Unable to verify marketplace permissions',
+          success: false,
+        }
+      }
+    }
+
+    // ALWAYS process social platforms regardless of marketplace status
+    if (socialPlatforms.length > 0) {
+      // Facebook posting
+      if (socialPlatforms.includes('facebook') && connection.facebook_page_id) {
+        try {
+          const fbResult = await publishToFacebook({
+            pageId: connection.facebook_page_id,
+            accessToken: connection.facebook_page_access_token,
+            productContent,
+            imageUrl: images[0],
+            publishType: 'post' as const,
+            catalogId: null,
+          })
+          results.push({ platform: 'facebook', ...fbResult })
+        } catch (fbError) {
+          const errorMessage =
+            fbError instanceof Error
+              ? fbError.message
+              : 'Facebook posting failed'
+          console.error('Facebook posting error:', errorMessage)
+          results.push({
+            platform: 'facebook',
+            error: errorMessage,
+            success: false,
+          })
+        }
+      }
+
+      // Instagram posting
+      if (
+        socialPlatforms.includes('instagram') &&
+        connection.instagram_account_id
+      ) {
+        try {
+          const igResult = await publishToInstagram({
+            accountId: connection.instagram_account_id,
+            accessToken: connection.facebook_page_access_token,
+            productContent,
+            imageUrl: images[0],
+            publishType: 'post' as const,
+          })
+          results.push({ platform: 'instagram', ...igResult })
+        } catch (igError) {
+          const errorMessage =
+            igError instanceof Error
+              ? igError.message
+              : 'Instagram posting failed'
+          console.error('Instagram posting error:', errorMessage)
+          results.push({
+            platform: 'instagram',
+            error: errorMessage,
+            success: false,
+          })
+        }
+      }
+    }
+
+    // Save successful posts to database
+    const successfulResults = results.filter((r) => !r.error)
+    if (successfulResults.length > 0) {
+      await supabase.from('published_products').insert({
+        user_id: userId,
+        content_id: productContent.id,
+        platform: 'meta',
+        platform_product_id: successfulResults.map((r) => r.id).join(','),
+        platform_url: successfulResults[0]?.permalink || null,
+        title: productContent.product_name,
+        description: productContent.generated_content,
+        price: productContent.price || 0,
+        quantity: productContent.quantity || 0,
+        sku: productContent.sku || `META-${Date.now()}`,
+        images: images,
+        platform_data: {
+          results: successfulResults,
+          publishType,
+          marketplaceResult,
+        },
+        status: 'published',
+        published_at: new Date().toISOString(),
+        last_synced_at: new Date().toISOString(),
+      })
+
+      // Save to meta_published_posts
+      await supabase.from('meta_published_posts').insert({
+        user_id: userId,
+        content_id: productContent.id,
+        platform: successfulResults.map((r) => r.platform).join(','),
+        facebook_post_id: successfulResults.find(
+          (r) => r.platform === 'facebook'
+        )?.id,
+        instagram_post_id: successfulResults.find(
+          (r) => r.platform === 'instagram'
+        )?.id,
+        caption: generateEnhancedCaption(productContent),
+        image_urls: images,
+        published_at: new Date().toISOString(),
+        post_type: publishType,
+        product_data: {
+          price: productContent.price,
+          quantity: productContent.quantity,
+          sku: productContent.sku,
+        },
+      })
+    }
+
+    // Return appropriate response
+    if (results.length === 0 || results.every((r) => r.error)) {
+      return NextResponse.json(
+        { error: 'All publishing attempts failed', details: results },
+        { status: 400 }
       )
     }
-
-    // Publish to Facebook
-    if (platforms.includes('facebook') && connection.facebook_page_id) {
-      const fbResult = await publishToFacebook({
-        pageId: connection.facebook_page_id,
-        accessToken: connection.facebook_page_access_token,
-        productContent,
-        imageUrl: images[0],
-        publishType,
-        catalogId,
-      })
-      results.push({ platform: 'facebook', ...fbResult })
-    }
-
-    // Publish to Instagram
-    if (platforms.includes('instagram') && connection.instagram_account_id) {
-      const igResult = await publishToInstagram({
-        accountId: connection.instagram_account_id,
-        accessToken: connection.facebook_page_access_token,
-        productContent,
-        imageUrl: images[0],
-        publishType,
-      })
-      results.push({ platform: 'instagram', ...igResult })
-    }
-
-    // Save to published_products table with enhanced data
-    await supabase.from('published_products').insert({
-      user_id: userId,
-      content_id: productContent.id,
-      platform: 'meta',
-      platform_product_id: results.map((r) => r.id).join(','),
-      platform_url: results[0]?.permalink || null,
-      title: productContent.product_name,
-      description: productContent.generated_content,
-      price: productContent.price || 0,
-      quantity: productContent.quantity || 0,
-      sku: productContent.sku || `META-${Date.now()}`,
-      images: images,
-      platform_data: {
-        results,
-        publishType,
-        catalogId,
-      },
-      status: 'published',
-      published_at: new Date().toISOString(),
-      last_synced_at: new Date().toISOString(),
-    })
-
-    // Save to meta_published_posts
-    await supabase.from('meta_published_posts').insert({
-      user_id: userId,
-      content_id: productContent.id,
-      platform: platforms.join(','),
-      facebook_post_id: results.find((r) => r.platform === 'facebook')?.id,
-      instagram_post_id: results.find((r) => r.platform === 'instagram')?.id,
-      caption: generateEnhancedCaption(productContent),
-      image_urls: images,
-      published_at: new Date().toISOString(),
-      post_type: publishType,
-      product_data: {
-        price: productContent.price,
-        quantity: productContent.quantity,
-        sku: productContent.sku,
-      },
-    })
 
     return NextResponse.json({
       success: true,
       data: results,
-      message: `Successfully posted to ${platforms.join(' and ')}!`,
+      message: `Successfully posted to ${results
+        .filter((r) => !r.error)
+        .map((r) =>
+          r.platform === 'marketplace'
+            ? 'Marketplace'
+            : r.platform === 'facebook'
+              ? 'Facebook'
+              : 'Instagram'
+        )
+        .join(', ')}!`,
       publishType,
+      marketplaceResult,
     })
   } catch (error) {
     console.error('Meta publish error:', error)
@@ -137,7 +275,7 @@ interface PublishOptions {
   productContent: any
   imageUrl: string
   publishType: 'post' | 'shopping' | 'story'
-  catalogId?: string
+  catalogId?: string | null
 }
 
 async function publishToFacebook(options: PublishOptions) {

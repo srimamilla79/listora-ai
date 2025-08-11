@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
     state,
     user_id: userId,
     platform: 'meta',
-    expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+    expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
   })
 
-  // Facebook OAuth URL with required permissions
+  // Updated scopes - add commerce permissions
   const scopes = [
     'pages_show_list',
     'pages_read_engagement',
@@ -36,6 +36,14 @@ export async function GET(request: NextRequest) {
     'instagram_basic',
     'instagram_content_publish',
     'business_management',
+    // Remove these deprecated ones:
+    // 'catalog_management', // DEPRECATED
+    // 'commerce_account',   // DEPRECATED
+
+    // Add these new ones:
+    'commerce_account_read_settings',
+    'commerce_account_manage_orders',
+    'ads_management',
   ].join(',')
 
   const authUrl =
