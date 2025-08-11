@@ -11,7 +11,6 @@ export async function POST(request: NextRequest) {
       platforms,
       userId,
       publishType = 'post',
-      publishingOptions, // ADD THIS LINE
     } = body
 
     if (!userId || !productContent) {
@@ -40,75 +39,6 @@ export async function POST(request: NextRequest) {
     }
 
     const results = []
-    let marketplaceResult = null
-
-    // ADD THIS ENTIRE SECTION - Handle marketplace if selected
-    if (
-      platforms.includes('marketplace') &&
-      publishingOptions?.marketplaceDetails
-    ) {
-      try {
-        // Check if catalog exists, if not create one
-        if (!connection.facebook_catalog_id) {
-          // Create catalog first
-          const catalogResponse = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/meta/marketplace/catalog`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: userId,
-                catalogName: 'Listora AI Products',
-              }),
-            }
-          )
-
-          if (!catalogResponse.ok) {
-            console.error('Failed to create catalog')
-          } else {
-            const catalogData = await catalogResponse.json()
-            connection.facebook_catalog_id = catalogData.catalogId
-          }
-        }
-
-        // Call marketplace publish endpoint
-        const marketplaceResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/meta/marketplace/publish`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              productContent: {
-                ...productContent,
-                price:
-                  publishingOptions.marketplaceDetails.price ||
-                  productContent.price,
-                quantity:
-                  publishingOptions.marketplaceDetails.quantity ||
-                  productContent.quantity,
-              },
-              images,
-              userId,
-              publishOptions: publishingOptions.marketplaceDetails,
-              createPost: false, // Don't create duplicate post
-            }),
-          }
-        )
-
-        if (marketplaceResponse.ok) {
-          marketplaceResult = await marketplaceResponse.json()
-          results.push({ platform: 'marketplace', ...marketplaceResult })
-        } else {
-          const errorData = await marketplaceResponse.json()
-          console.error('Marketplace publish failed:', errorData)
-        }
-      } catch (error) {
-        console.error('Marketplace publish error:', error)
-      }
-    }
-
-    // Filter out marketplace from social platforms
-    const socialPlatforms = platforms.filter((p: string) => p !== 'marketplace')
 
     // Check if commerce catalog exists (for shopping posts)
     let catalogId = null
@@ -119,8 +49,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Publish to Facebook - UPDATED CONDITION
-    if (socialPlatforms.includes('facebook') && connection.facebook_page_id) {
+    // Publish to Facebook
+    if (platforms.includes('facebook') && connection.facebook_page_id) {
       const fbResult = await publishToFacebook({
         pageId: connection.facebook_page_id,
         accessToken: connection.facebook_page_access_token,
@@ -132,11 +62,8 @@ export async function POST(request: NextRequest) {
       results.push({ platform: 'facebook', ...fbResult })
     }
 
-    // Publish to Instagram - UPDATED CONDITION
-    if (
-      socialPlatforms.includes('instagram') &&
-      connection.instagram_account_id
-    ) {
+    // Publish to Instagram
+    if (platforms.includes('instagram') && connection.instagram_account_id) {
       const igResult = await publishToInstagram({
         accountId: connection.instagram_account_id,
         accessToken: connection.facebook_page_access_token,
@@ -191,17 +118,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: results,
-      message: `Successfully posted to ${platforms
-        .map((p: string) =>
-          p === 'marketplace'
-            ? 'Marketplace'
-            : p === 'facebook'
-              ? 'Facebook'
-              : 'Instagram'
-        )
-        .join(', ')}!`,
+      message: `Successfully posted to ${platforms.join(' and ')}!`,
       publishType,
-      marketplaceResult, // Include marketplace result if available
     })
   } catch (error) {
     console.error('Meta publish error:', error)
