@@ -42,6 +42,24 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+    // Debug: Check what permissions we actually have
+    console.log('Checking Facebook permissions...')
+    try {
+      const permResponse = await fetch(
+        `https://graph.facebook.com/v18.0/me/permissions?access_token=${connection.facebook_page_access_token}`
+      )
+      const permissions = await permResponse.json()
+      console.log('Facebook permissions:', JSON.stringify(permissions, null, 2))
+    } catch (e) {
+      console.error('Failed to check permissions:', e)
+    }
+
+    // Debug: Check if page token is valid
+    console.log('Page info:', {
+      pageId: connection.facebook_page_id,
+      hasToken: !!connection.facebook_page_access_token,
+      tokenLength: connection.facebook_page_access_token?.length,
+    })
 
     const results = []
     let marketplaceResult = null
