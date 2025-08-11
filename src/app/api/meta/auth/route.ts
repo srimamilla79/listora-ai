@@ -36,13 +36,6 @@ export async function GET(request: NextRequest) {
     'instagram_basic',
     'instagram_content_publish',
     'business_management',
-    // Remove these deprecated ones:
-    // 'catalog_management', // DEPRECATED
-    // 'commerce_account',   // DEPRECATED
-
-    // Add these new ones:
-    'commerce_account_read_settings',
-    'commerce_account_manage_orders',
     'ads_management',
   ].join(',')
 

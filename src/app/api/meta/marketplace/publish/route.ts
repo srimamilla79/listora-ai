@@ -62,6 +62,12 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+    // Check what permissions we have
+    const permCheck = await fetch(
+      `https://graph.facebook.com/v18.0/me/permissions?access_token=${connection.facebook_page_access_token}`
+    )
+    const perms = await permCheck.json()
+    console.log('Current Facebook permissions:', perms)
 
     // Check permissions BEFORE attempting any marketplace operations
     console.log('Checking Facebook permissions...')
