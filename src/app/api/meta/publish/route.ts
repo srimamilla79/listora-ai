@@ -29,14 +29,17 @@ export async function POST(request: NextRequest) {
     const supabase = createClient()
 
     // Get Meta connection
-    const { data: connection } = await supabase
+    const { data: connections } = await supabase
       .from('meta_connections')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'connected')
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
 
-    if (!connection) {
+    const connection = connections?.[0]
+
+    // Check if we have a valid connection
+    if (!connection || !connection.facebook_page_access_token) {
       return NextResponse.json(
         { error: 'No Meta connection found' },
         { status: 404 }
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
     console.log('Checking Facebook permissions...')
     try {
       const permResponse = await fetch(
-        `https://graph.facebook.com/v18.0/me/permissions?access_token=${connection.facebook_page_access_token}`
+        `https://graph.facebook.com/v18.0/${connection.facebook_page_id}?fields=access_token,name,id&access_token=${connection.facebook_page_access_token}`
       )
       const permissions = await permResponse.json()
       console.log('Facebook permissions:', JSON.stringify(permissions, null, 2))
