@@ -1,6 +1,7 @@
 // src/app/api/walmart/oauth/callback/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,10 +14,16 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const state = searchParams.get('state')
     const error = searchParams.get('error')
+    const type = searchParams.get('type')
+    const clientId = searchParams.get('clientId')
+    const sellerId = searchParams.get('sellerId')
 
     console.log('🔄 Walmart OAuth callback received')
     console.log('📝 Code:', code ? 'Present' : 'Missing')
     console.log('📝 State:', state ? 'Present' : 'Missing')
+    console.log('📝 Type:', type)
+    console.log('📝 Client ID:', clientId)
+    console.log('📝 Seller ID:', sellerId)
     console.log('❌ Error:', error)
 
     // Handle OAuth errors
@@ -46,13 +53,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(errorUrl)
     }
 
-    const userId = stateData.user_id
+    // Use sellerId from callback if provided
+    let userId = stateData.user_id
+    const walmartSellerId = sellerId || process.env.WALMART_PARTNER_ID!
 
     // Clean up used state
     await supabase.from('oauth_states').delete().eq('state', state)
 
     // Exchange code for tokens
-    const tokenData = await exchangeCodeForToken(code)
+    const tokenData = await exchangeCodeForToken(code, walmartSellerId)
 
     if (!tokenData.access_token) {
       throw new Error('No access token received from Walmart')
@@ -146,10 +155,11 @@ export async function GET(request: NextRequest) {
 }
 
 // Exchange authorization code for access token
-async function exchangeCodeForToken(code: string) {
+async function exchangeCodeForToken(code: string, sellerId?: string) {
   const clientId = process.env.WALMART_CLIENT_ID!
   const clientSecret = process.env.WALMART_CLIENT_SECRET!
   const redirectUri = process.env.WALMART_REDIRECT_URI!
+  const partnerId = sellerId || process.env.WALMART_PARTNER_ID!
   const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
 
   const tokenUrl =
@@ -158,6 +168,7 @@ async function exchangeCodeForToken(code: string) {
       : 'https://sandbox.walmartapis.com/v3/token'
 
   console.log('🔄 Exchanging code for token at:', tokenUrl)
+  console.log('🏪 Using Partner/Seller ID:', partnerId)
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
     'base64'
@@ -169,7 +180,8 @@ async function exchangeCodeForToken(code: string) {
       Authorization: `Basic ${credentials}`,
       'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'application/json',
-      'WM_QOS.CORRELATION_ID': Date.now().toString(),
+      'WM_PARTNER.ID': partnerId,
+      'WM_QOS.CORRELATION_ID': crypto.randomUUID(),
       'WM_SVC.NAME': 'Listora AI',
     },
     body: new URLSearchParams({
