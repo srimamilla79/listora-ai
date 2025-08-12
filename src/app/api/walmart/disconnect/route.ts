@@ -51,13 +51,13 @@ export async function POST(request: NextRequest) {
       // Continue with disconnect even if revocation fails
     }
 
-    // Update connection status to 'disconnected' instead of deleting
+    // Update connection status to 'disconnected' with empty strings instead of null
     const { error: updateError } = await supabase
       .from('walmart_connections')
       .update({
         status: 'disconnected',
-        access_token: null, // Clear sensitive data
-        refresh_token: null,
+        access_token: '', // ✅ Use empty string instead of null
+        refresh_token: '', // ✅ Use empty string instead of null
         updated_at: new Date().toISOString(),
       })
       .eq('id', connection.id)
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('user_id', userId)
       .eq('platform', 'walmart')
-      .eq('status', 'published')
+      .in('status', ['published', 'pending', 'active'])
 
     if (publishedError) {
       console.error(
