@@ -509,13 +509,14 @@ export default function MarketplaceConnections({
     } else if (platform === 'ebay') {
       window.location.href = `/api/ebay/oauth?user_id=${currentUserId}`
     } else if (platform === 'walmart') {
-      window.location.href = `/api/walmart/oauth?user_id=${currentUserId}`
+      window.location.href = `/api/walmart/oauth/initiate?user_id=${currentUserId}`
     } else if (platform === 'meta') {
       window.location.href = `/api/meta/auth?user_id=${currentUserId}`
     }
   }
 
   // 🔧 PRESERVE original disconnect functionality
+  // 🔧 UPDATED disconnect functionality with cache clearing
   const handleDisconnect = async (platform: string) => {
     if (!currentUserId) return
 
@@ -527,7 +528,42 @@ export default function MarketplaceConnections({
       })
 
       if (response.ok) {
-        loadConnections()
+        console.log(`✅ ${platform} disconnected successfully`)
+
+        // 🔧 CLEAR ALL CACHES
+        // 1. Clear sessionStorage cache
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('marketplace_connections')
+          console.log('🗑️ Cleared sessionStorage cache')
+        }
+
+        // 2. Clear localStorage 5-minute cache
+        const cacheKey = `connections_${currentUserId}`
+        const cacheTimestampKey = `connections_timestamp_${currentUserId}`
+        localStorage.removeItem(cacheKey)
+        localStorage.removeItem(cacheTimestampKey)
+        console.log('🗑️ Cleared localStorage cache')
+
+        // 3. Update state immediately to reflect disconnection
+        setConnections((prevConnections) =>
+          prevConnections.map((conn) =>
+            conn.platform === platform
+              ? { ...conn, connected: false, storeInfo: {} }
+              : conn
+          )
+        )
+
+        // 4. Notify parent component if callback exists
+        if (onConnectionChange) {
+          onConnectionChange(platform, false)
+        }
+
+        // 5. Force a fresh load after a small delay
+        setTimeout(() => {
+          loadConnections()
+        }, 500)
+      } else {
+        console.error(`❌ Failed to disconnect ${platform}`)
       }
     } catch (err) {
       const error = err as Error
