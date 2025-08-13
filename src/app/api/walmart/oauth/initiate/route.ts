@@ -18,9 +18,38 @@ export async function GET(request: NextRequest) {
     console.log('📝 User ID:', userId)
     console.log('🔗 Walmart Callback URI:', walmartCallbackUri)
 
-    // If this is the initial call from our app, show our login/connect page
+    // Case 1: Called from Walmart App Store with walmartCallbackUri
+    if (walmartCallbackUri) {
+      console.log('🏪 Called from Walmart App Store - showing app login page')
+
+      // Store the Walmart callback URI in session/state for later use
+      const state = crypto.randomBytes(16).toString('hex')
+
+      await supabase.from('oauth_states').insert({
+        user_id: 'pending', // Will be updated after login
+        platform: 'walmart',
+        state: state,
+        nonce: walmartCallbackUri, // Store Walmart callback URI in nonce field temporarily
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      })
+
+      // Redirect to your app's login page with state
+      const loginUrl = new URL(
+        `${process.env.NEXT_PUBLIC_SITE_URL}/api/walmart/oauth/app-login`
+      )
+      loginUrl.searchParams.set('state', state)
+      loginUrl.searchParams.set('walmartCallbackUri', walmartCallbackUri)
+
+      console.log('🔐 Redirecting to app login page:', loginUrl.toString())
+      return NextResponse.redirect(loginUrl.toString())
+    }
+
+    // Case 2: Called from your app directly (user already logged in)
     if (!walmartCallbackUri && userId) {
-      // Store user ID in state for later
+      console.log('🔗 Direct connection from app - user already authenticated')
+
+      // Generate state for this connection
       const state = `${userId}-${crypto.randomBytes(16).toString('hex')}`
 
       await supabase.from('oauth_states').insert({
@@ -31,17 +60,14 @@ export async function GET(request: NextRequest) {
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       })
 
-      // For now, simulate that user is already logged in and redirect to Walmart
-      // In a real implementation, you might show a login page here
+      // Redirect directly to Walmart authorization
       const clientId = process.env.WALMART_CLIENT_ID!
       const redirectUri = process.env.WALMART_REDIRECT_URI!
       const nonce = crypto.randomBytes(8).toString('hex')
 
-      // Build the Walmart authorization URL according to their docs
       const walmartAuthUrl = new URL(
         'https://login.account.wal-mart.com/authorize'
       )
-
       walmartAuthUrl.searchParams.set('responseType', 'code')
       walmartAuthUrl.searchParams.set('clientId', clientId)
       walmartAuthUrl.searchParams.set('redirectUri', redirectUri)
@@ -53,33 +79,7 @@ export async function GET(request: NextRequest) {
         '🔐 Redirecting to Walmart authorization:',
         walmartAuthUrl.toString()
       )
-
       return NextResponse.redirect(walmartAuthUrl.toString())
-    }
-
-    // If Walmart is calling us with their callback URI (from App Store)
-    if (walmartCallbackUri) {
-      console.log('🏪 Called from Walmart App Store')
-
-      // In production, you'd show your app's login page here
-      // For now, we'll redirect directly to Walmart's auth
-      const clientId = process.env.WALMART_CLIENT_ID!
-      const redirectUri = process.env.WALMART_REDIRECT_URI!
-      const nonce = crypto.randomBytes(8).toString('hex')
-      const state = crypto.randomBytes(16).toString('hex')
-
-      // Build URL with Walmart's expected parameters
-      const authUrl = new URL(walmartCallbackUri)
-      authUrl.searchParams.set('responseType', 'code')
-      authUrl.searchParams.set('clientId', clientId)
-      authUrl.searchParams.set('redirectUri', redirectUri)
-      authUrl.searchParams.set('clientType', 'seller')
-      authUrl.searchParams.set('nonce', nonce)
-      authUrl.searchParams.set('state', state)
-
-      console.log('🔐 Redirecting to Walmart with params:', authUrl.toString())
-
-      return NextResponse.redirect(authUrl.toString())
     }
 
     // Invalid request
