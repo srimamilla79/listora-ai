@@ -21,41 +21,77 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // For now, we'll simulate that the user is already logged in
-    // In a real implementation, you'd show a login form here
-    // For demo purposes, we'll use a default user ID or get from session
-
-    // Get the current user from cookies/session
+    // Get the auth token from request cookies
     const cookieStore = request.cookies
-    const authCookie = cookieStore.get('sb-auth-token')
 
-    let userId = null
+    // The cookie name format: sb-<project-ref>-auth-token
+    const projectRef = process.env
+      .NEXT_PUBLIC_SUPABASE_URL!.split('//')[1]
+      .split('.')[0]
+    const cookieName = `sb-${projectRef}-auth-token`
 
-    if (authCookie) {
-      try {
-        // Parse the auth token to get user ID
-        const tokenData = JSON.parse(authCookie.value)
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser(tokenData.access_token)
-        if (user && !error) {
-          userId = user.id
-        }
-      } catch (err) {
-        console.error('Error parsing auth cookie:', err)
-      }
-    }
+    const authCookie = cookieStore.get(cookieName)
 
-    // If no user found, redirect to login page
-    if (!userId) {
-      // Store the Walmart flow info and redirect to login
+    if (!authCookie) {
+      console.log('❌ No auth cookie found, redirecting to login')
+      // No auth cookie, redirect to login
       const loginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
       loginUrl.searchParams.set(
         'redirect',
         `/api/walmart/oauth/app-login?state=${state}&walmartCallbackUri=${encodeURIComponent(walmartCallbackUri)}`
       )
+      return NextResponse.redirect(loginUrl.toString())
+    }
 
+    // Parse the cookie value to get user ID
+    let userId = null
+    try {
+      const cookieValue = authCookie.value
+      console.log('🔍 Auth cookie found, parsing...')
+
+      // Try to parse as JSON
+      let tokenData
+      try {
+        tokenData = JSON.parse(cookieValue)
+      } catch {
+        // If not JSON, use the raw value
+        tokenData = cookieValue
+      }
+
+      // Extract access token
+      let accessToken
+      if (Array.isArray(tokenData)) {
+        accessToken = tokenData[0]
+      } else if (typeof tokenData === 'object' && tokenData.access_token) {
+        accessToken = tokenData.access_token
+      } else if (typeof tokenData === 'string') {
+        accessToken = tokenData
+      }
+
+      if (accessToken) {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser(accessToken)
+        if (user && !error) {
+          userId = user.id
+          console.log('✅ User authenticated:', userId)
+        } else {
+          console.log('❌ Failed to get user:', error)
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error parsing auth cookie:', err)
+    }
+
+    if (!userId) {
+      console.log('❌ No user ID found after parsing, redirecting to login')
+      // Still no user, redirect to login
+      const loginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
+      loginUrl.searchParams.set(
+        'redirect',
+        `/api/walmart/oauth/app-login?state=${state}&walmartCallbackUri=${encodeURIComponent(walmartCallbackUri)}`
+      )
       return NextResponse.redirect(loginUrl.toString())
     }
 
