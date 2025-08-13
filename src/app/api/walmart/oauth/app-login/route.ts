@@ -1,12 +1,8 @@
 // src/app/api/walmart/oauth/app-login/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSideClient } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,20 +17,18 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get the auth token from request cookies
-    const cookieStore = request.cookies
+    // Use your existing server-side client
+    const supabase = await createServerSideClient()
 
-    // The cookie name format: sb-<project-ref>-auth-token
-    const projectRef = process.env
-      .NEXT_PUBLIC_SUPABASE_URL!.split('//')[1]
-      .split('.')[0]
-    const cookieName = `sb-${projectRef}-auth-token`
+    // Get the authenticated user
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
-    const authCookie = cookieStore.get(cookieName)
-
-    if (!authCookie) {
-      console.log('❌ No auth cookie found, redirecting to login')
-      // No auth cookie, redirect to login
+    if (error || !user) {
+      console.log('❌ No authenticated user found, redirecting to login')
+      // No authenticated user, redirect to login
       const loginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
       loginUrl.searchParams.set(
         'redirect',
@@ -43,62 +37,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(loginUrl.toString())
     }
 
-    // Parse the cookie value to get user ID
-    let userId = null
-    try {
-      const cookieValue = authCookie.value
-      console.log('🔍 Auth cookie found, parsing...')
-
-      // Try to parse as JSON
-      let tokenData
-      try {
-        tokenData = JSON.parse(cookieValue)
-      } catch {
-        // If not JSON, use the raw value
-        tokenData = cookieValue
-      }
-
-      // Extract access token
-      let accessToken
-      if (Array.isArray(tokenData)) {
-        accessToken = tokenData[0]
-      } else if (typeof tokenData === 'object' && tokenData.access_token) {
-        accessToken = tokenData.access_token
-      } else if (typeof tokenData === 'string') {
-        accessToken = tokenData
-      }
-
-      if (accessToken) {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser(accessToken)
-        if (user && !error) {
-          userId = user.id
-          console.log('✅ User authenticated:', userId)
-        } else {
-          console.log('❌ Failed to get user:', error)
-        }
-      }
-    } catch (err) {
-      console.error('❌ Error parsing auth cookie:', err)
-    }
-
-    if (!userId) {
-      console.log('❌ No user ID found after parsing, redirecting to login')
-      // Still no user, redirect to login
-      const loginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
-      loginUrl.searchParams.set(
-        'redirect',
-        `/api/walmart/oauth/app-login?state=${state}&walmartCallbackUri=${encodeURIComponent(walmartCallbackUri)}`
-      )
-      return NextResponse.redirect(loginUrl.toString())
-    }
+    console.log('✅ User authenticated:', user.id)
 
     // User is authenticated, update the state with user ID
-    await supabase
+    // Use service role client for admin operations
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    await supabaseAdmin
       .from('oauth_states')
-      .update({ user_id: userId })
+      .update({ user_id: user.id })
       .eq('state', state)
 
     // Now redirect to Walmart with all required parameters
