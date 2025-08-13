@@ -46,10 +46,17 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('oauth_states')
-      .update({ user_id: user.id })
+      .update({
+        user_id: user.id,
+        platform: 'walmart', // Ensure platform is set
+      })
       .eq('state', state)
+
+    if (updateError) {
+      console.error('❌ Failed to update oauth state:', updateError)
+    }
 
     // Now redirect to Walmart with all required parameters
     const clientId = process.env.WALMART_CLIENT_ID!

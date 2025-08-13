@@ -39,16 +39,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(errorUrl)
     }
 
-    // Validate state
-    const { data: stateData, error: stateError } = await supabase
+    // Validate state - add debugging
+    console.log('🔍 Validating state:', state)
+
+    // First try with platform filter
+    let { data: stateData, error: stateError } = await supabase
       .from('oauth_states')
       .select('user_id')
       .eq('state', state)
       .eq('platform', 'walmart')
       .single()
 
-    if (stateError || !stateData) {
-      console.error('❌ Invalid state parameter')
+    // If not found with platform, try without platform filter
+    if (!stateData || stateError) {
+      console.log('🔍 Trying without platform filter...')
+      const { data: fallbackState, error: fallbackError } = await supabase
+        .from('oauth_states')
+        .select('user_id')
+        .eq('state', state)
+        .single()
+
+      if (fallbackState) {
+        console.log('✅ Found state without platform filter')
+        stateData = fallbackState
+        stateError = null
+      } else {
+        console.log('❌ State not found in database')
+        console.log('Fallback error:', fallbackError)
+      }
+    }
+
+    if (stateError || !stateData || !stateData.user_id) {
+      console.error('❌ Invalid state parameter or missing user_id')
       const errorUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/generate?error=walmart_oauth_invalid&message=Invalid%20state%20parameter`
       return NextResponse.redirect(errorUrl)
     }
