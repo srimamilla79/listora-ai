@@ -43,7 +43,15 @@ export default function OptimizedLoginPage() {
         data: { session },
       } = await supabaseClient.auth.getSession()
       if (session) {
-        window.location.href = '/generate'
+        // ✅ Check for redirect parameter before going to /generate
+        const urlParams = new URLSearchParams(window.location.search)
+        const redirect = urlParams.get('redirect')
+
+        if (redirect) {
+          window.location.href = decodeURIComponent(redirect)
+        } else {
+          window.location.href = '/generate'
+        }
       }
     }
     checkUser()
@@ -73,7 +81,17 @@ export default function OptimizedLoginPage() {
           error.message || 'Error signing in. Please check your credentials.'
         )
       } else {
-        window.location.href = '/generate'
+        // ✅ Check for redirect parameter in URL
+        const urlParams = new URLSearchParams(window.location.search)
+        const redirect = urlParams.get('redirect')
+
+        if (redirect) {
+          // ✅ Decode and use the redirect URL
+          window.location.href = decodeURIComponent(redirect)
+        } else {
+          // Default to generate page
+          window.location.href = '/generate'
+        }
       }
     } catch (error) {
       setMessage('An unexpected error occurred. Please try again.')
@@ -87,10 +105,16 @@ export default function OptimizedLoginPage() {
     setMessage('')
 
     try {
+      // ✅ Check for redirect parameter in URL
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirect = urlParams.get('redirect')
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/generate`,
+          redirectTo: redirect
+            ? `${window.location.origin}${decodeURIComponent(redirect)}` // ✅ Use redirect param
+            : `${window.location.origin}/generate`,
         },
       })
 
