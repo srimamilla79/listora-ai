@@ -47,6 +47,15 @@ export default function OptimizedLoginPage() {
         const urlParams = new URLSearchParams(window.location.search)
         const redirect = urlParams.get('redirect')
 
+        // Check for pending Walmart OAuth first
+        const pendingOAuth = localStorage.getItem('walmart_oauth_pending')
+        if (pendingOAuth) {
+          const { oauthId } = JSON.parse(pendingOAuth)
+          localStorage.removeItem('walmart_oauth_pending')
+          window.location.href = `/api/walmart/oauth/callback?state=${oauthId}`
+          return
+        }
+
         if (redirect) {
           window.location.href = decodeURIComponent(redirect)
         } else {
@@ -81,15 +90,22 @@ export default function OptimizedLoginPage() {
           error.message || 'Error signing in. Please check your credentials.'
         )
       } else {
-        // ✅ Check for redirect parameter in URL
+        // Check for pending Walmart OAuth
+        const pendingOAuth = localStorage.getItem('walmart_oauth_pending')
+        if (pendingOAuth) {
+          const { oauthId } = JSON.parse(pendingOAuth)
+          localStorage.removeItem('walmart_oauth_pending')
+          window.location.href = `/api/walmart/oauth/callback?state=${oauthId}`
+          return
+        }
+
+        // Check for redirect parameter in URL
         const urlParams = new URLSearchParams(window.location.search)
         const redirect = urlParams.get('redirect')
 
         if (redirect) {
-          // ✅ Decode and use the redirect URL
           window.location.href = decodeURIComponent(redirect)
         } else {
-          // Default to generate page
           window.location.href = '/generate'
         }
       }

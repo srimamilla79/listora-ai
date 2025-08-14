@@ -51,14 +51,13 @@ export default function OptimizedSignupPage() {
     const message = urlParams.get('message')
 
     if (walmartOAuthId) {
-      // Store in session storage to complete after signup
-      sessionStorage.setItem(
-        'walmart_oauth_pending',
-        JSON.stringify({
-          oauthId: walmartOAuthId,
-          sellerId: sellerId,
-        })
-      )
+      // Store in both session and local storage for persistence
+      const oauthData = JSON.stringify({
+        oauthId: walmartOAuthId,
+        sellerId: sellerId,
+      })
+      sessionStorage.setItem('walmart_oauth_pending', oauthData)
+      localStorage.setItem('walmart_oauth_pending', oauthData)
     }
 
     if (message) {
@@ -157,6 +156,7 @@ export default function OptimizedSignupPage() {
             .eq('id', oauthId)
 
           sessionStorage.removeItem('walmart_oauth_pending')
+          localStorage.removeItem('walmart_oauth_pending')
         }
 
         setShowSuccessScreen(true)
