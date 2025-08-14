@@ -46,13 +46,14 @@ export default function OptimizedLoginPage() {
         // ✅ Check for redirect parameter before going to /generate
         const urlParams = new URLSearchParams(window.location.search)
         const redirect = urlParams.get('redirect')
-
         // Check for pending Walmart OAuth first
+        // Check for pending Walmart OAuth
         const pendingOAuth = localStorage.getItem('walmart_oauth_pending')
         if (pendingOAuth) {
-          const { oauthId } = JSON.parse(pendingOAuth)
+          const { oauthId, sellerId } = JSON.parse(pendingOAuth)
           localStorage.removeItem('walmart_oauth_pending')
-          window.location.href = `/api/walmart/oauth/callback?state=${oauthId}`
+          // Redirect back through OAuth initiate to complete the flow properly
+          window.location.href = `/api/walmart/oauth/initiate?state=${oauthId}&resume=true`
           return
         }
 
@@ -93,9 +94,9 @@ export default function OptimizedLoginPage() {
         // Check for pending Walmart OAuth
         const pendingOAuth = localStorage.getItem('walmart_oauth_pending')
         if (pendingOAuth) {
-          const { oauthId } = JSON.parse(pendingOAuth)
+          const { oauthId, sellerId } = JSON.parse(pendingOAuth)
           localStorage.removeItem('walmart_oauth_pending')
-          window.location.href = `/api/walmart/oauth/callback?state=${oauthId}`
+          window.location.href = `/api/walmart/oauth/initiate?state=${oauthId}&resume=true`
           return
         }
 
