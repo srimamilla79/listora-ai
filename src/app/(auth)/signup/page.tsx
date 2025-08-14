@@ -43,6 +43,29 @@ export default function OptimizedSignupPage() {
 
   const router = useRouter()
 
+  // Check for Walmart OAuth parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const walmartOAuthId = urlParams.get('walmart_oauth')
+    const sellerId = urlParams.get('seller_id')
+    const message = urlParams.get('message')
+
+    if (walmartOAuthId) {
+      // Store in session storage to complete after signup
+      sessionStorage.setItem(
+        'walmart_oauth_pending',
+        JSON.stringify({
+          oauthId: walmartOAuthId,
+          sellerId: sellerId,
+        })
+      )
+    }
+
+    if (message) {
+      setMessage(decodeURIComponent(message))
+    }
+  }, [])
+
   useEffect(() => {
     setMounted(true)
     const supabaseClient = createClient()
@@ -90,7 +113,7 @@ export default function OptimizedSignupPage() {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: null, // Disable Supabase's default confirmation email
+          emailRedirectTo: `${window.location.origin}/generate`,
           data: {
             email: formData.email,
           },
@@ -108,20 +131,34 @@ export default function OptimizedSignupPage() {
           )
         }
       } else {
-        // ✅ Send your custom confirmation email (LOCAL or PROD)
-        const confirmationUrl = `${window.location.origin}/confirm?email=${encodeURIComponent(formData.email)}`
-
-        await fetch('/api/auth/send-confirmation-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: formData.email,
-            name: formData.email.split('@')[0], // use actual name if available
-            confirmationUrl,
-          }),
-        })
-
         setUserEmail(formData.email)
+
+        // Check if this signup is for Walmart OAuth
+        const pendingOAuth = sessionStorage.getItem('walmart_oauth_pending')
+        if (pendingOAuth) {
+          const { oauthId } = JSON.parse(pendingOAuth)
+          // Store for completion after email verification
+          await supabase
+            .from('oauth_states')
+            .update({
+              user_id: data.user?.id || '',
+              metadata: {
+                ...((
+                  await supabase
+                    .from('oauth_states')
+                    .select('metadata')
+                    .eq('id', oauthId)
+                    .single()
+                ).data?.metadata || {}),
+                pending_user_id: data.user?.id,
+                pending_email_verification: true,
+              },
+            })
+            .eq('id', oauthId)
+
+          sessionStorage.removeItem('walmart_oauth_pending')
+        }
+
         setShowSuccessScreen(true)
       }
     } catch (error: any) {
@@ -129,7 +166,7 @@ export default function OptimizedSignupPage() {
     } finally {
       setLoading(false)
     }
-  } // This closing brace was missing!
+  }
 
   const handleGoogleSignUp = async () => {
     if (!formData.agreeToTerms) {
@@ -253,25 +290,10 @@ export default function OptimizedSignupPage() {
             </div>
 
             <div className="text-sm text-gray-600">
-              <p className="mb-2">Didn't receive the email?</p>
-              <button
-                onClick={async () => {
-                  try {
-                    const { error } = await supabase.auth.resend({
-                      type: 'signup',
-                      email: userEmail,
-                    })
-                    if (!error) {
-                      alert('✅ Verification email sent! Check your inbox.')
-                    }
-                  } catch (error) {
-                    alert('Error resending email. Please contact support.')
-                  }
-                }}
-                className="text-indigo-600 hover:text-indigo-500 underline font-medium"
-              >
-                Click here to resend verification email
-              </button>
+              <p>
+                Didn't receive the email? Check your spam folder or contact
+                support.
+              </p>
             </div>
           </div>
         </div>
@@ -520,6 +542,31 @@ export default function OptimizedSignupPage() {
         {/* Right Side - Signup Form */}
         <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-20 xl:px-24 py-8">
           <div className="w-full max-w-lg">
+            {/* Walmart OAuth Message */}
+            {(() => {
+              const urlParams = new URLSearchParams(window.location.search)
+              const sellerId = urlParams.get('seller_id')
+              if (sellerId) {
+                return (
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start">
+                      <ShoppingCart className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-blue-900">
+                          Walmart Seller Account Detected
+                        </h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Complete your signup to connect your Walmart Seller
+                          ID: {sellerId}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+              return null
+            })()}
+
             {/* Value Proposition */}
             <div className="text-center mb-6">
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">

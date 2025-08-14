@@ -42,45 +42,113 @@ export async function GET(request: NextRequest) {
     // Validate state - add debugging
     console.log('🔍 Validating state:', state)
 
-    // First try with platform filter
-    let { data: stateData, error: stateError } = await supabase
-      .from('oauth_states')
-      .select('user_id')
-      .eq('state', state)
-      .eq('platform', 'walmart')
-      .single()
+    let userId: string | null = null
 
-    // If not found with platform, try without platform filter
-    if (!stateData || stateError) {
-      console.log('🔍 Trying without platform filter...')
-      const { data: fallbackState, error: fallbackError } = await supabase
+    // Check if this is from Walmart App Store (they use their own state format)
+    if (type === 'auth' && clientId && sellerId) {
+      console.log('🏪 OAuth initiated from Walmart App Store')
+
+      // For Walmart App Store, they generate their own state
+      // We need to identify the user differently
+
+      // First, check if we have an existing connection for this seller
+      const { data: existingConnection } = await supabase
+        .from('walmart_connections')
+        .select('user_id')
+        .eq('seller_id', sellerId)
+        .eq('environment', process.env.WALMART_ENVIRONMENT || 'sandbox')
+        .single()
+
+      if (existingConnection && existingConnection.user_id) {
+        // Existing seller reconnecting
+        userId = existingConnection.user_id
+        console.log('📝 Found existing user for seller ID:', sellerId)
+      } else {
+        // New seller from Walmart App Store
+        console.log(
+          '🆕 New seller from Walmart App Store - Seller ID:',
+          sellerId
+        )
+
+        // Store the OAuth details temporarily so user can claim after signup
+        const tempOAuthId = crypto.randomUUID()
+
+        // Store the OAuth params in oauth_states temporarily
+        await supabase.from('oauth_states').insert({
+          id: tempOAuthId,
+          state: `walmart-temp-${tempOAuthId}`,
+          user_id: '00000000-0000-0000-0000-000000000000', // Placeholder UUID
+          platform: 'walmart',
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+          metadata: {
+            oauth_params: {
+              code,
+              state,
+              type,
+              clientId,
+              sellerId,
+            },
+            is_temp: true,
+          },
+        })
+
+        // Redirect to signup with the temp OAuth ID
+        const signupUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/signup?walmart_oauth=${tempOAuthId}&seller_id=${sellerId}&message=Create%20account%20to%20complete%20Walmart%20connection`
+        console.log('🔐 Redirecting to signup with temp OAuth ID:', tempOAuthId)
+        return NextResponse.redirect(signupUrl)
+      }
+    } else {
+      // Standard OAuth flow - state should be in our database
+      let { data: stateData, error: stateError } = await supabase
         .from('oauth_states')
         .select('user_id')
         .eq('state', state)
+        .eq('platform', 'walmart')
         .single()
 
-      if (fallbackState) {
-        console.log('✅ Found state without platform filter')
-        stateData = fallbackState
-        stateError = null
-      } else {
-        console.log('❌ State not found in database')
-        console.log('Fallback error:', fallbackError)
+      // If not found with platform, try without platform filter
+      if (!stateData || stateError) {
+        console.log('🔍 Trying without platform filter...')
+        const { data: fallbackState, error: fallbackError } = await supabase
+          .from('oauth_states')
+          .select('user_id')
+          .eq('state', state)
+          .single()
+
+        if (fallbackState) {
+          console.log('✅ Found state without platform filter')
+          stateData = fallbackState
+          stateError = null
+        } else {
+          console.log('❌ State not found in database')
+          console.log('Fallback error:', fallbackError)
+        }
       }
+
+      if (stateError || !stateData || !stateData.user_id) {
+        console.error('❌ Invalid state parameter or missing user_id')
+        const errorUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/generate?error=walmart_oauth_invalid&message=Invalid%20state%20parameter`
+        return NextResponse.redirect(errorUrl)
+      }
+
+      userId = stateData.user_id
     }
 
-    if (stateError || !stateData || !stateData.user_id) {
-      console.error('❌ Invalid state parameter or missing user_id')
-      const errorUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/generate?error=walmart_oauth_invalid&message=Invalid%20state%20parameter`
+    // Ensure we have a valid user ID
+    if (!userId) {
+      console.error('❌ No valid user ID found')
+      const errorUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/generate?error=walmart_oauth_invalid&message=User%20authentication%20required`
       return NextResponse.redirect(errorUrl)
     }
 
-    // Use sellerId from callback if provided
-    let userId = stateData.user_id
+    // Use sellerId from callback if provided, otherwise use environment variable
     const walmartSellerId = sellerId || process.env.WALMART_PARTNER_ID!
 
-    // Clean up used state
-    await supabase.from('oauth_states').delete().eq('state', state)
+    // Clean up used state (only for non-Walmart App Store flow)
+    if (!type || type !== 'auth') {
+      await supabase.from('oauth_states').delete().eq('state', state)
+    }
 
     // Exchange code for tokens
     const tokenData = await exchangeCodeForToken(code, walmartSellerId)
@@ -117,8 +185,8 @@ export async function GET(request: NextRequest) {
           refresh_token: tokenData.refresh_token,
           token_expires_at: expiresAt,
           seller_info: sellerInfo,
-          seller_id: sellerInfo.partnerId,
-          partner_id: sellerInfo.partnerId,
+          seller_id: sellerInfo.partnerId || walmartSellerId,
+          partner_id: sellerInfo.partnerId || walmartSellerId,
           status: 'active',
           last_used_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -141,8 +209,8 @@ export async function GET(request: NextRequest) {
           refresh_token: tokenData.refresh_token,
           token_expires_at: expiresAt,
           seller_info: sellerInfo,
-          seller_id: sellerInfo.partnerId,
-          partner_id: sellerInfo.partnerId,
+          seller_id: sellerInfo.partnerId || walmartSellerId,
+          partner_id: sellerInfo.partnerId || walmartSellerId,
           environment: process.env.WALMART_ENVIRONMENT || 'sandbox',
           status: 'active',
           last_used_at: new Date().toISOString(),
