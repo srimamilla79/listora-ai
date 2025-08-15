@@ -207,7 +207,7 @@ function createItemJson(data: any): string {
 
   const itemData = {
     MPItemFeedHeader: {
-      version: data.specVersion,
+      version: '4.8',
       requestId: `request-${Date.now()}`,
       requestBatchId: `batch-${Date.now()}`,
       feedDate: new Date().toISOString(),

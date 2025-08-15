@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     const connection = connections[0]
     const accessToken = connection.access_token
-    const sellerId = connection.seller_id || connection.seller_info?.sellerId
+    const sellerId = connection.seller_id || connection.seller_info?.partnerId
 
     // Get feed status from Walmart with rate limiting
     const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
@@ -74,8 +74,8 @@ export async function GET(request: NextRequest) {
             Authorization: `Bearer ${accessToken}`,
             'WM_SEC.ACCESS_TOKEN': accessToken,
             'WM_PARTNER.ID': sellerId || process.env.WALMART_PARTNER_ID || '',
-            WM_MARKET: 'us',
-            'WM_QOS.CORRELATION_ID': Date.now().toString(),
+            'WM_CONSUMER.CHANNEL.TYPE': 'SWAGGER_CHANNEL_TYPE',
+            'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
             'WM_SVC.NAME': 'Walmart Marketplace',
             Accept: 'application/json',
           },
