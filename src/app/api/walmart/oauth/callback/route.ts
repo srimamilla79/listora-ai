@@ -70,21 +70,30 @@ export async function GET(request: NextRequest) {
           sellerId
         )
 
-        // Check if user is already authenticated by checking the oauth_state
-        const { data: recentState } = await supabase
+        // Check if we have a recent oauth_state for this flow
+        // Look for the most recent walmart oauth state created in the last 5 minutes
+        const fiveMinutesAgo = new Date(
+          Date.now() - 5 * 60 * 1000
+        ).toISOString()
+        const { data: recentStates } = await supabase
           .from('oauth_states')
-          .select('user_id')
-          .eq('state', state)
-          .single()
+          .select('user_id, state')
+          .eq('platform', 'walmart')
+          .gte('created_at', fiveMinutesAgo)
+          .order('created_at', { ascending: false })
+          .limit(1)
 
         if (
-          recentState &&
-          recentState.user_id &&
-          recentState.user_id !== '00000000-0000-0000-0000-000000000000'
+          recentStates &&
+          recentStates.length > 0 &&
+          recentStates[0].user_id !== '00000000-0000-0000-0000-000000000000'
         ) {
           // User is already authenticated, continue with their user_id
-          userId = recentState.user_id
-          console.log('✅ Found authenticated user from oauth_state:', userId)
+          userId = recentStates[0].user_id
+          console.log(
+            '✅ Found authenticated user from recent oauth_state:',
+            userId
+          )
         } else {
           // Only redirect to signup if no authenticated user
           const tempOAuthId = crypto.randomUUID()
