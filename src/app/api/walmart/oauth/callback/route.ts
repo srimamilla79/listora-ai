@@ -70,33 +70,53 @@ export async function GET(request: NextRequest) {
           sellerId
         )
 
-        // Store the OAuth details temporarily so user can claim after signup
-        const tempOAuthId = crypto.randomUUID()
+        // Check if user is already authenticated by checking the oauth_state
+        const { data: recentState } = await supabase
+          .from('oauth_states')
+          .select('user_id')
+          .eq('state', state)
+          .single()
 
-        // Store the OAuth params in oauth_states temporarily
-        await supabase.from('oauth_states').insert({
-          id: tempOAuthId,
-          state: `walmart-temp-${tempOAuthId}`,
-          user_id: '00000000-0000-0000-0000-000000000000', // Placeholder UUID
-          platform: 'walmart',
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
-          metadata: {
-            oauth_params: {
-              code,
-              state,
-              type,
-              clientId,
-              sellerId,
+        if (
+          recentState &&
+          recentState.user_id &&
+          recentState.user_id !== '00000000-0000-0000-0000-000000000000'
+        ) {
+          // User is already authenticated, continue with their user_id
+          userId = recentState.user_id
+          console.log('✅ Found authenticated user from oauth_state:', userId)
+        } else {
+          // Only redirect to signup if no authenticated user
+          const tempOAuthId = crypto.randomUUID()
+
+          // Store the OAuth params in oauth_states temporarily
+          await supabase.from('oauth_states').insert({
+            id: tempOAuthId,
+            state: `walmart-temp-${tempOAuthId}`,
+            user_id: '00000000-0000-0000-0000-000000000000', // Placeholder UUID
+            platform: 'walmart',
+            created_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+            metadata: {
+              oauth_params: {
+                code,
+                state,
+                type,
+                clientId,
+                sellerId,
+              },
+              is_temp: true,
             },
-            is_temp: true,
-          },
-        })
+          })
 
-        // Redirect to signup with the temp OAuth ID
-        const signupUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/signup?walmart_oauth=${tempOAuthId}&seller_id=${sellerId}&message=Create%20account%20to%20complete%20Walmart%20connection`
-        console.log('🔐 Redirecting to signup with temp OAuth ID:', tempOAuthId)
-        return NextResponse.redirect(signupUrl)
+          // Redirect to signup with the temp OAuth ID
+          const signupUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/signup?walmart_oauth=${tempOAuthId}&seller_id=${sellerId}&message=Create%20account%20to%20complete%20Walmart%20connection`
+          console.log(
+            '🔐 Redirecting to signup with temp OAuth ID:',
+            tempOAuthId
+          )
+          return NextResponse.redirect(signupUrl)
+        }
       }
     } else {
       // Standard OAuth flow - state should be in our database
