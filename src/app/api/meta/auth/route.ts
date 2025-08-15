@@ -4,7 +4,6 @@ import { cookies } from 'next/headers'
 
 const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID!
 const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET!
-const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL}/api/meta/callback`
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -13,6 +12,11 @@ export async function GET(request: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: 'User ID required' }, { status: 400 })
   }
+
+  // Dynamic redirect URI based on the actual host
+  const host = request.headers.get('host') || 'listora.ai'
+  const protocol = host.includes('localhost') ? 'http' : 'https'
+  const REDIRECT_URI = `${protocol}://${host}/api/meta/callback`
 
   // Generate state for CSRF protection
   const state = Math.random().toString(36).substring(7)
