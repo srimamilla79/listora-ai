@@ -257,6 +257,11 @@ async function submitWalmartFeedWithRateLimit(
 
   console.log('📤 Submitting feed to:', feedUrl)
 
+  // Create FormData instead of sending raw JSON
+  const formData = new FormData()
+  const blob = new Blob([jsonContent], { type: 'application/json' })
+  formData.append('file', blob, 'feed.json')
+
   // Don't check rate limit here - already checked in main function
   // Just make the API call and update from response headers
   const response = await fetch(feedUrl, {
@@ -268,10 +273,10 @@ async function submitWalmartFeedWithRateLimit(
       WM_MARKET: 'us',
       'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
       'WM_SVC.NAME': 'Walmart Marketplace',
-      'Content-Type': 'application/json',
       Accept: 'application/json',
+      // Remove Content-Type - let fetch set it with boundary for multipart
     },
-    body: jsonContent,
+    body: formData,
   })
 
   // Update rate limits from response headers
