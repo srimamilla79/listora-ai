@@ -204,43 +204,41 @@ function createItemJson(data: any): string {
     }
   }
 
-  // Walmart expects MPItemFeed > MPItem[] structure for JSON
+  // This is the structure that works for MP_ITEM feeds
   const feedData = {
-    MPItemFeed: {
-      MPItem: [
-        {
-          sku: data.sku,
-          productIdentifiers: {
-            productIdType: 'SKU',
-            productId: data.sku,
-          },
-          MPProduct: {
-            productName: data.title,
-            shortDescription: data.description.substring(0, 200),
-            brand: data.brand,
-            mainImageUrl: data.images?.[0] || '',
-            productSecondaryImageURL: secondaryImages,
-            manufacturerPartNumber: data.sku,
-            msrp: data.price,
-            category: {
-              categoryPath: 'Home/Furniture/Living Room Furniture',
-            },
-          },
-          MPOffer: {
-            price: data.price,
-            shippingWeight: {
-              value: 1,
-              unit: 'LB',
-            },
-            productTaxCode: '2038710',
-            MinimumAdvertisedPrice: data.price,
-          },
-          MPLogistics: {
-            fulfillmentLagTime: 1,
+    MPItem: [
+      {
+        sku: data.sku,
+        productIdentifiers: {
+          productIdType: 'SKU',
+          productId: data.sku,
+        },
+        MPProduct: {
+          productName: data.title,
+          shortDescription: data.description.substring(0, 200),
+          brand: data.brand,
+          mainImageUrl: data.images?.[0] || '',
+          productSecondaryImageURL: secondaryImages,
+          manufacturerPartNumber: data.sku,
+          msrp: data.price,
+          category: {
+            categoryPath: 'Home/Furniture/Living Room Furniture',
           },
         },
-      ],
-    },
+        MPOffer: {
+          price: data.price,
+          shippingWeight: {
+            value: 1,
+            unit: 'LB',
+          },
+          productTaxCode: '2038710',
+          MinimumAdvertisedPrice: data.price,
+        },
+        MPLogistics: {
+          fulfillmentLagTime: 1,
+        },
+      },
+    ],
   }
 
   return JSON.stringify(feedData, null, 2)
