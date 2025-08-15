@@ -204,40 +204,46 @@ function createItemJson(data: any): string {
     }
   }
 
-  // Return just the item data without feed header
-  const itemData = {
-    sku: data.sku,
-    productIdentifiers: {
-      productIdType: 'SKU',
-      productId: data.sku,
-    },
-    MPProduct: {
-      productName: data.title,
-      shortDescription: data.description.substring(0, 200),
-      brand: data.brand,
-      mainImageUrl: data.images?.[0] || '',
-      productSecondaryImageURL: secondaryImages,
-      manufacturerPartNumber: data.sku,
-      msrp: data.price,
-      category: {
-        categoryPath: 'Home/Furniture/Living Room Furniture',
-      },
-    },
-    MPOffer: {
-      price: data.price,
-      shippingWeight: {
-        value: 1,
-        unit: 'LB',
-      },
-      productTaxCode: '2038710',
-      MinimumAdvertisedPrice: data.price,
-    },
-    MPLogistics: {
-      fulfillmentLagTime: 1,
+  // Walmart expects MPItemFeed > MPItem[] structure for JSON
+  const feedData = {
+    MPItemFeed: {
+      MPItem: [
+        {
+          sku: data.sku,
+          productIdentifiers: {
+            productIdType: 'SKU',
+            productId: data.sku,
+          },
+          MPProduct: {
+            productName: data.title,
+            shortDescription: data.description.substring(0, 200),
+            brand: data.brand,
+            mainImageUrl: data.images?.[0] || '',
+            productSecondaryImageURL: secondaryImages,
+            manufacturerPartNumber: data.sku,
+            msrp: data.price,
+            category: {
+              categoryPath: 'Home/Furniture/Living Room Furniture',
+            },
+          },
+          MPOffer: {
+            price: data.price,
+            shippingWeight: {
+              value: 1,
+              unit: 'LB',
+            },
+            productTaxCode: '2038710',
+            MinimumAdvertisedPrice: data.price,
+          },
+          MPLogistics: {
+            fulfillmentLagTime: 1,
+          },
+        },
+      ],
     },
   }
 
-  return JSON.stringify(itemData, null, 2)
+  return JSON.stringify(feedData, null, 2)
 }
 
 // Submit feed WITHOUT rate limiting check (already checked above)
