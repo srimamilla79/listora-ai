@@ -8,7 +8,7 @@ import {
 } from '@/lib/walmart-rate-limiter'
 
 // Latest MP_ITEM spec version as of documentation
-const ITEM_SPEC_VERSION = '5.0.20250605-14_26_25'
+const ITEM_SPEC_VERSION = '5.0'
 
 export async function POST(request: NextRequest) {
   try {
