@@ -51,8 +51,13 @@ export async function POST(request: NextRequest) {
     }
 
     const connection = connections[0]
-    const sellerId = connection.seller_id || connection.seller_info?.sellerId
+    const sellerId = connection.seller_id || connection.seller_info?.partnerId
     console.log('✅ Walmart connection found:', connection.id)
+    console.log('🔍 Connection debug:', {
+      connection_seller_id: connection.seller_id,
+      seller_info: connection.seller_info,
+      final_sellerId: sellerId,
+    })
     console.log('🏪 Seller ID:', sellerId)
 
     // Check if token needs refresh (5 minute buffer)
@@ -351,6 +356,7 @@ async function refreshWalmartToken(refreshToken: string, sellerId?: string) {
       Authorization: `Basic ${credentials}`,
       'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'application/json',
+      'WM_PARTNER.ID': partnerId,
       'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
       'WM_SVC.NAME': 'Walmart Marketplace',
     },
