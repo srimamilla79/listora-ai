@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     const sku = publishingOptions.sku || `LISTORA-WM-${Date.now()}`
 
     // Create XML feed with latest spec version and multiple images support
-    const itemXml = createItemXml({
+    const itemJson = createItemJson({
       sku,
       title: productContent.product_name || 'Product',
       description:
@@ -83,23 +83,23 @@ export async function POST(request: NextRequest) {
     })
 
     // Validate file size before submission
-    const xmlSizeBytes = new TextEncoder().encode(itemXml).length
-    if (!validateFeedFileSize('MP_ITEM', xmlSizeBytes)) {
+    const jsonSizeBytes = new TextEncoder().encode(itemJson).length
+    if (!validateFeedFileSize('MP_ITEM', jsonSizeBytes)) {
       return NextResponse.json(
         {
           error:
-            'XML file size exceeds 26MB limit. Please reduce content size.',
+            'JSON file size exceeds 26MB limit. Please reduce content size.',
         },
         { status: 413 }
       )
     }
 
     console.log('📄 Creating Walmart item via Feed API')
-    console.log(`📏 XML size: ${(xmlSizeBytes / 1024).toFixed(2)} KB`)
+    console.log(`📏 JSON size: ${(jsonSizeBytes / 1024).toFixed(2)} KB`)
 
     // Submit feed to Walmart with rate limiting
     const feedResult = await submitWalmartFeedWithRateLimit(
-      itemXml,
+      itemJson,
       accessToken,
       sellerId
     )
@@ -193,73 +193,57 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function createItemXml(data: any): string {
-  // Build secondary images XML if we have more than 1 image
-  let secondaryImagesXml = ''
+function createItemJson(data: any): string {
+  // Build secondary images array
+  const secondaryImages = []
   if (data.images && data.images.length > 1) {
-    secondaryImagesXml = '<productSecondaryImageURL>'
     for (let i = 1; i < Math.min(data.images.length, 9); i++) {
       if (data.images[i]) {
-        secondaryImagesXml += `
-        <productSecondaryImageURLValue>${data.images[i]}</productSecondaryImageURLValue>`
+        secondaryImages.push(data.images[i])
       }
     }
-    secondaryImagesXml += `
-      </productSecondaryImageURL>`
   }
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<MPItemFeed xmlns="http://walmart.com/">
-  <MPItem>
-    <sku>${escapeXml(data.sku)}</sku>
-    <productIdentifiers>
-      <productIdType>SKU</productIdType>
-      <productId>${escapeXml(data.sku)}</productId>
-    </productIdentifiers>
-    <MPProduct>
-      <productName>${escapeXml(data.title)}</productName>
-      <shortDescription>${escapeXml(data.description.substring(0, 200))}</shortDescription>
-      <brand>${escapeXml(data.brand)}</brand>
-      <mainImageUrl>${data.images?.[0] || ''}</mainImageUrl>
-      ${secondaryImagesXml}
-      <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
-      <msrp>${data.price}</msrp>
-      <category>
-        <categoryPath>Home/Furniture/Living Room Furniture</categoryPath>
-      </category>
-    </MPProduct>
-    <MPOffer>
-      <price>${data.price}</price>
-      <shippingWeight>
-        <value>1</value>
-        <unit>LB</unit>
-      </shippingWeight>
-      <productTaxCode>2038710</productTaxCode>
-      <MinimumAdvertisedPrice>${data.price}</MinimumAdvertisedPrice>
-    </MPOffer>
-    <MPLogistics>
-      <fulfillmentLagTime>1</fulfillmentLagTime>
-    </MPLogistics>
-  </MPItem>
-</MPItemFeed>`
+  // The correct JSON structure for MP_ITEM - single item object
+  const itemData = {
+    sku: data.sku,
+    productIdentifiers: {
+      productIdType: 'SKU',
+      productId: data.sku,
+    },
+    MPProduct: {
+      productName: data.title,
+      shortDescription: data.description.substring(0, 200),
+      brand: data.brand,
+      mainImageUrl: data.images?.[0] || '',
+      productSecondaryImageURL: secondaryImages,
+      manufacturerPartNumber: data.sku,
+      msrp: data.price,
+      category: {
+        categoryPath: 'Home/Furniture/Living Room Furniture',
+      },
+    },
+    MPOffer: {
+      price: data.price,
+      shippingWeight: {
+        value: 1,
+        unit: 'LB',
+      },
+      productTaxCode: '2038710',
+      MinimumAdvertisedPrice: data.price,
+    },
+    MPLogistics: {
+      fulfillmentLagTime: 1,
+    },
+  }
 
-  return xml
-}
-
-// Add this helper function
-function escapeXml(str: string): string {
-  if (!str) return ''
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
+  // Return single item object, not wrapped in array or feed structure
+  return JSON.stringify(itemData, null, 2)
 }
 
 // Submit feed WITHOUT rate limiting check (already checked above)
 async function submitWalmartFeedWithRateLimit(
-  xmlContent: string,
+  jsonContent: string,
   accessToken: string,
   sellerId?: string
 ): Promise<any> {
@@ -284,10 +268,10 @@ async function submitWalmartFeedWithRateLimit(
       WM_MARKET: 'us',
       'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
       'WM_SVC.NAME': 'Walmart Marketplace',
-      'Content-Type': 'application/xml',
+      'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: xmlContent,
+    body: jsonContent,
   })
 
   // Update rate limits from response headers
