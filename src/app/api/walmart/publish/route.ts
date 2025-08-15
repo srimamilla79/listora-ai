@@ -193,7 +193,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Updated createItemJson with latest spec version
 function createItemJson(data: any): string {
   // Build secondary images array
   const secondaryImages = []
@@ -205,46 +204,37 @@ function createItemJson(data: any): string {
     }
   }
 
+  // Return just the item data without feed header
   const itemData = {
-    MPItemFeedHeader: {
-      version: '4.8',
-      requestId: `request-${Date.now()}`,
-      requestBatchId: `batch-${Date.now()}`,
-      feedDate: new Date().toISOString(),
+    sku: data.sku,
+    productIdentifiers: {
+      productIdType: 'SKU',
+      productId: data.sku,
     },
-    MPItem: [
-      {
-        sku: data.sku,
-        productIdentifiers: {
-          productIdType: 'SKU',
-          productId: data.sku,
-        },
-        MPProduct: {
-          productName: data.title,
-          shortDescription: data.description.substring(0, 200),
-          brand: data.brand,
-          mainImageUrl: data.images?.[0] || '',
-          productSecondaryImageURL: secondaryImages,
-          manufacturerPartNumber: data.sku,
-          msrp: data.price,
-          category: {
-            categoryPath: 'Home/Furniture/Living Room Furniture',
-          },
-        },
-        MPOffer: {
-          price: data.price,
-          shippingWeight: {
-            value: 1,
-            unit: 'LB',
-          },
-          productTaxCode: '2038710',
-          MinimumAdvertisedPrice: data.price,
-        },
-        MPLogistics: {
-          fulfillmentLagTime: 1,
-        },
+    MPProduct: {
+      productName: data.title,
+      shortDescription: data.description.substring(0, 200),
+      brand: data.brand,
+      mainImageUrl: data.images?.[0] || '',
+      productSecondaryImageURL: secondaryImages,
+      manufacturerPartNumber: data.sku,
+      msrp: data.price,
+      category: {
+        categoryPath: 'Home/Furniture/Living Room Furniture',
       },
-    ],
+    },
+    MPOffer: {
+      price: data.price,
+      shippingWeight: {
+        value: 1,
+        unit: 'LB',
+      },
+      productTaxCode: '2038710',
+      MinimumAdvertisedPrice: data.price,
+    },
+    MPLogistics: {
+      fulfillmentLagTime: 1,
+    },
   }
 
   return JSON.stringify(itemData, null, 2)
