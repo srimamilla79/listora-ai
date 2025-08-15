@@ -335,11 +335,8 @@ async function refreshTokenIfNeeded(
 }
 
 async function refreshWalmartToken(refreshToken: string, sellerId?: string) {
-  const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
-  const tokenUrl =
-    environment === 'sandbox'
-      ? 'https://sandbox.walmartapis.com/v3/token'
-      : 'https://marketplace.walmartapis.com/v3/token'
+  // Force production URL for now
+  const tokenUrl = 'https://marketplace.walmartapis.com/v3/token'
 
   const clientId = process.env.WALMART_CLIENT_ID!
   const clientSecret = process.env.WALMART_CLIENT_SECRET!
@@ -354,10 +351,8 @@ async function refreshWalmartToken(refreshToken: string, sellerId?: string) {
       Authorization: `Basic ${credentials}`,
       'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'application/json',
-      'WM_PARTNER.ID': partnerId,
-      WM_MARKET: 'us',
       'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      'WM_SVC.NAME': 'Listora AI',
+      'WM_SVC.NAME': 'Walmart Marketplace',
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',

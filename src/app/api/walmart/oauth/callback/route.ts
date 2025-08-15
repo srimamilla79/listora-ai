@@ -170,7 +170,11 @@ export async function GET(request: NextRequest) {
     console.log('⏰ Access token expires in:', tokenData.expires_in, 'seconds')
 
     // Get seller info using the access token
-    const sellerInfo = await getSellerInfo(tokenData.access_token)
+    // Get seller info using the access token
+    const sellerInfo = await getSellerInfo(
+      tokenData.access_token,
+      walmartSellerId
+    )
 
     // Calculate token expiration
     const expiresAt = new Date(
@@ -301,15 +305,15 @@ async function exchangeCodeForToken(code: string, sellerId?: string) {
 }
 
 // Get seller info using access token
-async function getSellerInfo(accessToken: string) {
+async function getSellerInfo(accessToken: string, sellerId?: string) {
   const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
-  const partnerId = process.env.WALMART_PARTNER_ID!
+  const partnerId = sellerId || process.env.WALMART_PARTNER_ID!
 
   try {
     // For now, return mock data since seller info endpoint might not be available
     // In production, you would call the actual API endpoint
     return {
-      partnerId: partnerId,
+      partnerId: sellerId || partnerId,
       partnerName: 'Walmart Test Seller',
       marketplaceId: 'WALMART_US',
       status: 'active',
@@ -318,7 +322,7 @@ async function getSellerInfo(accessToken: string) {
     console.log('⚠️ Could not fetch seller info, using defaults')
     return {
       partnerId: partnerId,
-      partnerName: 'Walmart Seller',
+      partnerName: 'Walmart Test Seller',
       marketplaceId: 'WALMART_US',
       status: 'active',
     }
