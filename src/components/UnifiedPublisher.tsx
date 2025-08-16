@@ -110,6 +110,7 @@ export default function UnifiedPublisher({
   const [showInstructions, setShowInstructions] = useState(false)
   const [instructionData, setInstructionData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [publishResult, setPublishResult] = useState<any>(null)
   const [showMarketplacePermissionDialog, setShowMarketplacePermissionDialog] =
     useState(false)
 
@@ -839,6 +840,7 @@ export default function UnifiedPublisher({
               : `✅ Successfully published to ${selectedPlatformData?.name}! Product ID: ${result.productId || result.listingId || result.id || 'Unknown'}`
 
       setPublishSuccess(successMessage)
+      setPublishResult(result)
 
       setPublishedProducts((prev) => ({
         ...prev,
@@ -1987,6 +1989,44 @@ export default function UnifiedPublisher({
                     <p className="text-green-700 text-sm mt-1">
                       {publishSuccess}
                     </p>
+
+                    {/* Walmart Feed Status Check */}
+                    {selectedPlatform === 'walmart' &&
+                      publishResult?.feedId && (
+                        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                          <h4 className="font-medium text-blue-900 mb-2">
+                            Track Your Walmart Feed
+                          </h4>
+                          <p className="text-sm text-blue-700 mb-3">
+                            Feed ID: {publishResult.feedId}
+                          </p>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(
+                                  `/api/walmart/check-feed-status?feedId=${encodeURIComponent(
+                                    publishResult.feedId
+                                  )}&userId=${passedUser?.id}`
+                                )
+                                const data = await response.json()
+                                console.log('Feed Status:', data)
+                                alert(
+                                  `Feed Status: ${data.feedStatus || 'Unknown'}\n${data.interpretation?.message || ''}`
+                                )
+                              } catch (error) {
+                                console.error(
+                                  'Failed to check feed status:',
+                                  error
+                                )
+                                alert('Failed to check feed status')
+                              }
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            Check Feed Status
+                          </button>
+                        </div>
+                      )}
                   </div>
                 )}
 
