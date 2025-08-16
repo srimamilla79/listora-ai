@@ -414,23 +414,11 @@ function extractTitleFromContent(content: string): string | null {
           return title
         }
 
-        // If too long, find last good break point
+        // If too long, use the existing truncateTitle function
         if (title.length > 80) {
-          const breakPoints = [
-            title.lastIndexOf(',', 75),
-            title.lastIndexOf(' - ', 75),
-            title.lastIndexOf(' with ', 75),
-            title.lastIndexOf(' and ', 75),
-          ]
-
-          const bestBreak = Math.max(...breakPoints.filter((p) => p > 25))
-          if (bestBreak > 25) {
-            title = title.substring(0, bestBreak).trim()
-            if (title.length >= 15) {
-              console.log('✅ Smart truncated title:', title)
-              return title
-            }
-          }
+          title = truncateTitle(title)
+          console.log('✅ Smart truncated title:', title)
+          return title
         }
       }
     }
