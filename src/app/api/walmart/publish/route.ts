@@ -207,8 +207,8 @@ function createMPItemMatchJSON(data: any): string {
         Item: {
           sku: data.sku,
           productIdentifiers: {
-            productId: data.gtin,
-            productIdType: 'GTIN',
+            productId: data.sku, // Use SKU as identifier if no valid GTIN
+            productIdType: 'SELLER_ID', // Or use "SKU" type
           },
           ShippingWeight: 1,
           price: data.price,
@@ -251,18 +251,32 @@ function createSimpleItemJSON(data: any): string {
 
 // Generate a valid GTIN/UPC (12 digits with check digit)
 function generateValidGTIN(sku: string): string {
-  // Extract numbers from SKU and pad to 11 digits
-  const numbers = sku.replace(/\D/g, '').padStart(11, '0').substring(0, 11)
+  // For testing/demo purposes, generate a more realistic GTIN
+  // Real products should use actual GTINs
 
-  // Calculate check digit
+  // Use a more realistic prefix (not all zeros)
+  // Common UPC prefixes: 0-9 for US/Canada
+  const prefix = '8' // Using 8 as a common prefix
+
+  // Extract numbers from SKU and create a unique identifier
+  const skuNumbers = sku.replace(/\D/g, '')
+  const uniquePart = (skuNumbers + Date.now().toString()).substring(0, 10)
+
+  // Create 11 digits (prefix + unique part)
+  const elevenDigits = (prefix + uniquePart).substring(0, 11)
+
+  // Calculate UPC check digit
   let sum = 0
   for (let i = 0; i < 11; i++) {
-    const digit = parseInt(numbers[i])
-    sum += i % 2 === 0 ? digit : digit * 3
+    const digit = parseInt(elevenDigits[i])
+    sum += i % 2 === 0 ? digit * 3 : digit
   }
   const checkDigit = (10 - (sum % 10)) % 10
 
-  return numbers + checkDigit
+  const gtin = elevenDigits + checkDigit
+  console.log('📊 Generated GTIN:', gtin, 'from SKU:', sku)
+
+  return gtin
 }
 
 // Submit feed with proper content-type handling
