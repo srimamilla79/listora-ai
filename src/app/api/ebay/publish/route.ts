@@ -2034,33 +2034,119 @@ function extractProductTypeForCategory(
   fullText: string
 ): string {
   try {
-    // Extract title
+    console.log('🔍 Extracting product type for category detection...')
+
+    // Method 1: Extract from Section 3 - Product Description
+    const descMatch = generatedContent.match(
+      /\*\*3\.\s*DETAILED\s+PRODUCT\s+DESCRIPTION:\*\*\s*\n([\s\S]*?)(?=\n?\*\*4\.|$)/i
+    )
+    if (descMatch) {
+      const firstSentence = descMatch[1].trim().split(/[.!?]/)[0]
+      console.log('🔍 First sentence of description:', firstSentence)
+
+      // Extract key product words from the description
+      const productWords = firstSentence
+        .replace(
+          /Discover|Experience|Transform|Elevate|Enjoy|the|your|with|into|every|perfect|blend|of|classic|elegance|and/gi,
+          ''
+        )
+        .trim()
+
+      if (productWords.length > 10 && productWords.length < 50) {
+        console.log('✅ Extracted from description:', productWords)
+        return productWords
+      }
+    }
+
+    // Method 2: Look for product mentions in bullet points
+    const bulletMatch = generatedContent.match(
+      /\*\*2\.\s*KEY\s+SELLING\s+POINTS:\*\*\s*\n([\s\S]*?)(?=\*\*3\.|$)/i
+    )
+    if (bulletMatch) {
+      const bullets = bulletMatch[1]
+
+      // Look for product type mentions in bullets
+      const productMatches = bullets.match(
+        /(?:for|of|the)\s+([A-Za-z\s]+?)(?:\.|,|:|\n|$)/gi
+      )
+      if (productMatches && productMatches.length > 0) {
+        for (const match of productMatches) {
+          const cleaned = match.replace(/for|of|the/gi, '').trim()
+
+          // If it contains actual product words (not just adjectives)
+          if (
+            cleaned.length > 5 &&
+            !cleaned.match(
+              /^(premium|quality|perfect|ideal|excellent|great|best|elegant|modern|stylish|professional)$/i
+            )
+          ) {
+            console.log('✅ Extracted from bullets:', cleaned)
+            return cleaned
+          }
+        }
+      }
+    }
+
+    // Method 3: Extract from title but keep product-specific words
     const titleMatch = generatedContent.match(
       /\*\*1\.\s*PRODUCT\s+TITLE[^:]*:\*\*\s*\n([^\n]+)/i
     )
     if (titleMatch) {
       const title = titleMatch[1]
 
-      // Remove marketing words and extract core product
+      // Find the product name part (usually after "with" or similar prepositions)
+      const productPartMatch = title.match(
+        /(?:with|the)\s+([^-–]+?)(?:\s*[-–]|$)/i
+      )
+      if (productPartMatch) {
+        const productPart = productPartMatch[1].trim()
+        console.log('✅ Extracted from title product part:', productPart)
+        return productPart
+      }
+
+      // Fallback: Remove only marketing words, keep product descriptors
       const cleanTitle = title
-        .replace(
-          /Affordable|Premium|Quality|Professional|Advanced|Enhanced/gi,
-          ''
-        )
-        .replace(/Perfect for.*/i, '')
-        .replace(/Ideal for.*/i, '')
-        .replace(/[-,].*/g, '') // Remove everything after dash or comma
+        .replace(/Elevate|Experience|Discover|Transform|Enhance|your|the/gi, '')
+        .replace(/Perfect\s+for[^,]+/gi, '')
+        .replace(/^\s*[-–]\s*/, '')
         .trim()
 
-      // Return core product words
-      if (cleanTitle.length > 10) {
-        return cleanTitle.substring(0, 50)
+      // Take first 50 chars or up to first comma/dash
+      const endIndex = Math.min(
+        cleanTitle.length,
+        50,
+        cleanTitle.indexOf(',') > 0 ? cleanTitle.indexOf(',') : 50,
+        cleanTitle.indexOf('–') > 0 ? cleanTitle.indexOf('–') : 50,
+        cleanTitle.indexOf('-') > 0 ? cleanTitle.indexOf('-') : 50
+      )
+
+      const result = cleanTitle.substring(0, endIndex).trim()
+      if (result.length > 10) {
+        console.log('✅ Extracted from cleaned title:', result)
+        return result
       }
     }
 
-    // Fallback to basic text analysis
+    // Method 4: Look for specific product identifiers in full text
+    const productPatterns = [
+      /\b(\w+\s+(?:glass|glasses|set|kit|tool|device|product))\b/i,
+      /\b((?:whiskey|wine|beer|water|drinking)\s+\w+)\b/i,
+      /\b(\w+\s+\w+\s+(?:set|collection|series))\b/i,
+    ]
+
+    for (const pattern of productPatterns) {
+      const match = fullText.match(pattern)
+      if (match) {
+        console.log('✅ Extracted from pattern match:', match[1])
+        return match[1]
+      }
+    }
+
+    // Final fallback
+    console.log('⚠️ Using fallback extraction')
     return fullText.substring(0, 100)
   } catch (error) {
+    console.error('❌ Product type extraction error:', error)
     return fullText.substring(0, 100)
   }
 }
