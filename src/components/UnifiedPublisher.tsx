@@ -52,6 +52,12 @@ interface UnifiedPublisherProps {
   imageUpdateTrigger?: number
 }
 
+type WalmartLeafSelectPayload = {
+  category: { name: string; isLeaf?: boolean }
+  spec: any | null
+  version: '5.0' | '4.2' | 'unknown'
+}
+
 export default function UnifiedPublisher({
   productContent,
   images = [],
@@ -114,14 +120,29 @@ export default function UnifiedPublisher({
   const [showMarketplacePermissionDialog, setShowMarketplacePermissionDialog] =
     useState(false)
 
-  const [publishingOptions, setPublishingOptions] = useState({
-    price: '',
-    quantity: '1',
-    sku: '',
-    condition: 'new',
-    productType: '',
-    metaPlatforms: ['facebook', 'instagram'],
-  })
+  type PublishingOptions = {
+    price: string
+    quantity: string
+    sku: string
+    condition: string
+    productType: string
+    metaPlatforms: string[]
+    walmartProductType?: string
+    walmartAttributes?: any
+    // walmartSpec?: any;
+    // walmartSpecVersion?: '5.0' | '4.2' | 'unknown';
+  }
+
+  const [publishingOptions, setPublishingOptions] = useState<PublishingOptions>(
+    {
+      price: '',
+      quantity: '1',
+      sku: '',
+      condition: 'new',
+      productType: '',
+      metaPlatforms: ['facebook', 'instagram'],
+    }
+  )
 
   // Marketplace details state
   const [marketplaceDetails, setMarketplaceDetails] = useState({
@@ -1515,7 +1536,7 @@ export default function UnifiedPublisher({
                           onChange={(e) =>
                             setPublishingOptions((prev) => ({
                               ...prev,
-                              price: e.target.value,
+                              price: e.target.value, // ✅ Fixed
                             }))
                           }
                           placeholder="29.99"
@@ -1601,12 +1622,13 @@ export default function UnifiedPublisher({
                             Walmart Product Category
                           </label>
                           <WalmartCategoryPicker
-                            userId={passedUser?.id}
-                            onCategorySelect={(category, attributes) => {
+                            userId={String(passedUser?.id || '')}
+                            onLeafSelect={({ category, spec, version }) => {
                               setPublishingOptions((prev) => ({
                                 ...prev,
                                 walmartProductType: category.name,
-                                walmartAttributes: attributes,
+                                walmartAttributes: spec || {},
+                                walmartSpecVersion: version,
                               }))
                             }}
                           />
