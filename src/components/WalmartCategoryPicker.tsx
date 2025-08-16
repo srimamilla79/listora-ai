@@ -16,14 +16,8 @@ type LeafPayload = {
   version: '5.0' | '4.2' | 'unknown'
 }
 
-/**
- * This component supports EITHER:
- *  - onCategorySelect(category, attributes/spec)   // simpler callback
- *  - onLeafSelect({ category, spec, version })     // detailed payload
- * Provide whichever your parent uses; the component will call it.
- */
 type Props = {
-  userId: string
+  userId: string // MUST be a non-empty Listora user UUID
   onCategorySelect?: (category: Node, attributes: any) => void
   onLeafSelect?: (payload: LeafPayload) => void
   autoFetchSpec?: boolean
@@ -47,18 +41,43 @@ export default function WalmartCategoryPicker({
   const [search, setSearch] = useState('')
   const [selectedPath, setSelectedPath] = useState<string[]>(initialPath)
 
-  // ---- Fetch taxonomy and normalize safely ----
+  const canFetch = !!userId && userId.trim().length > 0
+
   useEffect(() => {
     let cancelled = false
-    const run = async () => {
+
+    async function run() {
+      // Guard: don’t even try until we have a real userId
+      if (!canFetch) {
+        setError('Missing userId — cannot load Walmart taxonomy.')
+        setTaxonomy([])
+        return
+      }
+
       setLoading(true)
       setError(null)
       try {
-        // IMPORTANT: send user id via header so the API can find the connection
-        const res = await fetch(`/api/walmart/taxonomy`, {
-          headers: { 'x-user-id': String(userId || '') },
+        // Send x-user-id so the server can locate the correct Walmart connection
+        const res = await fetch('/api/walmart/taxonomy', {
+          headers: { 'x-user-id': String(userId) },
+          cache: 'no-store',
         })
-        const json = await res.json().catch(() => ({}))
+
+        const text = await res.text()
+        let json: any = {}
+        try {
+          json = text ? JSON.parse(text) : {}
+        } catch {
+          json = { raw: text }
+        }
+
+        if (!res.ok || json?.ok === false) {
+          const msg =
+            json?.error ||
+            `Taxonomy request failed (${res.status}) — ensure the user is connected to Walmart.`
+          throw new Error(msg)
+        }
+
         const raw = json?.data ?? json
         const normalized = normalizeTaxonomy(raw)
         if (!cancelled) {
@@ -69,20 +88,20 @@ export default function WalmartCategoryPicker({
         }
       } catch (e: any) {
         if (!cancelled) {
-          setError(`Failed to load categories: ${String(e?.message || e)}`)
+          setError(String(e?.message || e))
           setTaxonomy([])
         }
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
+
     run()
     return () => {
       cancelled = true
     }
-  }, [userId, initialPath])
+  }, [canFetch, userId, initialPath])
 
-  // ---- Drill into the tree with guards (never assume arrays) ----
   const levelItems = useMemo<Node[]>(() => {
     let current: Node[] = taxonomy
     for (const segment of selectedPath) {
@@ -100,19 +119,16 @@ export default function WalmartCategoryPicker({
     return current.filter((n) => (n?.name || '').toLowerCase().includes(q))
   }, [taxonomy, selectedPath, search])
 
-  // ---- Click handlers ----
-  const onClickNode = async (node: Node) => {
+  async function onClickNode(node: Node) {
     const hasChildren = Array.isArray(node.children) && node.children.length > 0
     const isLeaf = node.isLeaf ?? !hasChildren
 
-    // Groups drill down; only leaf triggers callbacks/spec
     if (!isLeaf) {
       setSelectedPath((prev) => [...prev, node.name])
       setSearch('')
       return
     }
 
-    // If you don't want spec here (e.g., offer-match), just call the simple callback
     if (!autoFetchSpec) {
       if (onCategorySelect) onCategorySelect(node, {})
       else if (onLeafSelect)
@@ -120,15 +136,16 @@ export default function WalmartCategoryPicker({
       return
     }
 
-    // Try spec v5.0 then v4.2 via your backend /api/walmart/spec (send x-user-id header)
     setLoadingSpec(true)
     setError(null)
     try {
       const pt = encodeURIComponent(node.name)
+
       const v5 = await fetchJsonSafe(
         `/api/walmart/spec?productTypes=${pt}&version=5.0`,
-        { 'x-user-id': String(userId || '') }
+        { 'x-user-id': String(userId) }
       )
+
       if (v5?.ok && v5?.data && (v5.version === '5.0' || v5.version === '5')) {
         const spec = unwrapSpec(v5.data, node.name)
         if (onCategorySelect) onCategorySelect(node, spec)
@@ -137,7 +154,7 @@ export default function WalmartCategoryPicker({
       } else {
         const v42 = await fetchJsonSafe(
           `/api/walmart/spec?productTypes=${pt}&version=4.2`,
-          { 'x-user-id': String(userId || '') }
+          { 'x-user-id': String(userId) }
         )
         if (v42?.ok && v42?.data) {
           const spec = unwrapSpec(v42.data, node.name)
@@ -164,14 +181,20 @@ export default function WalmartCategoryPicker({
     setSelectedPath([])
     setSearch('')
   }
-  const onBreadcrumbTo = (indexInclusive: number) => {
-    setSelectedPath((prev) => prev.slice(0, indexInclusive + 1))
+  const onBreadcrumbTo = (i: number) => {
+    setSelectedPath((prev) => prev.slice(0, i + 1))
     setSearch('')
   }
 
-  // ---- UI ----
   return (
     <div className={className ?? 'space-y-4'}>
+      {/* Debug helper: surface missing id instead of blank list */}
+      {!canFetch && (
+        <div className="text-sm text-red-600">
+          Missing userId. Pass a valid Listora user id to WalmartCategoryPicker.
+        </div>
+      )}
+
       {/* Breadcrumbs */}
       <div className="flex items-center flex-wrap gap-x-2 text-sm">
         <button
@@ -240,7 +263,7 @@ export default function WalmartCategoryPicker({
             </button>
           )
         })}
-        {levelItems.length === 0 && !loading && (
+        {levelItems.length === 0 && !loading && !error && (
           <div className="px-4 py-3 text-sm text-gray-500">
             No categories found.
           </div>
@@ -300,7 +323,7 @@ async function fetchJsonSafe(
   headers?: Record<string, string>
 ): Promise<any> {
   try {
-    const res = await fetch(url, { method: 'GET', headers })
+    const res = await fetch(url, { method: 'GET', headers, cache: 'no-store' })
     const text = await res.text()
     try {
       const json = text ? JSON.parse(text) : {}

@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAndCacheTaxonomy } from '@/lib/specCache'
 
 /** Return a plain array so the client can normalize it */
-function normalize(raw: any): any[] {
-  const pickArray =
+function pickArray(raw: any): any[] {
+  const arr =
     (Array.isArray(raw) && raw) ||
     raw?.productTypeGroups ||
     raw?.productTypes ||
@@ -13,7 +13,7 @@ function normalize(raw: any): any[] {
     raw?.items ||
     raw?.data ||
     []
-  return Array.isArray(pickArray) ? pickArray : []
+  return Array.isArray(arr) ? arr : []
 }
 
 export async function GET(req: NextRequest) {
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
     const refresh = sp.get('refresh') === '1'
     const raw = await getAndCacheTaxonomy(userId, refresh)
-    const data = normalize(raw)
+    const data = pickArray(raw)
     return NextResponse.json({ ok: true, data })
   } catch (e: any) {
     return NextResponse.json(

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import WalmartCategoryPicker from './WalmartCategoryPicker'
+
 import {
   Upload,
   Package,
@@ -50,12 +51,6 @@ interface UnifiedPublisherProps {
   onPublishSuccess?: (result: any) => void
   user?: any
   imageUpdateTrigger?: number
-}
-
-type WalmartLeafSelectPayload = {
-  category: { name: string; isLeaf?: boolean }
-  spec: any | null
-  version: '5.0' | '4.2' | 'unknown'
 }
 
 export default function UnifiedPublisher({
@@ -117,6 +112,11 @@ export default function UnifiedPublisher({
   const [instructionData, setInstructionData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [publishResult, setPublishResult] = useState<any>(null)
+  const userId = String(passedUser?.id || '')
+  useEffect(() => {
+    console.log('Walmart picker userId:', userId)
+  }, [userId])
+
   const [showMarketplacePermissionDialog, setShowMarketplacePermissionDialog] =
     useState(false)
 
@@ -1622,13 +1622,12 @@ export default function UnifiedPublisher({
                             Walmart Product Category
                           </label>
                           <WalmartCategoryPicker
-                            userId={String(passedUser?.id || '')}
-                            onLeafSelect={({ category, spec, version }) => {
+                            userId={userId}
+                            onCategorySelect={(category, attributes) => {
                               setPublishingOptions((prev) => ({
                                 ...prev,
-                                walmartProductType: category.name,
-                                walmartAttributes: spec || {},
-                                walmartSpecVersion: version,
+                                walmartProductType: category?.name ?? '',
+                                walmartAttributes: attributes ?? {},
                               }))
                             }}
                           />
