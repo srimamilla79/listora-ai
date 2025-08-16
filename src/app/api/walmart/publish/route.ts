@@ -1,4 +1,4 @@
-// src/app/api/walmart/publish/route.ts - Complete MP_ITEM Implementation
+// src/app/api/walmart/publish/route.ts - MP_ITEM with XML Format
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 import { rateLimiter, validateFeedFileSize } from '@/lib/walmart-rate-limiter'
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       await request.json()
     const supabase = await createServerSideClient()
 
-    // Check rate limit ONCE at the beginning
+    // Check rate limit
     const canProceed = await rateLimiter.checkRateLimit('feeds:submit:MP_ITEM')
     if (!canProceed) {
       const remaining = rateLimiter.getRemainingTokens('feeds:submit:MP_ITEM')
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ Walmart connection found:', connection.id)
     console.log('🏪 Seller ID:', sellerId)
 
-    // Check if token needs refresh (5 minute buffer)
+    // Check if token needs refresh
     const accessToken = await refreshTokenIfNeeded(connection, supabase)
     console.log('🔑 Using access token:', accessToken.substring(0, 20) + '...')
 
@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
       category: publishingOptions.category || 'Home',
     })
 
-    // Create MP_ITEM feed JSON
-    const itemFeed = createMPItemFeed({
+    // Create XML feed for MP_ITEM (NOT JSON!)
+    const itemXML = createMPItemXML({
       sku,
       title: productContent.product_name || 'Product',
       description:
@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
       category: publishingOptions.category || 'Home',
     })
 
-    // Validate file size before submission
-    const feedSizeBytes = new TextEncoder().encode(itemFeed).length
+    // Validate file size
+    const feedSizeBytes = new TextEncoder().encode(itemXML).length
     if (!validateFeedFileSize('MP_ITEM', feedSizeBytes)) {
       return NextResponse.json(
         {
@@ -90,21 +90,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('📄 Creating Walmart item via Feed API')
+    console.log('📄 Creating Walmart item via MP_ITEM XML feed')
     console.log(`📏 Feed size: ${(feedSizeBytes / 1024).toFixed(2)} KB`)
-    console.log('🔍 Feed Preview:', itemFeed.substring(0, 500) + '...')
+    console.log('🔍 Feed Preview:', itemXML.substring(0, 500) + '...')
 
-    // Submit feed to Walmart
-    const feedResult = await submitWalmartFeed(
-      itemFeed,
+    // Submit XML feed to Walmart
+    const feedResult = await submitWalmartXMLFeed(
+      itemXML,
       accessToken,
       sellerId,
-      'MP_ITEM' // Using MP_ITEM instead of MP_ITEM_MATCH
+      'MP_ITEM'
     )
 
     console.log('✅ Walmart feed submitted:', feedResult.feedId)
 
-    // Save to walmart_listings table
+    // Save to database
     const { data: walmartListing } = await supabase
       .from('walmart_listings')
       .insert({
@@ -124,7 +124,6 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    // Save to unified published_products table
     const { data: publishedProduct, error: publishError } = await supabase
       .from('published_products')
       .insert({
@@ -145,6 +144,7 @@ export async function POST(request: NextRequest) {
           walmartListingId: walmartListing?.id,
           sellerId: sellerId,
           feedType: 'MP_ITEM',
+          format: 'XML',
           ...feedResult,
         },
         status: 'pending',
@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
         publishedProductId: publishedProduct?.id,
         remainingTokens: rateLimiter.getRemainingTokens('feeds:submit:MP_ITEM'),
         feedType: 'MP_ITEM',
+        format: 'XML',
       },
       message:
         'Successfully submitted to Walmart! Check feed status in 15-30 minutes.',
@@ -187,202 +188,163 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Create MP_ITEM feed structure (full item creation, no matching required)
-function createMPItemFeed(data: any): string {
-  // Map category to Walmart taxonomy
-  const categoryMapping = getCategoryMapping(data.category)
-
-  const feed = {
-    MPItemFeed: {
-      MPItemFeedHeader: {
-        version: '3.2', // Using stable version 3.2
-        requestId: Date.now().toString(),
-        requestBatchId: `${Date.now()}-batch`,
-        mart: 'WALMART_US',
-      },
-      MPItem: [
-        {
-          sku: data.sku,
-          productIdentifiers: [
-            {
-              productIdType: 'SKU', // Using SKU as identifier - no GTIN validation
-              productId: data.sku,
-            },
-          ],
-          MPProduct: {
-            productName: sanitizeText(data.title),
-            shortDescription: sanitizeText(data.description.substring(0, 500)),
-            brand: sanitizeText(data.brand),
-            manufacturer: sanitizeText(data.brand),
-            mainImageUrl: data.images[0] || '',
-            productIdUpdate: 'No',
-            skuUpdate: 'No',
-            additionalProductAttributes: {
-              hasWarranty: 'No',
-              countryOfOriginAssembly: 'US',
-              isAssemblyRequired: 'No',
-              assemblyInstructions: 'No assembly required',
-            },
-            category: categoryMapping.categoryStructure,
-          },
-          MPOffer: {
-            price: Number(data.price).toFixed(2),
-            MinimumAdvertisedPrice: Number(data.price).toFixed(2),
-            shippingWeight: {
-              measure: '1',
-              unit: 'lb',
-            },
-            productTaxCode: '2038710', // General taxable goods
-            shippingOverrides: [
-              {
-                shipRegion: 'STREET_48_STATES',
-                shipMethod: 'STANDARD',
-                shipPrice: '0', // Free shipping
-              },
-            ],
-          },
-          MPLogistics: {
-            fulfillmentLagTime: '1',
-          },
-        },
-      ],
-    },
+// Create XML for MP_ITEM feed type
+function createMPItemXML(data: any): string {
+  // Escape XML special characters
+  const escapeXml = (str: string): string => {
+    if (!str) return ''
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+      .replace(/\n+/g, ' ')
+      .trim()
   }
 
-  return JSON.stringify(feed, null, 2)
+  // Map category to Walmart structure
+  const categoryData = getCategoryMapping(data.category)
+
+  // Build XML based on working examples from Stack Overflow
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<MPItemFeed xmlns="http://walmart.com/">
+  <MPItemFeedHeader>
+    <version>3.1</version>
+    <mart>WALMART_US</mart>
+  </MPItemFeedHeader>
+  <MPItem>
+    <sku>${escapeXml(data.sku)}</sku>
+    <productIdentifiers>
+      <productIdentifier>
+        <productIdType>SKU</productIdType>
+        <productId>${escapeXml(data.sku)}</productId>
+      </productIdentifier>
+    </productIdentifiers>
+    <MPProduct>
+      <productName>${escapeXml(data.title)}</productName>
+      <ProductIdUpdate>No</ProductIdUpdate>
+      <SkuUpdate>No</SkuUpdate>
+      <category>
+        <${categoryData.categoryName}>
+          ${getCategorySpecificXML(categoryData.categoryName, data)}
+        </${categoryData.categoryName}>
+      </category>
+    </MPProduct>
+    <MPOffer>
+      <price>${data.price}</price>
+      <MinimumAdvertisedPrice>${data.price}</MinimumAdvertisedPrice>
+      <ShippingWeight>
+        <measure>1</measure>
+        <unit>lb</unit>
+      </ShippingWeight>
+      <ProductTaxCode>2038710</ProductTaxCode>
+    </MPOffer>
+  </MPItem>
+</MPItemFeed>`
+
+  return xml
 }
 
-// Get category mapping based on product type
+// Get category-specific XML content
+function getCategorySpecificXML(categoryName: string, data: any): string {
+  const escapeXml = (str: string): string => {
+    if (!str) return ''
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+      .replace(/\n+/g, ' ')
+      .trim()
+  }
+
+  // Common fields for all categories
+  const commonFields = `
+          <shortDescription>${escapeXml(data.description.substring(0, 500))}</shortDescription>
+          <brand>${escapeXml(data.brand)}</brand>
+          <mainImageUrl>${escapeXml(data.images[0] || '')}</mainImageUrl>`
+
+  switch (categoryName) {
+    case 'Footwear':
+      return `${commonFields}
+          <manufacturer>${escapeXml(data.brand)}</manufacturer>
+          <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
+          <modelNumber>${escapeXml(data.sku)}</modelNumber>
+          <gender>Unisex</gender>
+          <ageGroup>Adult</ageGroup>
+          <shoeSize>Various</shoeSize>
+          <color>Multi</color>`
+
+    case 'Electronics':
+      return `${commonFields}
+          <manufacturer>${escapeXml(data.brand)}</manufacturer>
+          <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
+          <modelNumber>${escapeXml(data.sku)}</modelNumber>
+          <warrantyLength>90 days</warrantyLength>
+          <warrantyText>90 day limited warranty</warrantyText>`
+
+    case 'ClothingAndAccessories':
+      return `${commonFields}
+          <manufacturer>${escapeXml(data.brand)}</manufacturer>
+          <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
+          <gender>Unisex</gender>
+          <ageGroup>Adult</ageGroup>
+          <clothingSize>One Size</clothingSize>
+          <color>Multi</color>`
+
+    case 'ToysAndGames':
+      return `${commonFields}
+          <manufacturer>${escapeXml(data.brand)}</manufacturer>
+          <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
+          <modelNumber>${escapeXml(data.sku)}</modelNumber>
+          <recommendedMinimumAge>
+            <measure>36</measure>
+            <unit>months</unit>
+          </recommendedMinimumAge>
+          <targetAudience>Unisex</targetAudience>`
+
+    case 'Home':
+    default:
+      return `${commonFields}
+          <manufacturer>${escapeXml(data.brand)}</manufacturer>
+          <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
+          <modelNumber>${escapeXml(data.sku)}</modelNumber>
+          <assemblyRequired>false</assemblyRequired>
+          <material>Mixed Materials</material>`
+  }
+}
+
+// Get category mapping
 function getCategoryMapping(userCategory: string) {
   const category = userCategory?.toLowerCase() || 'general'
 
-  // Category mappings with required attributes
   const categoryMappings: any = {
-    shoes: {
-      categoryName: 'Footwear',
-      categoryStructure: {
-        Footwear: {
-          shortDescription: '', // Will be filled
-          brand: '', // Will be filled
-          mainImageUrl: '', // Will be filled
-          manufacturerPartNumber: '', // Will be filled
-          gender: 'Unisex',
-          ageGroup: 'Adult',
-          shoeSize: 'Various',
-          shoeWidth: 'Medium',
-          color: 'Multi',
-          material: 'Synthetic',
-        },
-      },
-    },
-    'men shoes': {
-      categoryName: 'Footwear',
-      categoryStructure: {
-        Footwear: {
-          shortDescription: '', // Will be filled
-          brand: '', // Will be filled
-          mainImageUrl: '', // Will be filled
-          manufacturerPartNumber: '', // Will be filled
-          gender: 'Men',
-          ageGroup: 'Adult',
-          shoeSize: 'Various',
-          shoeWidth: 'Medium',
-          color: 'Multi',
-          material: 'Synthetic',
-        },
-      },
-    },
-    electronics: {
-      categoryName: 'Electronics',
-      categoryStructure: {
-        Electronics: {
-          shortDescription: '', // Will be filled
-          brand: '', // Will be filled
-          mainImageUrl: '', // Will be filled
-          manufacturerPartNumber: '', // Will be filled
-          modelNumber: '', // Will be filled
-          warrantyLength: '90 days',
-          warrantyText: '90 day limited warranty',
-        },
-      },
-    },
-    clothing: {
-      categoryName: 'ClothingAndAccessories',
-      categoryStructure: {
-        ClothingAndAccessories: {
-          shortDescription: '', // Will be filled
-          brand: '', // Will be filled
-          mainImageUrl: '', // Will be filled
-          manufacturerPartNumber: '', // Will be filled
-          gender: 'Unisex',
-          ageGroup: 'Adult',
-          size: 'One Size',
-          color: 'Multi',
-          material: 'Cotton Blend',
-        },
-      },
-    },
-    toys: {
-      categoryName: 'ToysAndGames',
-      categoryStructure: {
-        ToysAndGames: {
-          shortDescription: '', // Will be filled
-          brand: '', // Will be filled
-          mainImageUrl: '', // Will be filled
-          manufacturerPartNumber: '', // Will be filled
-          minimumAge: '36',
-          maximumAge: '1200', // 100 years in months
-          ageGroup: 'Child',
-          targetGender: 'Unisex',
-        },
-      },
-    },
-    default: {
-      categoryName: 'Home',
-      categoryStructure: {
-        Home: {
-          shortDescription: '', // Will be filled
-          brand: '', // Will be filled
-          mainImageUrl: '', // Will be filled
-          manufacturerPartNumber: '', // Will be filled
-          modelNumber: '', // Will be filled
-          material: 'Mixed Materials',
-          finish: 'Standard',
-          homeDecorStyle: 'Modern',
-        },
-      },
-    },
+    shoes: { categoryName: 'Footwear' },
+    'men shoes': { categoryName: 'Footwear' },
+    'women shoes': { categoryName: 'Footwear' },
+    electronics: { categoryName: 'Electronics' },
+    clothing: { categoryName: 'ClothingAndAccessories' },
+    toys: { categoryName: 'ToysAndGames' },
+    sports: { categoryName: 'SportsAndRecreation' },
+    home: { categoryName: 'Home' },
+    default: { categoryName: 'Home' },
   }
 
   // Find the best category match
-  let selectedCategory = categoryMappings.default
   for (const [key, value] of Object.entries(categoryMappings)) {
     if (category.includes(key) || key.includes(category)) {
-      selectedCategory = value
-      break
+      return value
     }
   }
 
-  return selectedCategory
+  return categoryMappings.default
 }
 
-// Sanitize text to prevent XML/JSON issues
-function sanitizeText(text: string): string {
-  if (!text) return ''
-
-  return text
-    .replace(/[<>]/g, '') // Remove angle brackets
-    .replace(/&/g, 'and') // Replace ampersands
-    .replace(/"/g, "'") // Replace quotes
-    .replace(/\n+/g, ' ') // Replace newlines with spaces
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim()
-    .substring(0, 4000) // Max length
-}
-
-// Submit feed to Walmart
-async function submitWalmartFeed(
-  feedContent: string,
+// Submit XML feed to Walmart
+async function submitWalmartXMLFeed(
+  xmlContent: string,
   accessToken: string,
   sellerId: string,
   feedType: string = 'MP_ITEM'
@@ -395,13 +357,14 @@ async function submitWalmartFeed(
 
   const feedUrl = `${baseUrl}/v3/feeds?feedType=${feedType}`
 
-  console.log('📤 Submitting feed to:', feedUrl)
+  console.log('📤 Submitting XML feed to:', feedUrl)
   console.log('📋 Feed Type:', feedType)
+  console.log('📝 Format: XML')
 
-  // Create FormData with proper content-type
+  // Create FormData with XML content
   const formData = new FormData()
-  const blob = new Blob([feedContent], { type: 'application/json' })
-  formData.append('file', blob, 'feed.json')
+  const blob = new Blob([xmlContent], { type: 'text/xml' })
+  formData.append('file', blob, 'feed.xml')
 
   try {
     const response = await fetch(feedUrl, {
@@ -430,7 +393,6 @@ async function submitWalmartFeed(
     }
 
     if (!response.ok) {
-      // Try to parse error response
       try {
         const errorData = JSON.parse(responseText)
         console.error('❌ Walmart error response:', errorData)
@@ -442,7 +404,6 @@ async function submitWalmartFeed(
 
     const result = JSON.parse(responseText)
 
-    // Ensure we have a valid feed response
     return {
       feedId: result.feedId || `FEED-${Date.now()}`,
       status: result.status || 'SUBMITTED',
@@ -454,7 +415,7 @@ async function submitWalmartFeed(
   }
 }
 
-// Token refresh with 5-minute buffer
+// Token refresh function
 async function refreshTokenIfNeeded(
   connection: any,
   supabase: any
