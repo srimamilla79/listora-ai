@@ -204,41 +204,51 @@ function createItemJson(data: any): string {
     }
   }
 
-  // The correct JSON structure for MP_ITEM - single item object
-  const itemData = {
-    sku: data.sku,
-    productIdentifiers: {
-      productIdType: 'SKU',
-      productId: data.sku,
-    },
-    MPProduct: {
-      productName: data.title,
-      shortDescription: data.description.substring(0, 200),
-      brand: data.brand,
-      mainImageUrl: data.images?.[0] || '',
-      productSecondaryImageURL: secondaryImages,
-      manufacturerPartNumber: data.sku,
-      msrp: data.price,
-      category: {
-        categoryPath: 'Home/Furniture/Living Room Furniture',
+  // Try wrapping in MPItemFeed with MPItem array
+  const feedData = {
+    MPItemFeed: {
+      MPItemFeedHeader: {
+        requestId: `${Date.now()}`,
+        requestBatchId: `${Date.now()}-batch`,
+        feedDate: new Date().toISOString(),
       },
-    },
-    MPOffer: {
-      price: data.price,
-      shippingWeight: {
-        value: 1,
-        unit: 'LB',
-      },
-      productTaxCode: '2038710',
-      MinimumAdvertisedPrice: data.price,
-    },
-    MPLogistics: {
-      fulfillmentLagTime: 1,
+      MPItem: [
+        {
+          sku: data.sku,
+          productIdentifiers: {
+            productIdType: 'SKU',
+            productId: data.sku,
+          },
+          MPProduct: {
+            productName: data.title,
+            shortDescription: data.description.substring(0, 200),
+            brand: data.brand,
+            mainImageUrl: data.images?.[0] || '',
+            productSecondaryImageURL: secondaryImages,
+            manufacturerPartNumber: data.sku,
+            msrp: data.price,
+            category: {
+              categoryPath: 'Home/Furniture/Living Room Furniture',
+            },
+          },
+          MPOffer: {
+            price: data.price,
+            shippingWeight: {
+              value: 1,
+              unit: 'LB',
+            },
+            productTaxCode: '2038710',
+            MinimumAdvertisedPrice: data.price,
+          },
+          MPLogistics: {
+            fulfillmentLagTime: 1,
+          },
+        },
+      ],
     },
   }
 
-  // Return single item object, not wrapped in array or feed structure
-  return JSON.stringify(itemData, null, 2)
+  return JSON.stringify(feedData, null, 2)
 }
 
 // Submit feed WITHOUT rate limiting check (already checked above)
