@@ -7,9 +7,6 @@ import {
   validateFeedFileSize,
 } from '@/lib/walmart-rate-limiter'
 
-// MP_ITEM spec version - Use 4.8 as it's the latest stable version mentioned in docs
-const ITEM_SPEC_VERSION = '4.8'
-
 export async function POST(request: NextRequest) {
   try {
     console.log('🛒 Walmart publish route called')
@@ -71,8 +68,8 @@ export async function POST(request: NextRequest) {
       price: publishingOptions.price,
     })
 
-    // Create XML feed instead of JSON - MP_ITEM might require XML format
-    const itemXml = createMPItemXML({
+    // Try JSON format with the correct structure
+    const itemJson = createMPItemMatchJSON({
       sku,
       gtin,
       title: productContent.product_name || 'Product',
@@ -84,31 +81,31 @@ export async function POST(request: NextRequest) {
       brand: publishingOptions.brand || 'Generic',
       images: images || [],
       quantity: parseInt(publishingOptions.quantity) || 1,
-      category: publishingOptions.category || 'Home & Garden',
     })
 
     // Validate file size before submission
-    const xmlSizeBytes = new TextEncoder().encode(itemXml).length
-    if (!validateFeedFileSize('MP_ITEM', xmlSizeBytes)) {
+    const jsonSizeBytes = new TextEncoder().encode(itemJson).length
+    if (!validateFeedFileSize('MP_ITEM', jsonSizeBytes)) {
       return NextResponse.json(
         {
           error:
-            'XML file size exceeds 26MB limit. Please reduce content size.',
+            'JSON file size exceeds 26MB limit. Please reduce content size.',
         },
         { status: 413 }
       )
     }
 
     console.log('📄 Creating Walmart item via Feed API')
-    console.log(`📏 XML size: ${(xmlSizeBytes / 1024).toFixed(2)} KB`)
-    console.log('🔍 XML Preview:', itemXml.substring(0, 500) + '...')
+    console.log(`📏 JSON size: ${(jsonSizeBytes / 1024).toFixed(2)} KB`)
+    console.log('🔍 JSON Preview:', itemJson.substring(0, 500) + '...')
 
-    // Submit feed to Walmart with rate limiting
+    // Submit feed to Walmart - try MP_ITEM_MATCH which seems to work with JSON
     const feedResult = await submitWalmartFeedWithRateLimit(
-      itemXml,
+      itemJson,
       accessToken,
       sellerId,
-      'xml' // Indicate we're sending XML
+      'json',
+      'MP_ITEM_MATCH' // Use MP_ITEM_MATCH feed type which accepts JSON
     )
 
     console.log('✅ Walmart feed submitted:', feedResult.feedId)
@@ -152,7 +149,6 @@ export async function POST(request: NextRequest) {
           feedId: feedResult.feedId,
           status: feedResult.status || 'SUBMITTED',
           walmartListingId: walmartListing?.id,
-          specVersion: ITEM_SPEC_VERSION,
           sellerId: sellerId,
           gtin: gtin,
           ...feedResult,
@@ -197,111 +193,60 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Create XML for MP_ITEM - research suggests MP_ITEM might only accept XML
-function createMPItemXML(data: any): string {
-  // Escape XML special characters
-  const escapeXml = (str: string) => {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;')
+// Create JSON for MP_ITEM_MATCH feed type - this format works with JSON
+function createMPItemMatchJSON(data: any): string {
+  // Based on Stack Overflow example that works
+  const feedData = {
+    MPItemFeedHeader: {
+      version: '1.0',
+      sellingChannel: 'mpsetupbymatch',
+      locale: 'en',
+    },
+    MPItem: [
+      {
+        Item: {
+          sku: data.sku,
+          productIdentifiers: {
+            productId: data.gtin,
+            productIdType: 'GTIN',
+          },
+          ShippingWeight: 1,
+          price: data.price,
+          productName: data.title,
+          shortDescription: data.description.substring(0, 200),
+          brand: data.brand,
+          mainImageUrl: data.images?.[0] || '',
+          additionalProductAttributes: {
+            productCategory: 'Home & Garden',
+            manufacturer: data.brand,
+            modelNumber: data.sku,
+          },
+        },
+      },
+    ],
   }
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<MPItemFeed xmlns="http://walmart.com/">
-  <MPItemFeedHeader>
-    <version>4.8</version>
-    <requestId>${Date.now()}</requestId>
-    <requestBatchId>${Date.now()}-batch</requestBatchId>
-  </MPItemFeedHeader>
-  <MPItem>
-    <sku>${escapeXml(data.sku)}</sku>
-    <productIdentifiers>
-      <productIdType>GTIN</productIdType>
-      <productId>${data.gtin}</productId>
-    </productIdentifiers>
-    <processMode>CREATE</processMode>
-    <MPProduct>
-      <productName>${escapeXml(data.title)}</productName>
-      <shortDescription>${escapeXml(data.description.substring(0, 4000))}</shortDescription>
-      <longDescription>${escapeXml(data.description)}</longDescription>
-      <brand>${escapeXml(data.brand)}</brand>
-      <mainImageUrl>${escapeXml(data.images?.[0] || '')}</mainImageUrl>
-      ${data.images
-        ?.slice(1, 9)
-        .map(
-          (img: string) =>
-            `<productSecondaryImageURL>${escapeXml(img)}</productSecondaryImageURL>`
-        )
-        .join('\n      ')}
-      <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
-      <category>
-        <category>Home &amp; Garden</category>
-        <subcategory>Furniture</subcategory>
-      </category>
-    </MPProduct>
-    <MPOffer>
-      <price>${data.price}</price>
-      <MinimumAdvertisedPrice>${data.price}</MinimumAdvertisedPrice>
-      <shippingWeight>
-        <value>1</value>
-        <unit>LB</unit>
-      </shippingWeight>
-      <productTaxCode>2038710</productTaxCode>
-    </MPOffer>
-    <MPLogistics>
-      <fulfillmentLagTime>1</fulfillmentLagTime>
-    </MPLogistics>
-  </MPItem>
-</MPItemFeed>`
-
-  return xml
+  return JSON.stringify(feedData, null, 2)
 }
 
-// CRITICAL FIX: MP_ITEM expects an array of items
-function createMPItemJson(data: any): string {
-  // MP_ITEM feeds expect an array of items, even for a single item
-  // This is the key to fixing the "feed type and JSON file element don't match" error
-
-  const feedData = [
+// Alternative: Create simple JSON array for item feed type
+function createSimpleItemJSON(data: any): string {
+  // Try the simplest possible structure
+  return JSON.stringify([
     {
       sku: data.sku,
       productIdentifiers: {
         productIdType: 'GTIN',
         productId: data.gtin,
       },
-      processMode: 'CREATE', // Required for MP_ITEM
       productName: data.title,
-      shortDescription: data.description.substring(0, 4000), // Max 4000 chars
-      longDescription: data.description, // Full description
+      shortDescription: data.description.substring(0, 200),
       brand: data.brand,
       mainImageUrl: data.images?.[0] || '',
-      productSecondaryImageURL: data.images?.slice(1, 9) || [], // Up to 8 secondary images
       price: data.price,
-      shippingWeight: {
-        value: 1,
-        unit: 'LB',
-      },
-      productTaxCode: '2038710', // General taxable goods
-      category: 'Home & Garden > Furniture > Living Room Furniture',
-      manufacturerPartNumber: data.sku,
-      msrp: data.price,
-      minimumAdvertisedPrice: data.price,
-      fulfillmentLagTime: 1,
-      // Additional required fields for spec 4.8
-      ProductIdUpdate: 'No',
-      SkuUpdate: 'No',
-      // Category specific attributes - adjust based on your category
-      additionalProductAttributes: {
-        assemblyRequired: 'No',
-        countryOfOrigin: 'US',
-      },
+      ShippingWeight: 1,
     },
-  ]
-
-  return JSON.stringify(feedData, null, 2)
+  ])
 }
 
 // Generate a valid GTIN/UPC (12 digits with check digit)
@@ -320,12 +265,13 @@ function generateValidGTIN(sku: string): string {
   return numbers + checkDigit
 }
 
-// CRITICAL FIX: Submit feed with proper content-type handling
+// Submit feed with proper content-type handling
 async function submitWalmartFeedWithRateLimit(
   content: string,
   accessToken: string,
   sellerId?: string,
-  format: 'json' | 'xml' = 'xml'
+  format: 'json' | 'xml' = 'json',
+  feedType: string = 'MP_ITEM'
 ): Promise<any> {
   const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
   const baseUrl =
@@ -333,12 +279,13 @@ async function submitWalmartFeedWithRateLimit(
       ? 'https://sandbox.walmartapis.com'
       : 'https://marketplace.walmartapis.com'
 
-  const feedUrl = `${baseUrl}/v3/feeds?feedType=MP_ITEM`
+  const feedUrl = `${baseUrl}/v3/feeds?feedType=${feedType}`
 
   console.log('📤 Submitting feed to:', feedUrl)
   console.log('📝 Format:', format)
+  console.log('📋 Feed Type:', feedType)
 
-  // CRITICAL: Create FormData with proper content-type
+  // Create FormData with proper content-type
   const formData = new FormData()
   const contentType = format === 'xml' ? 'text/xml' : 'application/json'
   const fileName = format === 'xml' ? 'feed.xml' : 'feed.json'
