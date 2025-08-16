@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       itemXML,
       accessToken,
       sellerId,
-      'MP_ITEM'
+      'item' // Changed from 'MP_ITEM' to 'item'
     )
 
     console.log('✅ Walmart feed submitted:', feedResult.feedId)
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           status: feedResult.status || 'SUBMITTED',
           walmartListingId: walmartListing?.id,
           sellerId: sellerId,
-          feedType: 'MP_ITEM',
+          feedType: 'item',
           format: 'XML',
           ...feedResult,
         },
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
           'Item submitted to Walmart. Processing typically takes 15-30 minutes.',
         publishedProductId: publishedProduct?.id,
         remainingTokens: rateLimiter.getRemainingTokens('feeds:submit:MP_ITEM'),
-        feedType: 'MP_ITEM',
+        feedType: 'item',
         format: 'XML',
       },
       message:
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Create XML for MP_ITEM feed type
+// Create XML for item feed type (not MP_ITEM)
 function createMPItemXML(data: any): string {
   // Escape XML special characters
   const escapeXml = (str: string): string => {
@@ -203,45 +203,45 @@ function createMPItemXML(data: any): string {
       .trim()
   }
 
-  // Map category to Walmart structure
-  const categoryData = getCategoryMapping(data.category)
-
-  // Build XML based on working examples from Stack Overflow
+  // Try the older "item" feed format which might work better
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<MPItemFeed xmlns="http://walmart.com/">
-  <MPItemFeedHeader>
-    <version>3.1</version>
-    <mart>WALMART_US</mart>
-  </MPItemFeedHeader>
-  <MPItem>
+<ItemFeed xmlns="http://walmart.com/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://walmart.com/ Item.xsd">
+  <ItemFeedHeader>
+    <version>2.1</version>
+    <requestId>${Date.now()}</requestId>
+    <requestBatchId>${Date.now()}-batch</requestBatchId>
+  </ItemFeedHeader>
+  <Item>
     <sku>${escapeXml(data.sku)}</sku>
-    <productIdentifiers>
-      <productIdentifier>
-        <productIdType>SKU</productIdType>
-        <productId>${escapeXml(data.sku)}</productId>
-      </productIdentifier>
-    </productIdentifiers>
-    <MPProduct>
+    <Product>
       <productName>${escapeXml(data.title)}</productName>
-      <ProductIdUpdate>No</ProductIdUpdate>
-      <SkuUpdate>No</SkuUpdate>
-      <category>
-        <${categoryData.categoryName}>
-          ${getCategorySpecificXML(categoryData.categoryName, data)}
-        </${categoryData.categoryName}>
-      </category>
-    </MPProduct>
-    <MPOffer>
-      <price>${data.price}</price>
-      <MinimumAdvertisedPrice>${data.price}</MinimumAdvertisedPrice>
-      <ShippingWeight>
-        <measure>1</measure>
-        <unit>lb</unit>
-      </ShippingWeight>
-      <ProductTaxCode>2038710</ProductTaxCode>
-    </MPOffer>
-  </MPItem>
-</MPItemFeed>`
+      <longDescription><![CDATA[${data.description}]]></longDescription>
+      <shortDescription>${escapeXml(data.description.substring(0, 500))}</shortDescription>
+      <mainImage>
+        <mainImageUrl>${escapeXml(data.images[0] || '')}</mainImageUrl>
+      </mainImage>
+      <productIdentifiers>
+        <productIdentifier>
+          <productIdType>SKU</productIdType>
+          <productId>${escapeXml(data.sku)}</productId>
+        </productIdentifier>
+      </productIdentifiers>
+      <productTaxCode>2038710</productTaxCode>
+      <brand>${escapeXml(data.brand)}</brand>
+      <manufacturer>${escapeXml(data.brand)}</manufacturer>
+      <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
+      <modelNumber>${escapeXml(data.sku)}</modelNumber>
+    </Product>
+    <price>
+      <currency>USD</currency>
+      <amount>${data.price}</amount>
+    </price>
+    <shippingWeight>
+      <value>1</value>
+      <unit>LB</unit>
+    </shippingWeight>
+  </Item>
+</ItemFeed>`
 
   return xml
 }
@@ -355,10 +355,10 @@ async function submitWalmartXMLFeed(
       ? 'https://sandbox.walmartapis.com'
       : 'https://marketplace.walmartapis.com'
 
-  const feedUrl = `${baseUrl}/v3/feeds?feedType=${feedType}`
+  const feedUrl = `${baseUrl}/v3/feeds?feedType=item` // Use 'item' instead of 'MP_ITEM'
 
   console.log('📤 Submitting XML feed to:', feedUrl)
-  console.log('📋 Feed Type:', feedType)
+  console.log('📋 Feed Type: item')
   console.log('📝 Format: XML')
 
   // Create FormData with XML content
