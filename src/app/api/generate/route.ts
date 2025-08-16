@@ -873,6 +873,7 @@ Visual Analysis: ${imageAnalysis}`
       }
     }
 
+    // AFTER:
     prompt += `
 
 === ENHANCEMENT INSTRUCTIONS ===
@@ -886,6 +887,7 @@ Please enhance the existing content while:
         ? '\n6. Emphasizing the professional image quality where appropriate'
         : ''
     }
+7. IMPORTANT: Remove any generic marketing phrases like "Elevate Your", "Transform Your", etc. from titles - start with the actual product name instead
 
 ${
   isCustomSelection
@@ -963,6 +965,7 @@ Note: The user provided additional context through voice input. Use this natural
   }
 
   if (hasImages && imageAnalysis) {
+    // Replace the same section with this:
     prompt += `
 
 Visual Analysis: ${imageAnalysis}`
@@ -987,6 +990,35 @@ Instructions: ${
 
 Instructions: ${config.instructions}`
   }
+
+  // ADD THIS NEW SECTION - TITLE GUIDELINES
+  prompt += `
+
+🚫 CRITICAL TITLE RULES:
+1. NEVER start titles with these generic phrases:
+   - "Elevate Your..."
+   - "Transform Your..."
+   - "Discover..."
+   - "Experience..."
+   - "Unlock..."
+   - "Unleash..."
+   - "Enhance Your..."
+   - "Revolutionize Your..."
+
+2. ALWAYS start titles with:
+   - The actual product/brand name (e.g., "Barraid WHI010 Whiskey Glass Set")
+   - A specific product descriptor (e.g., "Premium 300ML Crystal Whiskey Glasses")
+   - The key product category (e.g., "Professional Whiskey Glass Set")
+
+3. Good title examples:
+   - "Barraid WHI010 Whiskey Glass Set - 300ML Premium Crystal"
+   - "Nike Air Max 270 Running Shoes - Men's Athletic Footwear"
+   - "Professional Wireless Headphones with Active Noise Cancellation"
+
+4. Bad title examples to avoid:
+   - "Elevate Your Drinking Experience with..."
+   - "Transform Your Workout with..."
+   - "Discover the Perfect Solution for..."`
 
   if (voiceTranscription) {
     prompt += ` Incorporate the natural, authentic details from the voice input to make the content more genuine and compelling.`
