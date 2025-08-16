@@ -1,7 +1,7 @@
 // src/lib/specCache.ts
 
 import { createClient } from '@supabase/supabase-js'
-import { walmartGet, specRateLimiter } from '@/lib/walmart'
+import { walmartGet, walmartPost, specRateLimiter } from '@/lib/walmart'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,17 +55,23 @@ export async function getAndCacheSpec(
     let actualVersion = version
 
     try {
-      const path = `/v3/items/spec?feedType=MP_ITEM&version=${encodeURIComponent(version)}&productType=${encodeURIComponent(pt)}`
       console.log(`Fetching spec for ${pt} v${version}`)
-      spec = await walmartGet(userId, path)
+      spec = await walmartPost(userId, '/v3/items/spec', {
+        feedType: 'MP_ITEM',
+        version: version,
+        productTypes: [pt],
+      })
     } catch (e) {
       // Fallback to 4.2 if 5.0 fails
       if (version === '5.0') {
         console.log(`Version 5.0 failed for ${pt}, trying 4.2`)
         await specRateLimiter.waitForSlot()
 
-        const altPath = `/v3/items/spec?feedType=MP_ITEM&version=4.2&productType=${encodeURIComponent(pt)}`
-        spec = await walmartGet(userId, altPath)
+        spec = await walmartPost(userId, '/v3/items/spec', {
+          feedType: 'MP_ITEM',
+          version: '4.2',
+          productTypes: [pt],
+        })
         actualVersion = '4.2'
       } else {
         throw e

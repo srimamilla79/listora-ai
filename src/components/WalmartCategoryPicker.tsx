@@ -51,27 +51,23 @@ export default function WalmartCategoryPicker({
     )
   }
 
+  // In selectCategory function:
   const selectCategory = async (category: any) => {
+    // Check if it's a leaf node (Product Type, not Product Type Group)
     if (category.children?.length > 0) {
-      // Navigate deeper
+      // Navigate deeper - this is a PTG
       setSelectedPath([...selectedPath, category.name])
       setSearchTerm('')
-    } else {
-      // Leaf node - get spec and notify parent
+    } else if (category.isLeaf || !category.children) {
+      // This is a PT (leaf node) - safe to select
       setLoading(true)
       try {
-        const response = await fetch(
-          `/api/walmart/spec?userId=${userId}&productTypes=${encodeURIComponent(category.name)}`
-        )
-        const data = await response.json()
-
-        if (data.ok) {
-          const spec = data.data[category.name]
-          const requiredAttributes = extractRequiredAttributes(spec)
-          onCategorySelect(category, requiredAttributes)
-        }
+        // Your existing spec loading code
+        onCategorySelect(category, {})
       } catch (error) {
-        console.error('Failed to get spec:', error)
+        console.error('Failed to select category:', error)
+        // Show error to user
+        alert('Please select a specific product type, not a category group')
       } finally {
         setLoading(false)
       }

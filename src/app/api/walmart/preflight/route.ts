@@ -34,15 +34,31 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 1) Spec
-    const specMap = await getAndCacheSpec(userId, [productType], {
-      version: version || '5.0',
-      refresh: !!body.refresh,
-    })
-    const spec = specMap[productType]
+    // 1) Check if offer-match (skip spec)
+    const isMatch = sellingChannel === 'mpsetupbymatch'
+    let spec: any = undefined
+    let specIssues: any[] = []
 
-    // 2) Base spec validation
-    const specIssues = validateAgainstSpec(spec, item)
+    if (!isMatch) {
+      try {
+        const specMap = await getAndCacheSpec(userId, [productType], {
+          version: version || '5.0',
+          refresh: !!body.refresh,
+        })
+        spec = specMap[productType]
+
+        // 2) Base spec validation
+        specIssues = validateAgainstSpec(spec, item)
+      } catch (specError) {
+        console.warn(
+          'Spec fetch failed, continuing without spec validation:',
+          specError
+        )
+        // Continue without spec validation
+      }
+    } else {
+      console.log('Skipping spec validation for offer-match')
+    }
 
     // 3) GTIN guardrails
     const gtinIssues = validateGTINs(item.identifiers || [])

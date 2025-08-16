@@ -216,3 +216,35 @@ export const specRateLimiter = {
     this.recordCall()
   },
 }
+/** POST to Walmart with proper headers */
+export async function walmartPost(userId: string, path: string, body: any) {
+  const conn = await getWalmartConnection(userId)
+  if (!conn) throw new Error('No Walmart connection')
+
+  const accessToken = await ensureValidToken(conn)
+  const baseUrl =
+    conn.environment === 'sandbox'
+      ? 'https://sandbox.walmartapis.com'
+      : 'https://marketplace.walmartapis.com'
+
+  const headers = {
+    ...buildWalmartHeaders(accessToken, conn.seller_id),
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  }
+
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    const errorText = await res.text()
+    console.error(`Walmart POST error: ${res.status} - ${errorText}`)
+    throw new Error(`Walmart API error: ${res.status}`)
+  }
+
+  return res.json()
+}

@@ -1,15 +1,10 @@
 // src/app/api/walmart/items/offer-match/route.ts
-
 import { NextRequest, NextResponse } from 'next/server'
 import { walmartApiRequest } from '@/lib/walmart'
-import { getAndCacheSpec } from '@/lib/specCache'
-import { validateAgainstSpec, buildMpItemEnvelope } from '@/lib/specValidator'
-
 export async function POST(request: NextRequest) {
   try {
     const { userId, productContent, publishingOptions, images } =
       await request.json()
-
     if (!userId) {
       return NextResponse.json(
         { error: 'User ID is required' },
@@ -18,62 +13,66 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('📦 Walmart offer-match publish request')
+    console.log('📋 Skipping spec validation for offer-match')
 
-    // Determine product type
-    const productType = publishingOptions.walmartProductType || 'Home'
-
-    // Get spec and validate
-    const specMap = await getAndCacheSpec(userId, [productType])
-    const spec = specMap[productType]
-
-    // Prepare input for validation
-    const preflightInput = {
-      productType,
-      sku: publishingOptions.sku || `LISTORA-${Date.now()}`,
-      identifiers: publishingOptions.identifier
-        ? [
-            {
-              productIdType: (publishingOptions.identifierType ||
-                'GTIN') as any,
-              productId: publishingOptions.identifier,
-            },
-          ]
-        : [
-            {
-              productIdType: 'SKU' as const,
-              productId: publishingOptions.sku || `LISTORA-${Date.now()}`,
-            },
-          ],
-      brand: publishingOptions.brand || 'Generic',
-      productName: productContent.product_name,
-      shortDescription: productContent.content?.substring(0, 500),
-      price: parseFloat(publishingOptions.price),
-      shippingWeightLb: publishingOptions.shippingWeight || 1,
-      productTaxCode: publishingOptions.taxCode,
-      images: images?.map((url: string, index: number) =>
-        index === 0 ? { mainImageUrl: url } : { additionalImageUrl: url }
-      ),
-      attributes: publishingOptions.walmartAttributes || {},
+    // Basic validation only
+    if (!publishingOptions.sku) {
+      return NextResponse.json({ error: 'SKU is required' }, { status: 400 })
     }
 
-    // Validate
-    const issues = validateAgainstSpec(spec, preflightInput)
-    const errors = issues.filter((i) => i.level === 'error')
-
-    if (errors.length > 0) {
-      console.error('Validation errors:', errors)
+    if (!publishingOptions.price || parseFloat(publishingOptions.price) <= 0) {
       return NextResponse.json(
-        {
-          error: 'Validation failed',
-          issues: errors,
-        },
+        { error: 'Valid price is required' },
         { status: 400 }
       )
     }
 
-    // Build envelope
-    const payload = buildMpItemEnvelope(preflightInput, {
-      sellingChannel: 'mpsetupbymatch',
+    // Determine product type (not critical for offer-match)
+    const productType = publishingOptions.walmartProductType || 'General'
+
+    // Prepare minimal data for offer-match
+    const sku = publishingOptions.sku || `LISTORA-${Date.now()}`
+    const identifiers = publishingOptions.identifier
+      ? [
+          {
+            productIdType: publishingOptions.identifierType || 'GTIN',
+            productId: publishingOptions.identifier,
+          },
+        ]
+      : [
+          {
+            productIdType: 'SKU',
+            productId: sku,
+          },
+        ]
+
+    // Build minimal payload for offer-match
+    // Offer-match only needs: SKU, identifiers, and price
+    const payload = {
+      MPItemFeedHeader: {
+        version: '4.2',
+        locale: 'en',
+        sellingChannel: 'mpsetupbymatch',
+      },
+      MPItem: [
+        {
+          sku: sku,
+          productIdentifiers: identifiers,
+          MPOffer: {
+            price: Number(publishingOptions.price),
+            shippingWeight: {
+              measure: Number(publishingOptions.shippingWeight || 1),
+              unit: 'lb',
+            },
+          },
+        },
+      ],
+    }
+
+    console.log('📤 Submitting offer-match payload:', {
+      sku: sku,
+      identifiers: identifiers,
+      price: publishingOptions.price,
     })
 
     // Submit to Walmart
@@ -89,14 +88,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       feedId: result.feedId,
-      sku: preflightInput.sku,
+      sku: sku,
       message: 'Product submitted to Walmart. Check status in 15-30 minutes.',
     })
   } catch (error) {
     console.error('❌ Walmart offer-match error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to publish' },
-      { status: 500 }
-    )
+    // Better error handling
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to publish'
+    const isProductTypeError =
+      errorMessage.includes('CONTENT_NOT_FOUND') || errorMessage.includes('404')
+
+    if (isProductTypeError) {
+      return NextResponse.json(
+        {
+          error:
+            'Please select a valid Walmart product category from the dropdown. The selected category may not be valid.',
+          detail: errorMessage,
+        },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
