@@ -1,6 +1,8 @@
 // src/app/api/walmart/items/offer-match/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { walmartApiRequest } from '@/lib/walmart'
+import { createServerSideClient } from '@/lib/supabase'
+
 export async function POST(request: NextRequest) {
   try {
     const { userId, productContent, publishingOptions, images } =
@@ -85,11 +87,60 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Feed submitted:', result.feedId)
 
+    // Save to published_products table
+    const supabase = await createServerSideClient()
+
+    // Extract GTIN from identifiers
+    const gtin =
+      identifiers.find((id) => id.productIdType === 'GTIN')?.productId || null
+
+    const { data: savedProduct, error: saveError } = await supabase
+      .from('published_products')
+      .insert({
+        user_id: userId,
+        content_id: productContent?.id || null,
+        platform: 'walmart',
+        platform_product_id: null, // Will be updated later when feed is processed
+        platform_url: null, // Will be updated later
+        title: productContent?.product_name || 'Walmart Product',
+        description:
+          productContent?.generated_content || productContent?.features || '',
+        price: parseFloat(publishingOptions.price),
+        quantity: parseInt(publishingOptions.quantity) || 1,
+        sku: sku,
+        images: images || [],
+        platform_data: {
+          feedId: result.feedId,
+          gtin: gtin,
+          productType: productType,
+          identifiers: identifiers,
+        },
+        status: 'pending', // Since Walmart processes feeds asynchronously
+        published_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_synced_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (saveError) {
+      console.error('⚠️ Failed to save to published_products:', saveError)
+    } else {
+      console.log('✅ Saved to published_products table:', savedProduct?.id)
+    }
+
     return NextResponse.json({
       success: true,
       feedId: result.feedId,
       sku: sku,
       message: 'Product submitted to Walmart. Check status in 15-30 minutes.',
+      data: {
+        feedId: result.feedId,
+        sku: sku,
+        gtin: gtin,
+        price: publishingOptions.price,
+        quantity: publishingOptions.quantity || 1,
+      },
     })
   } catch (error) {
     console.error('❌ Walmart offer-match error:', error)
