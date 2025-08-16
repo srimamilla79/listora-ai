@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
       price: publishingOptions.price,
     })
 
-    // Create JSON feed - This is the critical fix!
-    const itemJson = createMPItemJson({
+    // Create XML feed instead of JSON - MP_ITEM might require XML format
+    const itemXml = createMPItemXML({
       sku,
       gtin,
       title: productContent.product_name || 'Product',
@@ -85,30 +85,30 @@ export async function POST(request: NextRequest) {
       images: images || [],
       quantity: parseInt(publishingOptions.quantity) || 1,
       category: publishingOptions.category || 'Home & Garden',
-      specVersion: ITEM_SPEC_VERSION,
     })
 
     // Validate file size before submission
-    const jsonSizeBytes = new TextEncoder().encode(itemJson).length
-    if (!validateFeedFileSize('MP_ITEM', jsonSizeBytes)) {
+    const xmlSizeBytes = new TextEncoder().encode(itemXml).length
+    if (!validateFeedFileSize('MP_ITEM', xmlSizeBytes)) {
       return NextResponse.json(
         {
           error:
-            'JSON file size exceeds 26MB limit. Please reduce content size.',
+            'XML file size exceeds 26MB limit. Please reduce content size.',
         },
         { status: 413 }
       )
     }
 
     console.log('📄 Creating Walmart item via Feed API')
-    console.log(`📏 JSON size: ${(jsonSizeBytes / 1024).toFixed(2)} KB`)
-    console.log('🔍 JSON Preview:', itemJson.substring(0, 500) + '...')
+    console.log(`📏 XML size: ${(xmlSizeBytes / 1024).toFixed(2)} KB`)
+    console.log('🔍 XML Preview:', itemXml.substring(0, 500) + '...')
 
     // Submit feed to Walmart with rate limiting
     const feedResult = await submitWalmartFeedWithRateLimit(
-      itemJson,
+      itemXml,
       accessToken,
-      sellerId
+      sellerId,
+      'xml' // Indicate we're sending XML
     )
 
     console.log('✅ Walmart feed submitted:', feedResult.feedId)
@@ -197,46 +197,111 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// CRITICAL FIX: The JSON structure for MP_ITEM is different than what you had
-function createMPItemJson(data: any): string {
-  // Based on research, MP_ITEM expects a flat structure, not wrapped in MPItemFeed
-  // This matches the spec 4.8 format
-
-  const itemData = {
-    sku: data.sku,
-    productIdentifiers: {
-      productIdType: 'GTIN',
-      productId: data.gtin,
-    },
-    processMode: 'CREATE', // Required for MP_ITEM
-    productName: data.title,
-    shortDescription: data.description.substring(0, 4000), // Max 4000 chars
-    longDescription: data.description, // Full description
-    brand: data.brand,
-    mainImageUrl: data.images?.[0] || '',
-    productSecondaryImageURL: data.images?.slice(1, 9) || [], // Up to 8 secondary images
-    price: data.price,
-    shippingWeight: {
-      value: 1,
-      unit: 'LB',
-    },
-    productTaxCode: '2038710', // General taxable goods
-    category: 'Home & Garden > Furniture > Living Room Furniture',
-    manufacturerPartNumber: data.sku,
-    msrp: data.price,
-    minimumAdvertisedPrice: data.price,
-    fulfillmentLagTime: 1,
-    // Additional required fields for spec 4.8
-    ProductIdUpdate: 'No',
-    SkuUpdate: 'No',
-    // Category specific attributes - adjust based on your category
-    additionalProductAttributes: {
-      assemblyRequired: 'No',
-      countryOfOrigin: 'US',
-    },
+// Create XML for MP_ITEM - research suggests MP_ITEM might only accept XML
+function createMPItemXML(data: any): string {
+  // Escape XML special characters
+  const escapeXml = (str: string) => {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
   }
 
-  return JSON.stringify(itemData, null, 2)
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<MPItemFeed xmlns="http://walmart.com/">
+  <MPItemFeedHeader>
+    <version>4.8</version>
+    <requestId>${Date.now()}</requestId>
+    <requestBatchId>${Date.now()}-batch</requestBatchId>
+  </MPItemFeedHeader>
+  <MPItem>
+    <sku>${escapeXml(data.sku)}</sku>
+    <productIdentifiers>
+      <productIdType>GTIN</productIdType>
+      <productId>${data.gtin}</productId>
+    </productIdentifiers>
+    <processMode>CREATE</processMode>
+    <MPProduct>
+      <productName>${escapeXml(data.title)}</productName>
+      <shortDescription>${escapeXml(data.description.substring(0, 4000))}</shortDescription>
+      <longDescription>${escapeXml(data.description)}</longDescription>
+      <brand>${escapeXml(data.brand)}</brand>
+      <mainImageUrl>${escapeXml(data.images?.[0] || '')}</mainImageUrl>
+      ${data.images
+        ?.slice(1, 9)
+        .map(
+          (img: string) =>
+            `<productSecondaryImageURL>${escapeXml(img)}</productSecondaryImageURL>`
+        )
+        .join('\n      ')}
+      <manufacturerPartNumber>${escapeXml(data.sku)}</manufacturerPartNumber>
+      <category>
+        <category>Home &amp; Garden</category>
+        <subcategory>Furniture</subcategory>
+      </category>
+    </MPProduct>
+    <MPOffer>
+      <price>${data.price}</price>
+      <MinimumAdvertisedPrice>${data.price}</MinimumAdvertisedPrice>
+      <shippingWeight>
+        <value>1</value>
+        <unit>LB</unit>
+      </shippingWeight>
+      <productTaxCode>2038710</productTaxCode>
+    </MPOffer>
+    <MPLogistics>
+      <fulfillmentLagTime>1</fulfillmentLagTime>
+    </MPLogistics>
+  </MPItem>
+</MPItemFeed>`
+
+  return xml
+}
+
+// CRITICAL FIX: MP_ITEM expects an array of items
+function createMPItemJson(data: any): string {
+  // MP_ITEM feeds expect an array of items, even for a single item
+  // This is the key to fixing the "feed type and JSON file element don't match" error
+
+  const feedData = [
+    {
+      sku: data.sku,
+      productIdentifiers: {
+        productIdType: 'GTIN',
+        productId: data.gtin,
+      },
+      processMode: 'CREATE', // Required for MP_ITEM
+      productName: data.title,
+      shortDescription: data.description.substring(0, 4000), // Max 4000 chars
+      longDescription: data.description, // Full description
+      brand: data.brand,
+      mainImageUrl: data.images?.[0] || '',
+      productSecondaryImageURL: data.images?.slice(1, 9) || [], // Up to 8 secondary images
+      price: data.price,
+      shippingWeight: {
+        value: 1,
+        unit: 'LB',
+      },
+      productTaxCode: '2038710', // General taxable goods
+      category: 'Home & Garden > Furniture > Living Room Furniture',
+      manufacturerPartNumber: data.sku,
+      msrp: data.price,
+      minimumAdvertisedPrice: data.price,
+      fulfillmentLagTime: 1,
+      // Additional required fields for spec 4.8
+      ProductIdUpdate: 'No',
+      SkuUpdate: 'No',
+      // Category specific attributes - adjust based on your category
+      additionalProductAttributes: {
+        assemblyRequired: 'No',
+        countryOfOrigin: 'US',
+      },
+    },
+  ]
+
+  return JSON.stringify(feedData, null, 2)
 }
 
 // Generate a valid GTIN/UPC (12 digits with check digit)
@@ -257,9 +322,10 @@ function generateValidGTIN(sku: string): string {
 
 // CRITICAL FIX: Submit feed with proper content-type handling
 async function submitWalmartFeedWithRateLimit(
-  jsonContent: string,
+  content: string,
   accessToken: string,
-  sellerId?: string
+  sellerId?: string,
+  format: 'json' | 'xml' = 'xml'
 ): Promise<any> {
   const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
   const baseUrl =
@@ -270,11 +336,14 @@ async function submitWalmartFeedWithRateLimit(
   const feedUrl = `${baseUrl}/v3/feeds?feedType=MP_ITEM`
 
   console.log('📤 Submitting feed to:', feedUrl)
+  console.log('📝 Format:', format)
 
-  // CRITICAL: Create FormData with proper content-type for JSON
+  // CRITICAL: Create FormData with proper content-type
   const formData = new FormData()
-  const blob = new Blob([jsonContent], { type: 'application/json' })
-  formData.append('file', blob, 'feed.json')
+  const contentType = format === 'xml' ? 'text/xml' : 'application/json'
+  const fileName = format === 'xml' ? 'feed.xml' : 'feed.json'
+  const blob = new Blob([content], { type: contentType })
+  formData.append('file', blob, fileName)
 
   try {
     const response = await fetch(feedUrl, {
