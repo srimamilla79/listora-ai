@@ -677,6 +677,12 @@ export default function UnifiedPublisher({
 
     try {
       let endpoint = `/api/${selectedPlatform}/publish`
+
+      // Special handling for Walmart - use the new endpoint
+      if (selectedPlatform === 'walmart') {
+        endpoint = `/api/walmart/items/offer-match`
+      }
+
       let requestPayload: any = {
         productContent: {
           id: productContent?.id,
@@ -694,7 +700,6 @@ export default function UnifiedPublisher({
         platform: selectedPlatform,
         userId: passedUser?.id,
       }
-
       // Handle Meta publishing
       if (selectedPlatform === 'meta') {
         requestPayload = {
