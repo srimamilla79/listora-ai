@@ -1,50 +1,39 @@
 // WalmartCategoryPicker.tsx  (drop-in replacement)
 'use client'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 type Node = {
   id?: string
   name: string
   children?: Node[]
   isLeaf?: boolean
-  // carry-through for any extra fields you might have
   [k: string]: any
 }
 
+type LeafPayload = {
+  category: Node
+  spec: any | null
+  version: '5.0' | '4.2' | 'unknown'
+}
+
+/**
+ * This component supports EITHER:
+ *  - onCategorySelect(category, attributes/spec)   // simpler callback
+ *  - onLeafSelect({ category, spec, version })     // detailed payload
+ * Provide whichever your parent uses; the component will call it.
+ */
 type Props = {
-  /** Your logged-in Listora user id */
   userId: string
-
-  /**
-   * Called when user selects a **leaf** Product Type.
-   * You receive the normalized category, the resolved spec JSON, and the spec version used.
-   */
-  onLeafSelect: (payload: {
-    category: Node
-    spec: any | null // null if spec fetch disabled/fails
-    version: '5.0' | '4.2' | 'unknown'
-  }) => void
-
-  /**
-   * Auto-fetch the Walmart spec when a leaf is chosen.
-   * Defaults to true. If false, we just return the leaf (category) and skip spec.
-   */
+  onCategorySelect?: (category: Node, attributes: any) => void
+  onLeafSelect?: (payload: LeafPayload) => void
   autoFetchSpec?: boolean
-
-  /**
-   * Optional: initial preselected path (breadcrumb), e.g. ['Home', 'Kitchen & Dining']
-   * If provided, we’ll try to drill to that path on load (best-effort).
-   */
   initialPath?: string[]
-
-  /**
-   * Optional CSS class wrapper.
-   */
   className?: string
 }
 
 export default function WalmartCategoryPicker({
   userId,
+  onCategorySelect,
   onLeafSelect,
   autoFetchSpec = true,
   initialPath = [],
@@ -65,18 +54,15 @@ export default function WalmartCategoryPicker({
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(
-          `/api/walmart/taxonomy?userId=${encodeURIComponent(userId)}`
-        )
+        // IMPORTANT: send user id via header so the API can find the connection
+        const res = await fetch(`/api/walmart/taxonomy`, {
+          headers: { 'x-user-id': String(userId || '') },
+        })
         const json = await res.json().catch(() => ({}))
-        // Support either { ok, data } or raw array/object
         const raw = json?.data ?? json
-
         const normalized = normalizeTaxonomy(raw)
         if (!cancelled) {
           setTaxonomy(normalized)
-
-          // Best-effort drill into initialPath if provided
           if (initialPath.length) {
             setSelectedPath((prev) => (prev.length ? prev : initialPath))
           }
@@ -94,7 +80,7 @@ export default function WalmartCategoryPicker({
     return () => {
       cancelled = true
     }
-  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId, initialPath])
 
   // ---- Drill into the tree with guards (never assume arrays) ----
   const levelItems = useMemo<Node[]>(() => {
@@ -108,68 +94,67 @@ export default function WalmartCategoryPicker({
       const next = match?.children
       current = Array.isArray(next) ? next : []
     }
-
     if (!Array.isArray(current)) return []
     if (!search) return current
-
     const q = search.toLowerCase()
     return current.filter((n) => (n?.name || '').toLowerCase().includes(q))
   }, [taxonomy, selectedPath, search])
 
   // ---- Click handlers ----
   const onClickNode = async (node: Node) => {
-    // PTG → navigate deeper; PT leaf → continue
     const hasChildren = Array.isArray(node.children) && node.children.length > 0
     const isLeaf = node.isLeaf ?? !hasChildren
 
+    // Groups drill down; only leaf triggers callbacks/spec
     if (!isLeaf) {
-      // drill down
       setSelectedPath((prev) => [...prev, node.name])
       setSearch('')
       return
     }
 
-    // Leaf selected → either auto-fetch spec or just return selection
+    // If you don't want spec here (e.g., offer-match), just call the simple callback
     if (!autoFetchSpec) {
-      onLeafSelect({ category: node, spec: null, version: 'unknown' })
+      if (onCategorySelect) onCategorySelect(node, {})
+      else if (onLeafSelect)
+        onLeafSelect({ category: node, spec: null, version: 'unknown' })
       return
     }
 
-    // Attempt spec v5.0 then v4.2 via your backend /api/walmart/spec
+    // Try spec v5.0 then v4.2 via your backend /api/walmart/spec (send x-user-id header)
     setLoadingSpec(true)
     setError(null)
     try {
       const pt = encodeURIComponent(node.name)
       const v5 = await fetchJsonSafe(
-        `/api/walmart/spec?userId=${encodeURIComponent(userId)}&productTypes=${pt}&version=5.0`
+        `/api/walmart/spec?productTypes=${pt}&version=5.0`,
+        { 'x-user-id': String(userId || '') }
       )
-
       if (v5?.ok && v5?.data && (v5.version === '5.0' || v5.version === '5')) {
-        onLeafSelect({
-          category: node,
-          spec: unwrapSpec(v5.data, node.name),
-          version: '5.0',
-        })
+        const spec = unwrapSpec(v5.data, node.name)
+        if (onCategorySelect) onCategorySelect(node, spec)
+        else if (onLeafSelect)
+          onLeafSelect({ category: node, spec, version: '5.0' })
       } else {
-        // fallback to 4.2 (or your server may already fallback; this is extra-safe)
         const v42 = await fetchJsonSafe(
-          `/api/walmart/spec?userId=${encodeURIComponent(userId)}&productTypes=${pt}&version=4.2`
+          `/api/walmart/spec?productTypes=${pt}&version=4.2`,
+          { 'x-user-id': String(userId || '') }
         )
         if (v42?.ok && v42?.data) {
-          onLeafSelect({
-            category: node,
-            spec: unwrapSpec(v42.data, node.name),
-            version: '4.2',
-          })
+          const spec = unwrapSpec(v42.data, node.name)
+          if (onCategorySelect) onCategorySelect(node, spec)
+          else if (onLeafSelect)
+            onLeafSelect({ category: node, spec, version: '4.2' })
         } else {
-          // deliver leaf anyway so caller can proceed (e.g., offer-match doesn’t need spec)
-          onLeafSelect({ category: node, spec: null, version: 'unknown' })
+          if (onCategorySelect) onCategorySelect(node, {})
+          else if (onLeafSelect)
+            onLeafSelect({ category: node, spec: null, version: 'unknown' })
         }
       }
     } catch (e: any) {
-      // don’t throw; return the leaf so users can still do offer-match
       setError(`Spec fetch failed: ${String(e?.message || e)}`)
-      onLeafSelect({ category: node, spec: null, version: 'unknown' })
+      if (onCategorySelect) onCategorySelect(node, {})
+      else if (onLeafSelect)
+        onLeafSelect({ category: node, spec: null, version: 'unknown' })
     } finally {
       setLoadingSpec(false)
     }
@@ -211,24 +196,22 @@ export default function WalmartCategoryPicker({
       </div>
 
       {/* Search */}
-      <div>
-        <div className="relative">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search categories…"
-            className="w-full border rounded-lg px-3 py-2 pr-8"
-          />
-          {search && (
-            <button
-              aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
-              onClick={() => setSearch('')}
-            >
-              ×
-            </button>
-          )}
-        </div>
+      <div className="relative">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search categories…"
+          className="w-full border rounded-lg px-3 py-2 pr-8"
+        />
+        {search && (
+          <button
+            aria-label="Clear search"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+            onClick={() => setSearch('')}
+          >
+            ×
+          </button>
+        )}
       </div>
 
       {/* Status / Error */}
@@ -269,26 +252,17 @@ export default function WalmartCategoryPicker({
 
 /* ------------------------- helpers ------------------------- */
 
-/**
- * Normalize any Walmart taxonomy response into a clean Node[] tree.
- * Handles common shapes:
- *  - array of nodes
- *  - { productTypeGroups: [...] }
- *  - { productTypes: [...] }
- *  - { children|nodes|items|data: [...] }
- *  - single node objects
- */
 function normalizeTaxonomy(raw: any): Node[] {
   const liftArray = (obj: any): any[] | null => {
     if (!obj) return null
     if (Array.isArray(obj)) return obj
     return (
-      obj.productTypeGroups ??
-      obj.productTypes ??
-      obj.children ??
-      obj.nodes ??
-      obj.items ??
-      obj.data ??
+      obj?.productTypeGroups ??
+      obj?.productTypes ??
+      obj?.children ??
+      obj?.nodes ??
+      obj?.items ??
+      obj?.data ??
       null
     )
   }
@@ -313,33 +287,23 @@ function normalizeTaxonomy(raw: any): Node[] {
   return []
 }
 
-/**
- * Some backends wrap the spec differently. Try to pull the PT section if present.
- */
 function unwrapSpec(specResponse: any, productTypeName: string): any {
   if (!specResponse) return null
-
-  // Common happy path: { productTypes: { [PT]: { ...spec } } }
   const ptMap = specResponse.productTypes || specResponse?.data?.productTypes
   if (ptMap && ptMap[productTypeName]) return ptMap[productTypeName]
-
-  // Already a single spec object
   if (specResponse.attributes || specResponse.rules) return specResponse
-
-  // Fallback to raw
   return specResponse
 }
 
-/**
- * Small fetch wrapper that won’t throw for non-2xx; returns parsed JSON or {}.
- */
-async function fetchJsonSafe(url: string): Promise<any> {
+async function fetchJsonSafe(
+  url: string,
+  headers?: Record<string, string>
+): Promise<any> {
   try {
-    const res = await fetch(url, { method: 'GET' })
+    const res = await fetch(url, { method: 'GET', headers })
     const text = await res.text()
     try {
       const json = text ? JSON.parse(text) : {}
-      // Attach http status so callers can branch if needed
       ;(json as any).__status = res.status
       return json
     } catch {

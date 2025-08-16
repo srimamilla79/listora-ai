@@ -1,37 +1,48 @@
 // src/app/api/walmart/taxonomy/route.ts
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getAndCacheTaxonomy } from '@/lib/specCache'
 
-export const dynamic = 'force-dynamic'
+/** Return a plain array so the client can normalize it */
+function normalize(raw: any): any[] {
+  const pickArray =
+    (Array.isArray(raw) && raw) ||
+    raw?.productTypeGroups ||
+    raw?.productTypes ||
+    raw?.children ||
+    raw?.nodes ||
+    raw?.items ||
+    raw?.data ||
+    []
+  return Array.isArray(pickArray) ? pickArray : []
+}
 
 export async function GET(req: NextRequest) {
   try {
-    const userId =
+    const sp = req.nextUrl.searchParams
+    const userId = (
       req.headers.get('x-user-id') ||
-      req.nextUrl.searchParams.get('userId') ||
+      sp.get('userId') ||
       ''
+    ).trim()
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'userId required (header x-user-id or ?userId=)' },
-        { status: 400 }
+        {
+          ok: false,
+          error: 'Missing userId (send x-user-id header or ?userId=)',
+        },
+        { status: 401 }
       )
     }
 
-    const refresh = req.nextUrl.searchParams.get('refresh') === '1'
-    const data = await getAndCacheTaxonomy(userId, refresh)
-
-    return NextResponse.json({
-      ok: true,
-      data,
-      cached: !refresh,
-    })
+    const refresh = sp.get('refresh') === '1'
+    const raw = await getAndCacheTaxonomy(userId, refresh)
+    const data = normalize(raw)
+    return NextResponse.json({ ok: true, data })
   } catch (e: any) {
-    console.error('Taxonomy API error:', e)
     return NextResponse.json(
       { ok: false, error: String(e?.message || e) },
-      { status: 500 }
+      { status: 400 }
     )
   }
 }
