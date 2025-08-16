@@ -4,9 +4,13 @@ import { cookies } from 'next/headers'
 
 const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID!
 const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET!
-const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL}/api/meta/callback`
 
 export async function GET(request: NextRequest) {
+  // Dynamic redirect URI based on the actual host
+  const host = request.headers.get('host') || 'listora.ai'
+  const protocol = host.includes('localhost') ? 'http' : 'https'
+  const REDIRECT_URI = `${protocol}://${host}/api/meta/callback`
+
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get('code')
   const state = searchParams.get('state')
