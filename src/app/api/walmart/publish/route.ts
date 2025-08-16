@@ -169,51 +169,52 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// THE KEY: Don't wrap in MPItemFeed, send items array directly
-function createWorkingItemPayload(data: any): any[] {
-  // Based on actual working implementations, MP_ITEM expects an array of items
-  // NOT wrapped in MPItemFeed object
-  return [
-    {
-      sku: data.sku,
-      productIdentifiers: [
-        {
-          productIdType: 'SKU',
-          productId: data.sku,
-        },
-      ],
-      MPProduct: {
-        productName: data.title,
-        shortDescription: data.description.substring(0, 500),
-        brand: data.brand,
-        mainImageUrl: data.images[0] || '',
-        manufacturerPartNumber: data.sku,
-        msrp: data.price.toString(),
-        countryOfOriginAssembly: 'US',
-        // Category mapping - use appropriate category
-        Home: {
+// THE KEY: Wrap the array in an object with MPItem property
+function createWorkingItemPayload(data: any): any {
+  // Walmart expects an object with MPItem array, not just an array
+  return {
+    MPItem: [
+      {
+        sku: data.sku,
+        productIdentifiers: [
+          {
+            productIdType: 'SKU',
+            productId: data.sku,
+          },
+        ],
+        MPProduct: {
+          productName: data.title,
           shortDescription: data.description.substring(0, 500),
           brand: data.brand,
           mainImageUrl: data.images[0] || '',
           manufacturerPartNumber: data.sku,
-          material: 'Mixed Materials',
-          assemblyRequired: 'No',
+          msrp: data.price.toString(),
+          countryOfOriginAssembly: 'US',
+          // Category mapping - use appropriate category
+          Home: {
+            shortDescription: data.description.substring(0, 500),
+            brand: data.brand,
+            mainImageUrl: data.images[0] || '',
+            manufacturerPartNumber: data.sku,
+            material: 'Mixed Materials',
+            assemblyRequired: 'No',
+          },
+        },
+        MPOffer: {
+          price: data.price.toString(),
+          MinimumAdvertisedPrice: data.price.toString(),
+          ShippingWeight: {
+            measure: '1',
+            unit: 'LB',
+          },
+          productTaxCode: '2038710',
+        },
+        MPLogistics: {
+          fulfillmentLagTime: '1',
         },
       },
-      MPOffer: {
-        price: data.price.toString(),
-        MinimumAdvertisedPrice: data.price.toString(),
-        ShippingWeight: {
-          measure: '1',
-          unit: 'LB',
-        },
-        productTaxCode: '2038710',
-      },
-      MPLogistics: {
-        fulfillmentLagTime: '1',
-      },
-    },
-  ]
+    ],
+  }
 }
 
 // Alternative approach that definitely works - send as plain JSON body
