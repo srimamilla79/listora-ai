@@ -1,4 +1,4 @@
-// src/app/api/walmart/publish/route.ts - Updated with rate limiting and latest spec version
+// src/app/api/walmart/publish/route.ts - Complete Fixed Version
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 import {
@@ -7,8 +7,8 @@ import {
   validateFeedFileSize,
 } from '@/lib/walmart-rate-limiter'
 
-// Latest MP_ITEM spec version as of documentation
-const ITEM_SPEC_VERSION = '5.0'
+// MP_ITEM spec version - Use 4.8 as it's the latest stable version mentioned in docs
+const ITEM_SPEC_VERSION = '4.8'
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,23 +53,28 @@ export async function POST(request: NextRequest) {
     const connection = connections[0]
     const sellerId = connection.seller_id || connection.seller_info?.partnerId
     console.log('✅ Walmart connection found:', connection.id)
-    console.log('🔍 Connection debug:', {
-      connection_seller_id: connection.seller_id,
-      seller_info: connection.seller_info,
-      final_sellerId: sellerId,
-    })
     console.log('🏪 Seller ID:', sellerId)
 
     // Check if token needs refresh (5 minute buffer)
     const accessToken = await refreshTokenIfNeeded(connection, supabase)
-    console.log('🔐 Using access token:', accessToken.substring(0, 20) + '...')
+    console.log('🔑 Using access token:', accessToken.substring(0, 20) + '...')
 
-    // Generate SKU
+    // Generate SKU and GTIN
     const sku = publishingOptions.sku || `LISTORA-WM-${Date.now()}`
+    // Generate a valid 12-digit UPC/GTIN
+    const gtin = generateValidGTIN(sku)
 
-    // Create XML feed with latest spec version and multiple images support
-    const itemJson = createItemJson({
+    console.log('📦 Product details:', {
       sku,
+      gtin,
+      title: productContent.product_name,
+      price: publishingOptions.price,
+    })
+
+    // Create JSON feed - This is the critical fix!
+    const itemJson = createMPItemJson({
+      sku,
+      gtin,
       title: productContent.product_name || 'Product',
       description:
         productContent.content ||
@@ -79,6 +84,7 @@ export async function POST(request: NextRequest) {
       brand: publishingOptions.brand || 'Generic',
       images: images || [],
       quantity: parseInt(publishingOptions.quantity) || 1,
+      category: publishingOptions.category || 'Home & Garden',
       specVersion: ITEM_SPEC_VERSION,
     })
 
@@ -96,6 +102,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📄 Creating Walmart item via Feed API')
     console.log(`📏 JSON size: ${(jsonSizeBytes / 1024).toFixed(2)} KB`)
+    console.log('🔍 JSON Preview:', itemJson.substring(0, 500) + '...')
 
     // Submit feed to Walmart with rate limiting
     const feedResult = await submitWalmartFeedWithRateLimit(
@@ -126,10 +133,6 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    // Generate GTIN if not already defined
-    const gtin =
-      '00' + sku.replace(/\D/g, '').padStart(12, '0').substring(0, 12)
-
     // Save to unified published_products table
     const { data: publishedProduct, error: publishError } = await supabase
       .from('published_products')
@@ -151,7 +154,7 @@ export async function POST(request: NextRequest) {
           walmartListingId: walmartListing?.id,
           specVersion: ITEM_SPEC_VERSION,
           sellerId: sellerId,
-          gtin: gtin, // ADD THIS LINE - This enables the search functionality
+          gtin: gtin,
           ...feedResult,
         },
         status: 'pending',
@@ -174,6 +177,7 @@ export async function POST(request: NextRequest) {
       data: {
         feedId: feedResult.feedId,
         sku: sku,
+        gtin: gtin,
         status: 'SUBMITTED',
         message:
           'Item submitted to Walmart. Processing may take a few minutes.',
@@ -193,65 +197,65 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function createItemJson(data: any): string {
-  // Build secondary images array
-  const secondaryImages = []
-  if (data.images && data.images.length > 1) {
-    for (let i = 1; i < Math.min(data.images.length, 9); i++) {
-      if (data.images[i]) {
-        secondaryImages.push(data.images[i])
-      }
-    }
-  }
+// CRITICAL FIX: The JSON structure for MP_ITEM is different than what you had
+function createMPItemJson(data: any): string {
+  // Based on research, MP_ITEM expects a flat structure, not wrapped in MPItemFeed
+  // This matches the spec 4.8 format
 
-  // Try wrapping in MPItemFeed with MPItem array
-  const feedData = {
-    MPItemFeed: {
-      MPItemFeedHeader: {
-        requestId: `${Date.now()}`,
-        requestBatchId: `${Date.now()}-batch`,
-        feedDate: new Date().toISOString(),
-      },
-      MPItem: [
-        {
-          sku: data.sku,
-          productIdentifiers: {
-            productIdType: 'SKU',
-            productId: data.sku,
-          },
-          MPProduct: {
-            productName: data.title,
-            shortDescription: data.description.substring(0, 200),
-            brand: data.brand,
-            mainImageUrl: data.images?.[0] || '',
-            productSecondaryImageURL: secondaryImages,
-            manufacturerPartNumber: data.sku,
-            msrp: data.price,
-            category: {
-              categoryPath: 'Home/Furniture/Living Room Furniture',
-            },
-          },
-          MPOffer: {
-            price: data.price,
-            shippingWeight: {
-              value: 1,
-              unit: 'LB',
-            },
-            productTaxCode: '2038710',
-            MinimumAdvertisedPrice: data.price,
-          },
-          MPLogistics: {
-            fulfillmentLagTime: 1,
-          },
-        },
-      ],
+  const itemData = {
+    sku: data.sku,
+    productIdentifiers: {
+      productIdType: 'GTIN',
+      productId: data.gtin,
+    },
+    processMode: 'CREATE', // Required for MP_ITEM
+    productName: data.title,
+    shortDescription: data.description.substring(0, 4000), // Max 4000 chars
+    longDescription: data.description, // Full description
+    brand: data.brand,
+    mainImageUrl: data.images?.[0] || '',
+    productSecondaryImageURL: data.images?.slice(1, 9) || [], // Up to 8 secondary images
+    price: data.price,
+    shippingWeight: {
+      value: 1,
+      unit: 'LB',
+    },
+    productTaxCode: '2038710', // General taxable goods
+    category: 'Home & Garden > Furniture > Living Room Furniture',
+    manufacturerPartNumber: data.sku,
+    msrp: data.price,
+    minimumAdvertisedPrice: data.price,
+    fulfillmentLagTime: 1,
+    // Additional required fields for spec 4.8
+    ProductIdUpdate: 'No',
+    SkuUpdate: 'No',
+    // Category specific attributes - adjust based on your category
+    additionalProductAttributes: {
+      assemblyRequired: 'No',
+      countryOfOrigin: 'US',
     },
   }
 
-  return JSON.stringify(feedData, null, 2)
+  return JSON.stringify(itemData, null, 2)
 }
 
-// Submit feed WITHOUT rate limiting check (already checked above)
+// Generate a valid GTIN/UPC (12 digits with check digit)
+function generateValidGTIN(sku: string): string {
+  // Extract numbers from SKU and pad to 11 digits
+  const numbers = sku.replace(/\D/g, '').padStart(11, '0').substring(0, 11)
+
+  // Calculate check digit
+  let sum = 0
+  for (let i = 0; i < 11; i++) {
+    const digit = parseInt(numbers[i])
+    sum += i % 2 === 0 ? digit : digit * 3
+  }
+  const checkDigit = (10 - (sum % 10)) % 10
+
+  return numbers + checkDigit
+}
+
+// CRITICAL FIX: Submit feed with proper content-type handling
 async function submitWalmartFeedWithRateLimit(
   jsonContent: string,
   accessToken: string,
@@ -267,47 +271,59 @@ async function submitWalmartFeedWithRateLimit(
 
   console.log('📤 Submitting feed to:', feedUrl)
 
-  // Create FormData instead of sending raw JSON
+  // CRITICAL: Create FormData with proper content-type for JSON
   const formData = new FormData()
   const blob = new Blob([jsonContent], { type: 'application/json' })
   formData.append('file', blob, 'feed.json')
 
-  // Don't check rate limit here - already checked in main function
-  // Just make the API call and update from response headers
-  const response = await fetch(feedUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'WM_SEC.ACCESS_TOKEN': accessToken,
-      'WM_PARTNER.ID': sellerId || process.env.WALMART_PARTNER_ID || '',
-      WM_MARKET: 'us',
-      'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      'WM_SVC.NAME': 'Walmart Marketplace',
-      Accept: 'application/json',
-      // Remove Content-Type - let fetch set it with boundary for multipart
-    },
-    body: formData,
-  })
+  try {
+    const response = await fetch(feedUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'WM_SEC.ACCESS_TOKEN': accessToken,
+        'WM_PARTNER.ID': sellerId || process.env.WALMART_PARTNER_ID || '',
+        WM_MARKET: 'us',
+        'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        'WM_SVC.NAME': 'Walmart Marketplace',
+        Accept: 'application/json',
+        // DO NOT set Content-Type - let fetch set it with boundary for multipart
+      },
+      body: formData,
+    })
 
-  // Update rate limits from response headers
-  rateLimiter.updateFromHeaders('feeds:submit:MP_ITEM', response.headers)
+    // Update rate limits from response headers
+    rateLimiter.updateFromHeaders('feeds:submit:MP_ITEM', response.headers)
 
-  if (response.status === 429) {
-    throw new Error('Rate limit exceeded by Walmart')
-  }
+    const responseText = await response.text()
+    console.log('📨 Raw response:', responseText.substring(0, 500))
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Feed submission failed: ${errorText}`)
-  }
+    if (response.status === 429) {
+      throw new Error('Rate limit exceeded by Walmart')
+    }
 
-  const result = await response.json()
+    if (!response.ok) {
+      // Try to parse error response
+      try {
+        const errorData = JSON.parse(responseText)
+        console.error('❌ Walmart error response:', errorData)
+        throw new Error(`Feed submission failed: ${JSON.stringify(errorData)}`)
+      } catch (e) {
+        throw new Error(`Feed submission failed: ${responseText}`)
+      }
+    }
 
-  // Ensure we have a valid feed response
-  return {
-    feedId: result.feedId || `FEED-${Date.now()}`,
-    status: result.status || 'SUBMITTED',
-    ...result,
+    const result = JSON.parse(responseText)
+
+    // Ensure we have a valid feed response
+    return {
+      feedId: result.feedId || `FEED-${Date.now()}`,
+      status: result.status || 'SUBMITTED',
+      ...result,
+    }
+  } catch (error) {
+    console.error('❌ Feed submission error:', error)
+    throw error
   }
 }
 
@@ -317,7 +333,7 @@ async function refreshTokenIfNeeded(
   supabase: any
 ): Promise<string> {
   const expiresAt = new Date(connection.token_expires_at)
-  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000) // 5-minute buffer
+  const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000)
 
   if (expiresAt <= fiveMinutesFromNow && connection.refresh_token) {
     console.log('🔄 Refreshing Walmart token (expires within 5 minutes)...')
@@ -346,8 +362,11 @@ async function refreshTokenIfNeeded(
 }
 
 async function refreshWalmartToken(refreshToken: string, sellerId?: string) {
-  // Force production URL for now
-  const tokenUrl = 'https://marketplace.walmartapis.com/v3/token'
+  const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
+  const tokenUrl =
+    environment === 'sandbox'
+      ? 'https://sandbox.walmartapis.com/v3/token'
+      : 'https://marketplace.walmartapis.com/v3/token'
 
   const clientId = process.env.WALMART_CLIENT_ID!
   const clientSecret = process.env.WALMART_CLIENT_SECRET!
