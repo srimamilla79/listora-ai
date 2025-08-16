@@ -37,6 +37,11 @@ export async function POST(request: NextRequest) {
 
     // Submit using MP_ITEM_MATCH feed
     const feedPayload = {
+      MPItemMatchFeedHeader: {
+        version: '1.0',
+        sellingChannel: 'mpsetupbymatch',
+        locale: 'en',
+      },
       MPItemMatch: [offer],
     }
 
