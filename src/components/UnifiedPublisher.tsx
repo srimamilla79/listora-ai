@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { ExternalLink, RefreshCw } from 'lucide-react'
+import WalmartCategoryPicker from './WalmartCategoryPicker'
 import {
   Upload,
   Package,
@@ -1590,6 +1591,26 @@ export default function UnifiedPublisher({
                           </option>
                         </select>
                       </div>
+                      {/* 👇 ADD THE WALMART CATEGORY SELECTOR HERE 👇 */}
+                      {selectedPlatform === 'walmart' && (
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <Package className="h-4 w-4 inline mr-1 text-blue-600" />
+                            Walmart Product Category
+                          </label>
+                          <WalmartCategoryPicker
+                            userId={passedUser?.id}
+                            onCategorySelect={(category, attributes) => {
+                              setPublishingOptions((prev) => ({
+                                ...prev,
+                                walmartProductType: category.name,
+                                walmartAttributes: attributes,
+                              }))
+                            }}
+                          />
+                        </div>
+                      )}
+                      {/* 👆 END OF WALMART CATEGORY SELECTOR 👆 */}
 
                       {/* Amazon Product Type - Only shows for Amazon platform */}
                       {selectedPlatform === 'amazon' && (

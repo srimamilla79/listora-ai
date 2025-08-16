@@ -157,3 +157,62 @@ export async function walmartApiRequest(
 
   return response.json()
 }
+/** Generic GET to Walmart with proper headers */
+export async function walmartGet(userId: string, path: string) {
+  const conn = await getWalmartConnection(userId)
+  if (!conn) throw new Error('No Walmart connection')
+
+  const accessToken = await ensureValidToken(conn)
+  const baseUrl =
+    conn.environment === 'sandbox'
+      ? 'https://sandbox.walmartapis.com'
+      : 'https://marketplace.walmartapis.com'
+
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: 'GET',
+    headers: buildWalmartHeaders(accessToken, conn.seller_id),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    const errorText = await res.text()
+    console.error(`Walmart GET error: ${res.status} - ${errorText}`)
+    throw new Error(`Walmart API error: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+/** Utility: try a list of paths until one succeeds */
+export async function walmartGetFirstOk(userId: string, paths: string[]) {
+  let lastErr: any
+  for (const p of paths) {
+    try {
+      return await walmartGet(userId, p)
+    } catch (e) {
+      console.log(`Path ${p} failed, trying next...`)
+      lastErr = e
+    }
+  }
+  throw lastErr || new Error('No candidate path succeeded')
+}
+
+/** Rate limit handler for spec API (3 TPM) */
+export const specRateLimiter = {
+  calls: [] as number[],
+  canCall(): boolean {
+    const now = Date.now()
+    const oneMinuteAgo = now - 60000
+    this.calls = this.calls.filter((t) => t > oneMinuteAgo)
+    return this.calls.length < 3
+  },
+  recordCall() {
+    this.calls.push(Date.now())
+  },
+  async waitForSlot() {
+    while (!this.canCall()) {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
+    this.recordCall()
+  },
+}

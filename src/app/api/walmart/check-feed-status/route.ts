@@ -60,8 +60,7 @@ export async function GET(request: NextRequest) {
         : 'https://marketplace.walmartapis.com'
 
     // Add includeDetails=true and offset=0&limit=50 to get error details
-    const statusUrl = `${baseUrl}/v3/feeds/${feedId}?includeDetails=true&offset=0&limit=50`
-
+    const statusUrl = `${baseUrl}/v3/feeds/${encodeURIComponent(feedId)}?includeDetails=true&offset=0&limit=50`
     console.log('📊 Checking feed status:', statusUrl)
 
     // Use rate-limited API call with proper typing

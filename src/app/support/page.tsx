@@ -152,24 +152,74 @@ export default function SupportPage() {
       answer:
         "To connect your Shopify store for the first time, start by generating content for at least one product on the Generate page. Once you have generated content, the marketplace connections will appear. Look for the Shopify option and click \"Connect\". You'll be redirected to Shopify's secure login page where you'll need to enter your store URL and credentials. After authenticating, Shopify will ask you to authorize Listora AI to access your store. Once approved, you'll be redirected back to Listora with your store successfully connected, ready to publish products directly.",
     },
+    {
+      id: '7',
+      category: 'platforms',
+      question: 'How do I connect Facebook & Instagram to Listora AI?',
+      answer: `To publish content through Listora AI to Facebook and Instagram, you'll need to set up your accounts properly:
+
+**Before You Start:**
+• A Facebook Page (not a personal profile)
+• An Instagram Business or Creator account (optional, for Instagram publishing)
+• Admin access to both accounts
+
+**Step 1: Set Up Your Facebook Page**
+If you don't have a Facebook Page yet:
+1. Visit facebook.com/pages/create
+2. Select your business category
+3. Enter your business name and details
+4. Complete the page setup
+
+Note: Personal Facebook profiles cannot be used for publishing. You must have a Facebook Page.
+
+**Step 2: Convert Your Instagram to a Business Account**
+To publish to Instagram, you need a Business or Creator account:
+1. Open the Instagram app on your phone
+2. Go to Settings → Account
+3. Tap "Switch to Professional Account"
+4. Choose "Business" (recommended) or "Creator"
+5. Follow the setup prompts
+
+**Step 3: Link Instagram to Your Facebook Page**
+Connect your Instagram Business account to your Facebook Page:
+1. In Instagram app: Settings → Account → Linked Accounts
+2. Select Facebook
+3. Choose "Link to Facebook Page"
+4. Select your Facebook Page from the list
+5. Confirm the connection
+
+**Step 4: Connect to Listora AI**
+Once your accounts are properly set up:
+1. Log into your Listora AI account
+2. Navigate to Generate Content
+3. Find "Marketplace Connections"
+4. Click "Connect" next to Facebook & Instagram
+5. Authorize Listora AI to access your accounts
+6. Select which Facebook Page and Instagram account to use
+
+**Troubleshooting Common Issues:**
+• "No Facebook Pages found" - Ensure you have at least one Facebook Page and you're an admin
+• Instagram account not showing - Confirm it's converted to Business/Creator and linked to your Facebook Page
+• "Feature Unavailable" error - Clear browser cache and ensure you're accessing from the same domain`,
+    },
 
     // Billing
     {
-      id: '7',
+      id: '8',
       category: 'billing',
       question: "What's included in the free Starter plan?",
       answer:
         "The Starter plan includes 10 free content generations per month, access to all four platforms (Amazon, Shopify, eBay, Etsy), basic AI optimization, and email support. It's perfect for small sellers just getting started.",
     },
     {
-      id: '8',
+      id: '9',
       category: 'billing',
       question: 'How do I upgrade my plan?',
       answer:
         'Visit the Pricing page to see all available plans. Click "Upgrade" on your desired plan, enter your payment information, and your new limits will be available immediately. You can change or cancel your plan anytime.',
     },
     {
-      id: '9',
+      id: '10',
       category: 'billing',
       question: 'When does my usage reset?',
       answer:
@@ -178,21 +228,21 @@ export default function SupportPage() {
 
     // Features
     {
-      id: '10',
+      id: '11',
       category: 'features',
       question: 'What is Bulk Upload and how does it work?',
       answer:
         'Bulk Upload allows you to generate content for multiple products at once using a CSV file. Prepare your product data in our template format, upload the file, and our AI will generate optimized listings for all products. This feature is available on Business and higher plans.',
     },
     {
-      id: '11',
+      id: '12',
       category: 'features',
       question: 'Can I edit AI-generated content?',
       answer:
         'Absolutely! All generated content is fully editable. You can modify titles, descriptions, bullet points, and any other fields directly on the Generate page before publishing. We recommend reviewing and personalizing the content to match your brand voice.',
     },
     {
-      id: '12',
+      id: '13',
       category: 'features',
       question: 'How does the AI optimization work?',
       answer:
@@ -201,14 +251,14 @@ export default function SupportPage() {
 
     // Troubleshooting
     {
-      id: '13',
+      id: '14',
       category: 'troubleshooting',
       question: 'Why is my content generation failing?',
       answer:
         'Common causes include: insufficient product information, special characters in input fields, or temporary server issues. Try providing more detailed information and avoiding special symbols. If issues persist, contact support.',
     },
     {
-      id: '14',
+      id: '15',
       category: 'troubleshooting',
       question: "My published products aren't showing up on the platform",
       answer:
@@ -286,6 +336,63 @@ export default function SupportPage() {
     } finally {
       setSending(false)
     }
+  }
+
+  // Function to render answer with formatting
+  const renderAnswer = (answer: string) => {
+    // Split by double newlines for paragraphs
+    const paragraphs = answer.split('\n\n')
+
+    return paragraphs.map((paragraph, idx) => {
+      // Check if it's a bold heading (starts with **)
+      if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+        return (
+          <h4 key={idx} className="font-semibold text-gray-900 mt-4 mb-2">
+            {paragraph.slice(2, -2)}
+          </h4>
+        )
+      }
+
+      // Check if it's a heading followed by content (has **)
+      if (paragraph.includes('**')) {
+        const parts = paragraph.split('**')
+        return (
+          <div key={idx} className="mb-3">
+            {parts.map((part, partIdx) => {
+              if (partIdx % 2 === 1) {
+                return (
+                  <span key={partIdx} className="font-semibold">
+                    {part}
+                  </span>
+                )
+              }
+              return <span key={partIdx}>{part}</span>
+            })}
+          </div>
+        )
+      }
+
+      // Check if it's a list item (starts with • or number.)
+      if (paragraph.startsWith('•') || /^\d+\./.test(paragraph)) {
+        const lines = paragraph.split('\n')
+        return (
+          <ul key={idx} className="list-disc list-inside space-y-1 mb-3 ml-2">
+            {lines.map((line, lineIdx) => (
+              <li key={lineIdx} className="text-gray-700">
+                {line.replace(/^[•\d+\.]/, '').trim()}
+              </li>
+            ))}
+          </ul>
+        )
+      }
+
+      // Regular paragraph
+      return (
+        <p key={idx} className="text-gray-700 mb-3">
+          {paragraph}
+        </p>
+      )
+    })
   }
 
   // Main content component
@@ -396,7 +503,7 @@ export default function SupportPage() {
                     </button>
                     {expandedFAQ === faq.id && (
                       <div className="px-6 py-4 bg-gray-50 border-t">
-                        <p className="text-gray-700">{faq.answer}</p>
+                        {renderAnswer(faq.answer)}
                       </div>
                     )}
                   </div>
