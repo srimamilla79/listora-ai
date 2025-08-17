@@ -119,7 +119,6 @@ export default function UnifiedPublisher({
 
   const [showMarketplacePermissionDialog, setShowMarketplacePermissionDialog] =
     useState(false)
-
   type PublishingOptions = {
     price: string
     quantity: string
@@ -127,10 +126,15 @@ export default function UnifiedPublisher({
     condition: string
     productType: string
     metaPlatforms: string[]
+
+    // Walmart category + spec
     walmartProductType?: string
     walmartAttributes?: any
-    // walmartSpec?: any;
-    // walmartSpecVersion?: '5.0' | '4.2' | 'unknown';
+
+    // 🔎 NEW — identifier controls
+    walmartIdentifierType?: 'GTIN' | 'UPC' | 'EAN' | 'ISBN' | 'SKU'
+    walmartIdentifier?: string
+    walmartNoBarcode?: boolean // checked = GTIN-exempt flow
   }
 
   const [publishingOptions, setPublishingOptions] = useState<PublishingOptions>(
@@ -138,9 +142,15 @@ export default function UnifiedPublisher({
       price: '',
       quantity: '1',
       sku: '',
-      condition: 'new',
+      condition: 'New',
       productType: '',
-      metaPlatforms: ['facebook', 'instagram'],
+      metaPlatforms: [],
+
+      walmartProductType: '',
+      walmartAttributes: {},
+      walmartIdentifierType: 'GTIN',
+      walmartIdentifier: '',
+      walmartNoBarcode: false,
     }
   )
 
@@ -699,12 +709,76 @@ export default function UnifiedPublisher({
     setPublishSuccess(null)
 
     try {
-      let endpoint = `/api/${selectedPlatform}/publish`
-
-      // Special handling for Walmart - use the new endpoint
+      // Walmart: send everything to one orchestrator route and return early
       if (selectedPlatform === 'walmart') {
-        endpoint = `/api/walmart/items/offer-match`
+        const sku = publishingOptions.sku || generateSKU()
+
+        // Build identifiers payload (empty if "no barcode")
+        const identifiers = publishingOptions.walmartNoBarcode
+          ? []
+          : publishingOptions.walmartIdentifier &&
+              publishingOptions.walmartIdentifierType
+            ? [
+                {
+                  productIdType: publishingOptions.walmartIdentifierType,
+                  productId: publishingOptions.walmartIdentifier,
+                },
+              ]
+            : []
+
+        const res = await fetch('/api/walmart/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: String(passedUser?.id || ''),
+            sku,
+            price: Number(publishingOptions.price),
+            quantity: Number(publishingOptions.quantity || '1'),
+            condition: publishingOptions.condition,
+            productType: publishingOptions.walmartProductType || null,
+            attributes: publishingOptions.walmartAttributes || {},
+            identifiers,
+            noBarcode: !!publishingOptions.walmartNoBarcode,
+          }),
+        })
+
+        const data = await res.json()
+
+        if (!res.ok || data?.ok === false) {
+          // Special guidance if GTIN required
+          if (
+            data?.status === 412 &&
+            data?.error === 'GTIN_EXEMPTION_REQUIRED'
+          ) {
+            setPublishError(
+              'Walmart requires a valid GTIN/UPC/EAN or an approved GTIN-exemption to list this item without a barcode.'
+            )
+            return
+          }
+          setPublishError(
+            data?.message ||
+              data?.error ||
+              `Walmart publish failed (${res.status})`
+          )
+          return
+        }
+
+        // Success → show feed id (if any) and mark platform published
+        setPublishResult({ feedId: data?.feedId || null, raw: data })
+        setPublishSuccess('Successfully submitted to Walmart!')
+        setPublishedProducts((prev) => ({
+          ...prev,
+          walmart: {
+            method: data?.method || 'auto',
+            feedId: data?.feedId || null,
+          },
+        }))
+        setPublishedPlatforms((prev) => [...new Set([...prev, 'walmart'])])
+        return
       }
+
+      // For all non-Walmart platforms, keep using the generic endpoint right below
+      let endpoint = `/api/${selectedPlatform}/publish`
 
       let requestPayload: any = {
         productContent: {
@@ -1621,17 +1695,101 @@ export default function UnifiedPublisher({
                             <Package className="h-4 w-4 inline mr-1 text-blue-600" />
                             Walmart Product Category
                           </label>
+                          {/* Walmart category picker */}
                           <WalmartCategoryPicker
                             userId={userId}
-                            onLeafSelect={({ category, spec, version }) => {
+                            onCategorySelect={(category, attributes) => {
                               setPublishingOptions((prev) => ({
                                 ...prev,
                                 walmartProductType: category?.name ?? '',
-                                walmartAttributes: spec ?? {},
-                                // walmartSpecVersion: version,
+                                walmartAttributes: attributes ?? {},
                               }))
                             }}
                           />
+
+                          {/* NEW — Identifier / No-barcode controls */}
+                          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label className="flex items-center gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="wm-id-mode"
+                                checked={!publishingOptions.walmartNoBarcode}
+                                onChange={() =>
+                                  setPublishingOptions((prev) => ({
+                                    ...prev,
+                                    walmartNoBarcode: false,
+                                  }))
+                                }
+                              />
+                              I have a barcode (GTIN/UPC/EAN/ISBN)
+                            </label>
+
+                            <label className="flex items-center gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="wm-id-mode"
+                                checked={!!publishingOptions.walmartNoBarcode}
+                                onChange={() =>
+                                  setPublishingOptions((prev) => ({
+                                    ...prev,
+                                    walmartNoBarcode: true,
+                                  }))
+                                }
+                              />
+                              No barcode (GTIN-exempt)
+                            </label>
+
+                            {!publishingOptions.walmartNoBarcode && (
+                              <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <div className="md:col-span-1">
+                                  <select
+                                    className="w-full border rounded px-3 py-2"
+                                    value={
+                                      publishingOptions.walmartIdentifierType ??
+                                      'GTIN'
+                                    }
+                                    onChange={(e) =>
+                                      setPublishingOptions((prev) => ({
+                                        ...prev,
+                                        walmartIdentifierType: e.target
+                                          .value as any,
+                                      }))
+                                    }
+                                  >
+                                    <option value="GTIN">GTIN</option>
+                                    <option value="UPC">UPC</option>
+                                    <option value="EAN">EAN</option>
+                                    <option value="ISBN">ISBN</option>
+                                    <option value="SKU">SKU</option>
+                                  </select>
+                                </div>
+                                <div className="md:col-span-3">
+                                  <input
+                                    className="w-full border rounded px-3 py-2"
+                                    placeholder="Enter the barcode value"
+                                    value={
+                                      publishingOptions.walmartIdentifier ?? ''
+                                    }
+                                    onChange={(e) =>
+                                      setPublishingOptions((prev) => ({
+                                        ...prev,
+                                        walmartIdentifier:
+                                          e.target.value.trim(),
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {publishingOptions.walmartNoBarcode && (
+                              <div className="col-span-1 md:col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                                Your account must have an approved
+                                GTIN-exemption with Walmart for this category to
+                                list without a barcode.
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                       {/* 👆 END OF WALMART CATEGORY SELECTOR 👆 */}
