@@ -1,7 +1,7 @@
 // src/app/api/walmart/publish/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { walmartPost, walmartPostXml } from '@/lib/walmart' // ← import BOTH
-import { hasGtinExemption } from '@/lib/exemptions' // if this errors, switch to: '../../../../lib/exemptions'
+import { walmartPost, walmartUploadFeed } from '@/lib/walmart'
+import { hasGtinExemption } from '@/lib/exemptions'
 
 type Identifier = {
   productIdType: 'GTIN' | 'UPC' | 'EAN' | 'ISBN' | 'SKU'
@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
       price,
       quantity,
       condition,
-      productType, // category/product-type name (optional)
-      attributes, // spec attributes if collected (optional)
+      productType, // optional leaf name (better if provided)
+      attributes, // optional: map from spec
       identifiers = [], // Identifier[]
       noBarcode = false, // boolean
     } = body || {}
@@ -39,17 +39,17 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
 
-    // PATH A: barcode present → Offer-Match (v3 JSON)
+    // ──────────────────────────────────────────────────────────────────────────
+    // PATH A: barcode present → Offer-Match (JSON)
+    // ──────────────────────────────────────────────────────────────────────────
     if (!noBarcode && Array.isArray(identifiers) && identifiers.length > 0) {
       const payload = {
         sku: String(sku),
-        identifiers: identifiers.map((i) => ({
+        identifiers: identifiers.map((i: Identifier) => ({
           productIdType: i.productIdType,
           productId: i.productId,
         })),
         price: Number(price),
-        // quantity: Number(quantity || 1),
-        // condition: condition || 'New',
       }
 
       const resp = await walmartPost(userId, '/v3/items/offer-match', payload)
@@ -61,7 +61,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // PATH B: no barcode → must be GTIN-exempt (otherwise block)
+    // ──────────────────────────────────────────────────────────────────────────
+    // PATH B: no barcode → must be GTIN-exempt
+    // ──────────────────────────────────────────────────────────────────────────
     const exempt = await hasGtinExemption(userId, productType)
     if (!exempt) {
       return NextResponse.json(
@@ -76,10 +78,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Exempt path: create catalog content via MP_ITEM (XML), then price & inventory
+    // Minimal required fields for MP_ITEM (Walmart will tell us if more are needed)
     const required = pickRequiredFields(attributes)
     const missing = validateRequired(required)
-
     if (missing.length) {
       return NextResponse.json(
         {
@@ -103,20 +104,22 @@ export async function POST(req: NextRequest) {
       attributes: attributes || {},
     })
 
-    // 1) Create content (MP_ITEM)
-    const itemFeed = await walmartPostXml(
+    // 1) Create catalog content via multipart upload
+    const itemFeed = await walmartUploadFeed(
       userId,
-      '/v3/feeds?feedType=MP_ITEM',
-      xml
+      'MP_ITEM',
+      `${String(sku)}.xml`,
+      xml,
+      'application/xml'
     )
 
-    // 2) Price
+    // 2) Price (JSON feed still works in your tenant)
     await walmartPost(userId, '/v3/feeds?feedType=PRICE_AND_PROMOTION', {
       sku: String(sku),
       price: Number(price),
     })
 
-    // 3) Inventory
+    // 3) Inventory (JSON)
     await walmartPost(userId, '/v3/feeds?feedType=MP_INVENTORY', {
       sku: String(sku),
       quantity: Number(quantity ?? 1),
@@ -136,7 +139,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/* ===== helper functions (MUST be outside POST) ===== */
+/* ===== helper functions (outside POST) ===== */
 
 function pickRequiredFields(attrs: any) {
   const get = (...keys: string[]) => {
@@ -198,6 +201,7 @@ function buildMpItemXml(input: {
   const { sku, productType, brand, title, shortDescription, mainImageUrl } =
     input
 
+  // Tag casing matters: sku is lowercase; others are PascalCase.
   return `<?xml version="1.0" encoding="UTF-8"?>
 <MPItemFeed xmlns="http://walmart.com/">
   <MPItemFeedHeader>
@@ -206,8 +210,8 @@ function buildMpItemXml(input: {
   </MPItemFeedHeader>
   <MPItem>
     <sku>${xmlEscape(sku)}</sku>
-    <productIdentifiers/> <!-- empty because GTIN-exempt -->
-    <productCategory>${xmlEscape(productType)}</productCategory>
+    <ProductIdentifiers/> <!-- empty because GTIN-exempt -->
+    <ProductCategory>${xmlEscape(productType)}</ProductCategory>
     <Brand>${xmlEscape(brand)}</Brand>
     <ProductName>${xmlEscape(title)}</ProductName>
     <ShortDescription>${xmlEscape(shortDescription)}</ShortDescription>

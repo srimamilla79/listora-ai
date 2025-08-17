@@ -1,6 +1,7 @@
-// lib/walmart.ts
+// src/lib/walmart.ts
 import { createClient } from '@supabase/supabase-js'
-import { walmartApiCall } from './walmart-rate-limiter'
+
+/* ------------------------------ Supabase admin ------------------------------ */
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,12 +18,12 @@ export interface WalmartConnection {
   partner_id: string
   seller_info: any
   status: string
-  environment: string
+  environment: 'sandbox' | 'production' | string
 }
 
-/**
- * Get active Walmart connection for a user
- */
+/* --------------------------- Connection + Refresh --------------------------- */
+
+/** Get active Walmart connection for a user */
 export async function getWalmartConnection(
   userId: string
 ): Promise<WalmartConnection | null> {
@@ -34,12 +35,10 @@ export async function getWalmartConnection(
     .single()
 
   if (error || !data) return null
-  return data
+  return data as WalmartConnection
 }
 
-/**
- * Refresh access token if needed (with 5-minute buffer)
- */
+/** Refresh access token if needed (5-minute buffer) */
 export async function ensureValidToken(
   connection: WalmartConnection
 ): Promise<string> {
@@ -47,7 +46,7 @@ export async function ensureValidToken(
   const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000)
 
   if (expiresAt <= fiveMinutesFromNow && connection.refresh_token) {
-    console.log('🔄 Refreshing Walmart token...')
+    console.log('🔄 Refreshing Walmart token…')
 
     const environment = connection.environment || 'production'
     const tokenUrl =
@@ -84,7 +83,6 @@ export async function ensureValidToken(
 
     const tokenData = await response.json()
 
-    // Update connection with new token
     await supabaseAdmin
       .from('walmart_connections')
       .update({
@@ -96,16 +94,22 @@ export async function ensureValidToken(
       })
       .eq('id', connection.id)
 
-    console.log('✅ Token refreshed successfully')
+    console.log('✅ Token refreshed')
     return tokenData.access_token
   }
 
   return connection.access_token
 }
 
-/**
- * Build Walmart API headers
- */
+/* --------------------------------- Helpers --------------------------------- */
+
+function baseUrlForEnv(env: string | undefined) {
+  return env === 'sandbox'
+    ? 'https://sandbox.walmartapis.com'
+    : 'https://marketplace.walmartapis.com'
+}
+
+/** Build Walmart API headers (JSON default) */
 export function buildWalmartHeaders(
   accessToken: string,
   sellerId: string
@@ -121,9 +125,9 @@ export function buildWalmartHeaders(
   }
 }
 
-/**
- * Make authenticated Walmart API request
- */
+/* ----------------------------- Generic JSON API ---------------------------- */
+
+/** Make authenticated Walmart API request (JSON) */
 export async function walmartApiRequest(
   userId: string,
   method: string,
@@ -131,42 +135,39 @@ export async function walmartApiRequest(
   body?: any
 ): Promise<any> {
   const connection = await getWalmartConnection(userId)
-  if (!connection) {
-    throw new Error('No Walmart connection found')
-  }
+  if (!connection) throw new Error('No Walmart connection found')
 
   const accessToken = await ensureValidToken(connection)
   const headers = buildWalmartHeaders(accessToken, connection.seller_id)
+  const baseUrl = baseUrlForEnv(connection.environment)
 
-  const environment = connection.environment || 'production'
-  const baseUrl =
-    environment === 'sandbox'
-      ? 'https://sandbox.walmartapis.com'
-      : 'https://marketplace.walmartapis.com'
-
-  const response = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
   })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Walmart API error: ${response.status} - ${errorText}`)
+  if (!res.ok) {
+    const txt = await res.text()
+    throw new Error(`Walmart API error: ${res.status} - ${txt}`)
   }
 
-  return response.json()
+  const text = await res.text()
+  try {
+    return text ? JSON.parse(text) : {}
+  } catch {
+    return { raw: text }
+  }
 }
-/** Generic GET to Walmart with proper headers */
+
+/** GET JSON helper */
 export async function walmartGet(userId: string, path: string) {
   const conn = await getWalmartConnection(userId)
   if (!conn) throw new Error('No Walmart connection')
 
   const accessToken = await ensureValidToken(conn)
-  const baseUrl =
-    conn.environment === 'sandbox'
-      ? 'https://sandbox.walmartapis.com'
-      : 'https://marketplace.walmartapis.com'
+  const baseUrl = baseUrlForEnv(conn.environment)
 
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'GET',
@@ -174,35 +175,40 @@ export async function walmartGet(userId: string, path: string) {
     cache: 'no-store',
   })
 
+  const text = await res.text()
   if (!res.ok) {
-    const errorText = await res.text()
-    console.error(`Walmart GET error: ${res.status} - ${errorText}`)
+    console.error(`Walmart GET error: ${res.status} - ${text}`)
     throw new Error(`Walmart API error: ${res.status}`)
   }
-
-  return res.json()
+  try {
+    return text ? JSON.parse(text) : {}
+  } catch {
+    return { raw: text }
+  }
 }
 
-/** Utility: try a list of paths until one succeeds */
+/** Try multiple paths until one succeeds */
 export async function walmartGetFirstOk(userId: string, paths: string[]) {
   let lastErr: any
   for (const p of paths) {
     try {
       return await walmartGet(userId, p)
     } catch (e) {
-      console.log(`Path ${p} failed, trying next...`)
+      console.log(`Path ${p} failed, trying next…`)
       lastErr = e
     }
   }
   throw lastErr || new Error('No candidate path succeeded')
 }
 
-/** Rate limit handler for spec API (3 TPM) */
+/* ------------------------------ Simple limiter ----------------------------- */
+
+/** Spec API is ~3 TPM; keep a tiny in-memory limiter on single server */
 export const specRateLimiter = {
   calls: [] as number[],
   canCall(): boolean {
     const now = Date.now()
-    const oneMinuteAgo = now - 60000
+    const oneMinuteAgo = now - 60_000
     this.calls = this.calls.filter((t) => t > oneMinuteAgo)
     return this.calls.length < 3
   },
@@ -211,21 +217,21 @@ export const specRateLimiter = {
   },
   async waitForSlot() {
     while (!this.canCall()) {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((r) => setTimeout(r, 1000))
     }
     this.recordCall()
   },
 }
-/** POST to Walmart with proper headers */
+
+/* --------------------------- JSON & XML feed posts -------------------------- */
+
+/** POST JSON (e.g., offer-match; price; inventory) */
 export async function walmartPost(userId: string, path: string, body: any) {
   const conn = await getWalmartConnection(userId)
   if (!conn) throw new Error('No Walmart connection')
 
   const accessToken = await ensureValidToken(conn)
-  const baseUrl =
-    conn.environment === 'sandbox'
-      ? 'https://sandbox.walmartapis.com'
-      : 'https://marketplace.walmartapis.com'
+  const baseUrl = baseUrlForEnv(conn.environment)
 
   const headers = {
     ...buildWalmartHeaders(accessToken, conn.seller_id),
@@ -240,15 +246,19 @@ export async function walmartPost(userId: string, path: string, body: any) {
     cache: 'no-store',
   })
 
+  const text = await res.text()
   if (!res.ok) {
-    const errorText = await res.text()
-    console.error(`Walmart POST error: ${res.status} - ${errorText}`)
+    console.error(`Walmart POST error: ${res.status} - ${text}`)
     throw new Error(`Walmart API error: ${res.status}`)
   }
-
-  return res.json()
+  try {
+    return text ? JSON.parse(text) : {}
+  } catch {
+    return { raw: text }
+  }
 }
-// --- XML feed post helper for MP_ITEM etc. ---
+
+/** Raw XML POST (fallback; prefer multipart uploader below for feeds) */
 export async function walmartPostXml(
   userId: string,
   path: string,
@@ -258,12 +268,8 @@ export async function walmartPostXml(
   if (!conn) throw new Error('No Walmart connection')
 
   const accessToken = await ensureValidToken(conn)
-  const baseUrl =
-    conn.environment === 'sandbox'
-      ? 'https://sandbox.walmartapis.com'
-      : 'https://marketplace.walmartapis.com'
+  const baseUrl = baseUrlForEnv(conn.environment)
 
-  // We cannot reuse buildWalmartHeaders because it sets application/json
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     'WM_SEC.ACCESS_TOKEN': accessToken,
@@ -287,6 +293,62 @@ export async function walmartPostXml(
     throw new Error(`Walmart API error: ${res.status} - ${text}`)
   }
 
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { ok: true, raw: text }
+  }
+}
+
+/**
+ * Multipart uploader for Feeds v3 (Walmart expects the file in a part named 'file').
+ * Use for MP_ITEM (XML), PRICE_AND_PROMOTION (JSON), MP_INVENTORY (JSON), etc.
+ *
+ * IMPORTANT: Do NOT set 'Content-Type' yourself; let fetch set the multipart boundary.
+ */
+export async function walmartUploadFeed(
+  userId: string,
+  feedType: string, // 'MP_ITEM' | 'PRICE_AND_PROMOTION' | 'MP_INVENTORY' | etc.
+  fileName: string, // e.g., 'item.xml' or 'price.json'
+  fileContents: string | Blob,
+  mime: 'application/xml' | 'application/json' = 'application/xml'
+) {
+  const conn = await getWalmartConnection(userId)
+  if (!conn) throw new Error('No Walmart connection')
+
+  const accessToken = await ensureValidToken(conn)
+  const baseUrl = baseUrlForEnv(conn.environment)
+
+  const fd = new FormData()
+  const blob =
+    typeof fileContents === 'string'
+      ? new Blob([fileContents], { type: mime })
+      : fileContents
+  fd.append('file', blob, fileName)
+
+  const res = await fetch(
+    `${baseUrl}/v3/feeds?feedType=${encodeURIComponent(feedType)}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'WM_SEC.ACCESS_TOKEN': accessToken,
+        'WM_PARTNER.ID': conn.seller_id,
+        'WM_QOS.CORRELATION_ID': crypto.randomUUID(),
+        'WM_SVC.NAME': 'Walmart Marketplace',
+        Accept: 'application/json',
+        // DO NOT set 'Content-Type' here; fetch/undici sets the multipart boundary.
+      },
+      body: fd,
+      cache: 'no-store',
+    }
+  )
+
+  const text = await res.text()
+  if (!res.ok) {
+    console.error(`Walmart FEED upload error: ${res.status} - ${text}`)
+    throw new Error(`Walmart API error: ${res.status} - ${text}`)
+  }
   try {
     return JSON.parse(text)
   } catch {
