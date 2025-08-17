@@ -1,20 +1,5 @@
-// src/app/api/walmart/taxonomy/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAndCacheTaxonomy } from '@/lib/specCache'
-
-/** Return a plain array so the client can normalize it */
-function pickArray(raw: any): any[] {
-  const arr =
-    (Array.isArray(raw) && raw) ||
-    raw?.productTypeGroups ||
-    raw?.productTypes ||
-    raw?.children ||
-    raw?.nodes ||
-    raw?.items ||
-    raw?.data ||
-    []
-  return Array.isArray(arr) ? arr : []
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,8 +22,9 @@ export async function GET(req: NextRequest) {
 
     const refresh = sp.get('refresh') === '1'
     const raw = await getAndCacheTaxonomy(userId, refresh)
-    const data = pickArray(raw)
-    return NextResponse.json({ ok: true, data })
+
+    // Return the raw taxonomy shape; the client normalizer will build the tree.
+    return NextResponse.json({ ok: true, data: raw })
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: String(e?.message || e) },
