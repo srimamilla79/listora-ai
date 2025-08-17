@@ -248,3 +248,48 @@ export async function walmartPost(userId: string, path: string, body: any) {
 
   return res.json()
 }
+// --- XML feed post helper for MP_ITEM etc. ---
+export async function walmartPostXml(
+  userId: string,
+  path: string,
+  xmlBody: string
+) {
+  const conn = await getWalmartConnection(userId)
+  if (!conn) throw new Error('No Walmart connection')
+
+  const accessToken = await ensureValidToken(conn)
+  const baseUrl =
+    conn.environment === 'sandbox'
+      ? 'https://sandbox.walmartapis.com'
+      : 'https://marketplace.walmartapis.com'
+
+  // We cannot reuse buildWalmartHeaders because it sets application/json
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    'WM_SEC.ACCESS_TOKEN': accessToken,
+    'WM_PARTNER.ID': conn.seller_id,
+    'WM_QOS.CORRELATION_ID': crypto.randomUUID(),
+    'WM_SVC.NAME': 'Walmart Marketplace',
+    Accept: 'application/json',
+    'Content-Type': 'application/xml',
+  }
+
+  const res = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers,
+    body: xmlBody,
+    cache: 'no-store',
+  })
+
+  const text = await res.text()
+  if (!res.ok) {
+    console.error(`Walmart POST XML error: ${res.status} - ${text}`)
+    throw new Error(`Walmart API error: ${res.status} - ${text}`)
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { ok: true, raw: text }
+  }
+}
