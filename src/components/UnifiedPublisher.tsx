@@ -1623,11 +1623,12 @@ export default function UnifiedPublisher({
                           </label>
                           <WalmartCategoryPicker
                             userId={userId}
-                            onCategorySelect={(category, attributes) => {
+                            onLeafSelect={({ category, spec, version }) => {
                               setPublishingOptions((prev) => ({
                                 ...prev,
                                 walmartProductType: category?.name ?? '',
-                                walmartAttributes: attributes ?? {},
+                                walmartAttributes: spec ?? {},
+                                // walmartSpecVersion: version,
                               }))
                             }}
                           />

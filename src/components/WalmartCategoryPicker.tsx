@@ -37,6 +37,7 @@ export default function WalmartCategoryPicker({
   const [loading, setLoading] = useState(false)
   const [loadingSpec, setLoadingSpec] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const fetchedForUserRef = React.useRef<string | null>(null)
 
   const [search, setSearch] = useState('')
   const [selectedPath, setSelectedPath] = useState<string[]>(initialPath)
@@ -54,15 +55,16 @@ export default function WalmartCategoryPicker({
         return
       }
 
+      // ✅ do not refetch if we already fetched for this user
+      if (fetchedForUserRef.current === userId) return
+
       setLoading(true)
       setError(null)
       try {
-        // Send x-user-id so the server can locate the correct Walmart connection
         const res = await fetch('/api/walmart/taxonomy', {
           headers: { 'x-user-id': String(userId) },
           cache: 'no-store',
         })
-
         const text = await res.text()
         let json: any = {}
         try {
@@ -85,6 +87,8 @@ export default function WalmartCategoryPicker({
           if (initialPath.length) {
             setSelectedPath((prev) => (prev.length ? prev : initialPath))
           }
+          // ✅ mark fetched for this user
+          fetchedForUserRef.current = userId
         }
       } catch (e: any) {
         if (!cancelled) {
@@ -100,7 +104,7 @@ export default function WalmartCategoryPicker({
     return () => {
       cancelled = true
     }
-  }, [canFetch, userId, initialPath])
+  }, [userId]) // ✅ only depends on userId now
 
   const levelItems = useMemo<Node[]>(() => {
     let current: Node[] = taxonomy
@@ -274,39 +278,59 @@ export default function WalmartCategoryPicker({
 }
 
 /* ------------------------- helpers ------------------------- */
-
 function normalizeTaxonomy(raw: any): Node[] {
   const liftArray = (obj: any): any[] | null => {
     if (!obj) return null
     if (Array.isArray(obj)) return obj
     return (
-      obj?.productTypeGroups ??
-      obj?.productTypes ??
-      obj?.children ??
-      obj?.nodes ??
-      obj?.items ??
-      obj?.data ??
+      obj?.productTypeGroups ?? // older tree shape
+      obj?.productTypes ?? // product types list
+      obj?.children ?? // nested nodes
+      obj?.nodes ?? // nested nodes
+      obj?.items ?? // nested nodes
+      obj?.data ?? // some APIs wrap under data
+      obj?.payload ?? // ← YOUR CURRENT SHAPE
       null
     )
   }
 
   const toNode = (node: any): Node => {
+    // Map Walmart variants into our canonical shape
+    const name =
+      node?.name ??
+      node?.categoryName ?? // ← e.g., "Footwear"
+      String(node?.id ?? node?.categoryId ?? 'Unnamed')
+
+    const id =
+      node?.id ??
+      node?.categoryId ?? // ← e.g., "footwear_other"
+      name
+
     const kidsRaw =
-      node?.children ?? node?.nodes ?? node?.items ?? node?.productTypes ?? null
+      node?.children ??
+      node?.nodes ??
+      node?.items ??
+      node?.productTypes ??
+      node?.payload ?? // if a node contains a payload list
+      null
+
     const childrenArr = liftArray(kidsRaw)
-    const kids = Array.isArray(childrenArr) ? childrenArr.map(toNode) : []
+    const children = Array.isArray(childrenArr) ? childrenArr.map(toNode) : []
+
+    // Heuristic: entries that come from top-level payload are groups → not leaf
     return {
-      id: node?.id ?? node?.name,
-      name: node?.name ?? String(node?.id ?? 'Unnamed'),
-      children: kids,
-      isLeaf: kids.length === 0,
+      id,
+      name,
+      children,
+      isLeaf: children.length === 0, // ← treat as leaf when no children
       ...node,
     }
   }
 
   const arr = liftArray(raw)
   if (Array.isArray(arr)) return arr.map(toNode)
-  if (raw?.name || raw?.id) return [toNode(raw)]
+  if (raw?.name || raw?.id || raw?.categoryName || raw?.categoryId)
+    return [toNode(raw)]
   return []
 }
 
