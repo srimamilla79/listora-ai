@@ -1,167 +1,146 @@
-// src/app/api/walmart/check-feed-status/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSideClient } from '@/lib/supabase'
-import { rateLimiter, walmartApiCall } from '@/lib/walmart-rate-limiter'
+import { createClient } from '@supabase/supabase-js'
+import { getWalmartConnection, buildWalmartHeaders } from '@/lib/walmart'
 
-export async function GET(request: NextRequest) {
-  try {
-    const feedId = request.nextUrl.searchParams.get('feedId')
-    const userId = request.nextUrl.searchParams.get('userId')
+/** Admin client so we can persist a refreshed access token if needed */
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
-    if (!feedId) {
-      return NextResponse.json(
-        { error: 'Feed ID is required' },
-        { status: 400 }
-      )
+async function fetchFeedStatusWithAutoRefresh(
+  userId: string,
+  feedId: string,
+  includeDetails: boolean
+) {
+  const conn = await getWalmartConnection(userId)
+  if (!conn) throw new Error('No Walmart connection')
+
+  const baseUrl =
+    conn.environment === 'sandbox'
+      ? 'https://sandbox.walmartapis.com'
+      : 'https://marketplace.walmartapis.com'
+
+  const qs = new URLSearchParams({
+    includeDetails: includeDetails ? 'true' : 'false',
+    offset: '0',
+    limit: '50',
+  }).toString()
+
+  const url = `${baseUrl}/v3/feeds/${encodeURIComponent(feedId)}?${qs}`
+
+  const doFetch = async (accessToken: string) => {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: buildWalmartHeaders(accessToken, conn.seller_id),
+      cache: 'no-store',
+    })
+    const text = await res.text()
+    return { res, text }
+  }
+
+  // 1) First attempt with current token
+  let { res, text } = await doFetch(conn.access_token)
+
+  // 2) If unauthorized, force-refresh token and retry once
+  if (res.status === 401) {
+    const tokenUrl =
+      conn.environment === 'sandbox'
+        ? 'https://sandbox.walmartapis.com/v3/token'
+        : 'https://marketplace.walmartapis.com/v3/token'
+
+    const clientId = process.env.WALMART_CLIENT_ID!
+    const clientSecret = process.env.WALMART_CLIENT_SECRET!
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString(
+      'base64'
+    )
+
+    const refreshResp = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+        'WM_PARTNER.ID': conn.seller_id,
+        'WM_QOS.CORRELATION_ID': crypto.randomUUID(),
+        'WM_SVC.NAME': 'Walmart Marketplace',
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: conn.refresh_token,
+      }).toString(),
+    })
+
+    const refreshText = await refreshResp.text()
+    if (!refreshResp.ok) {
+      throw new Error(`Token refresh failed: ${refreshText}`)
     }
+    const tokenData = JSON.parse(refreshText)
 
-    // Skip rate limit check for feed status (5000/min is very high)
-    // Just track the response headers
+    // Persist new token
+    await supabaseAdmin
+      .from('walmart_connections')
+      .update({
+        access_token: tokenData.access_token,
+        token_expires_at: new Date(
+          Date.now() + (tokenData.expires_in - 300) * 1000
+        ).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conn.id)
 
-    const supabase = await createServerSideClient()
+    // Retry once with refreshed token
+    ;({ res, text } = await doFetch(tokenData.access_token))
+  }
 
-    // Get user ID from session if not provided
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    const finalUserId: string | null = userId || session?.user?.id || null
+  if (!res.ok) {
+    throw new Error(`API call failed: ${res.status} - ${text}`)
+  }
 
-    if (!finalUserId) {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { raw: text }
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const sp = req.nextUrl.searchParams
+    const userId = (
+      req.headers.get('x-user-id') ||
+      sp.get('userId') ||
+      ''
+    ).trim()
+    const feedId = (sp.get('feedId') || '').trim()
+    const includeDetails = (sp.get('includeDetails') || '0') === '1'
+
+    if (!userId) {
       return NextResponse.json(
-        { error: 'User ID is required' },
+        {
+          ok: false,
+          error: 'Missing userId (send x-user-id header or ?userId=)',
+        },
         { status: 401 }
       )
     }
-
-    // Get Walmart connection
-    const { data: connections, error: connectionError } = await supabase
-      .from('walmart_connections')
-      .select('*')
-      .eq('user_id', finalUserId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-
-    if (connectionError || !connections || connections.length === 0) {
+    if (!feedId) {
       return NextResponse.json(
-        { error: 'Walmart account not connected' },
+        { ok: false, error: 'Missing feedId (?feedId=...)' },
         { status: 400 }
       )
     }
 
-    const connection = connections[0]
-    const accessToken = connection.access_token
-    const sellerId = connection.seller_id || connection.seller_info?.partnerId
-
-    // Get feed status from Walmart with rate limiting
-    const environment = process.env.WALMART_ENVIRONMENT || 'sandbox'
-    const baseUrl =
-      environment === 'sandbox'
-        ? 'https://sandbox.walmartapis.com'
-        : 'https://marketplace.walmartapis.com'
-
-    // Add includeDetails=true and offset=0&limit=50 to get error details
-    const statusUrl = `${baseUrl}/v3/feeds/${encodeURIComponent(feedId)}?includeDetails=true&offset=0&limit=50`
-    console.log('📊 Checking feed status:', statusUrl)
-
-    // Use rate-limited API call with proper typing
-    const feedStatus = await walmartApiCall<any>(
-      statusUrl,
-      'feeds:status:single',
-      () =>
-        fetch(statusUrl, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'WM_SEC.ACCESS_TOKEN': accessToken,
-            'WM_PARTNER.ID': sellerId || process.env.WALMART_PARTNER_ID || '',
-            'WM_CONSUMER.CHANNEL.TYPE': 'SWAGGER_CHANNEL_TYPE',
-            'WM_QOS.CORRELATION_ID': `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-            'WM_SVC.NAME': 'Walmart Marketplace',
-            Accept: 'application/json',
-          },
-        })
+    const data = await fetchFeedStatusWithAutoRefresh(
+      userId,
+      feedId,
+      includeDetails
     )
-
-    // Log any errors for debugging
-    if (feedStatus.ingestionErrors?.ingestionError) {
-      console.log(
-        '❌ Feed errors found:',
-        JSON.stringify(feedStatus.ingestionErrors, null, 2)
-      )
-    }
-
-    if (feedStatus.itemDetails?.itemIngestionStatus?.length > 0) {
-      console.log(
-        '📦 Item details:',
-        JSON.stringify(feedStatus.itemDetails, null, 2)
-      )
-    }
-
-    // Add interpretation to make it easier to understand
-    const interpretation = {
-      message: '',
-      isComplete: false,
-      isError: false,
-      progress: 0,
-    }
-
-    switch (feedStatus.feedStatus) {
-      case 'RECEIVED':
-        interpretation.message = 'Feed received and queued for processing'
-        interpretation.progress = 25
-        break
-      case 'INPROGRESS':
-        interpretation.message = 'Feed is currently being processed'
-        interpretation.progress = 50
-        break
-      case 'PROCESSED':
-        interpretation.message = 'Feed processed successfully'
-        interpretation.isComplete = true
-        interpretation.progress = 100
-        break
-      case 'ERROR':
-        interpretation.message = 'Feed processing failed'
-        interpretation.isComplete = true
-        interpretation.isError = true
-        interpretation.progress = 100
-        break
-      case 'PARTIAL_SUCCESS':
-        interpretation.message = 'Some items processed, some failed'
-        interpretation.isComplete = true
-        interpretation.progress = 100
-        break
-    }
-
-    // If there are specific errors, add them to the interpretation
-    if (feedStatus.ingestionErrors?.ingestionError?.length > 0) {
-      const errors = feedStatus.ingestionErrors.ingestionError
-      interpretation.message += `. Errors: ${errors
-        .map((e: any) => `${e.description} (${e.code})`)
-        .join(', ')}`
-    }
-
-    // Update published_products status if feed is complete
-    if (interpretation.isComplete && !interpretation.isError) {
-      await supabase
-        .from('published_products')
-        .update({
-          status: 'published',
-          last_synced_at: new Date().toISOString(),
-        })
-        .eq('platform_product_id', feedId)
-        .eq('user_id', finalUserId)
-    }
-
-    return NextResponse.json({
-      ...(typeof feedStatus === 'object' && feedStatus !== null
-        ? feedStatus
-        : {}),
-      interpretation,
-      remainingTokens: rateLimiter.getRemainingTokens('feeds:status:single'),
-    })
-  } catch (error) {
-    console.error('❌ Feed status check error:', error)
+    return NextResponse.json({ ok: true, data })
+  } catch (e: any) {
+    console.error('❌ Feed status check error:', e)
     return NextResponse.json(
-      { error: 'Failed to check feed status' },
+      { ok: false, error: String(e?.message || e) },
       { status: 500 }
     )
   }
