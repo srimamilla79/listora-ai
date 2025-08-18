@@ -1,10 +1,11 @@
-// src/app/api/walmart/publish/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { walmartPost, walmartUploadFeed } from '@/lib/walmart'
+import { walmartUploadFeed } from '@/lib/walmart'
 import { hasGtinExemption } from '@/lib/exemptions'
 
+export const dynamic = 'force-dynamic'
+
 type Identifier = {
-  productIdType: 'GTIN' | 'UPC' | 'EAN' | 'ISBN' | 'SKU'
+  productIdType: 'GTIN' | 'UPC' | 'EAN' | 'ISBN' | 'ISSN'
   productId: string
 }
 
@@ -20,11 +21,210 @@ type PublishBody = {
   noBarcode?: boolean
 }
 
-/**
- * POST /api/walmart/publish
- * A) With identifiers & not noBarcode → Offer-Match (JSON)
- * B) Without identifiers but GTIN-exempt → Upload MPItem XML feed (feedType=item) + price + inventory
- */
+/* ------------------------ XML helpers ------------------------ */
+const esc = (s: any) =>
+  String(s ?? '').replace(
+    /[<>&'"]/g,
+    (c) =>
+      ({
+        '<': '&lt;',
+        '>': '&gt;',
+        '&': '&amp;',
+        "'": '&apos;',
+        '"': '&quot;',
+      })[c]!
+  )
+const cdata = (s: any) =>
+  `<![CDATA[${String(s ?? '').replace(']]>', ']]]]><![CDATA[>')}]]>`
+
+/** MP_ITEM content feed (root: <MPItemFeed>) */
+function buildMpItemXml(input: {
+  sku: string
+  productType: string
+  brand: string
+  title: string
+  shortDescription: string
+  mainImageUrl: string
+  attributes?: Record<string, any>
+}) {
+  const {
+    sku,
+    productType,
+    brand,
+    title,
+    shortDescription,
+    mainImageUrl,
+    attributes = {},
+  } = input
+
+  // Optional footwear-like fields (safe for others too)
+  const gender = attributes.gender ?? attributes.Gender
+  const color = attributes.color ?? attributes.Color
+  const shoeSize = attributes.size ?? attributes.shoeSize ?? attributes.ShoeSize
+  const ageGroup = attributes.ageGroup ?? attributes.AgeGroup
+  const shoeWidth = attributes.shoeWidth ?? attributes.ShoeWidth
+  const addImgs =
+    attributes.additionalImageUrls ??
+    attributes.AdditionalImageUrls ??
+    attributes.additionalImages
+
+  const extraLines: string[] = []
+  if (gender) extraLines.push(`    <Gender>${esc(gender)}</Gender>`)
+  if (color) extraLines.push(`    <Color>${esc(color)}</Color>`)
+  if (shoeSize) extraLines.push(`    <ShoeSize>${esc(shoeSize)}</ShoeSize>`)
+  if (ageGroup) extraLines.push(`    <AgeGroup>${esc(ageGroup)}</AgeGroup>`)
+  if (shoeWidth) extraLines.push(`    <ShoeWidth>${esc(shoeWidth)}</ShoeWidth>`)
+
+  if (Array.isArray(addImgs)) {
+    for (const u of addImgs)
+      if (u)
+        extraLines.push(
+          `    <AdditionalImageUrl>${esc(u)}</AdditionalImageUrl>`
+        )
+  } else if (addImgs) {
+    extraLines.push(
+      `    <AdditionalImageUrl>${esc(addImgs)}</AdditionalImageUrl>`
+    )
+  }
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<MPItemFeed xmlns="http://walmart.com/">
+  <MPItemFeedHeader>
+    <version>5.0</version>
+    <mart>WALMART_US</mart>
+  </MPItemFeedHeader>
+  <MPItem>
+    <sku>${esc(sku)}</sku>
+    <ProductIdentifiers/>
+    <ProductCategory>${esc(productType)}</ProductCategory>
+    <Brand>${esc(brand)}</Brand>
+    <ProductName>${cdata(title)}</ProductName>
+    <ShortDescription>${cdata(shortDescription)}</ShortDescription>
+    <MainImageUrl>${esc(mainImageUrl)}</MainImageUrl>
+${extraLines.length ? extraLines.join('\n') + '\n' : ''}  </MPItem>
+</MPItemFeed>`
+}
+
+/** MP_ITEM_MATCH feed (root: <MPItemMatchFeed>) */
+function buildMpItemMatchXml(
+  rows: Array<{
+    sku: string
+    condition?: string
+    price?: number
+    productIdType: 'GTIN' | 'UPC' | 'EAN' | 'ISBN' | 'ISSN'
+    productId: string
+  }>
+) {
+  const items = rows
+    .map(
+      (r) => `
+  <MPItem>
+    <Item>
+      <sku>${esc(r.sku)}</sku>
+      <productIdentifiers>
+        <productIdType>${esc(r.productIdType)}</productIdType>
+        <productId>${esc(r.productId)}</productId>
+      </productIdentifiers>
+      ${r.condition ? `<condition>${esc(r.condition)}</condition>` : ''}
+      ${r.price != null ? `<price>${esc(r.price)}</price>` : ''}
+    </Item>
+  </MPItem>`
+    )
+    .join('\n')
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<MPItemMatchFeed xmlns="http://walmart.com/">
+  <MPItemFeedHeader>
+    <version>4.2</version>
+  </MPItemFeedHeader>
+  ${items}
+</MPItemMatchFeed>`
+}
+
+/** PRICE feed (root: <PriceFeed>) */
+function buildPriceFeedXml(
+  rows: Array<{ sku: string; amount: number; currency?: string }>
+) {
+  const lines = rows
+    .map(
+      (r) => `
+  <price>
+    <itemIdentifier>
+      <sku>${esc(r.sku)}</sku>
+    </itemIdentifier>
+    <pricingList>
+      <currentPrice>
+        <value>
+          <amount>${esc(r.amount)}</amount>
+          <currency>${esc(r.currency || 'USD')}</currency>
+        </value>
+      </currentPrice>
+    </pricingList>
+  </price>`
+    )
+    .join('\n')
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<PriceFeed xmlns="http://walmart.com/">
+  <PriceHeader>
+    <version>1.7</version>
+  </PriceHeader>
+  ${lines}
+</PriceFeed>`
+}
+
+/** INVENTORY feed (root: <InventoryFeed>) */
+function buildInventoryFeedXml(
+  rows: Array<{ sku: string; quantity: number; unit?: 'EACH' }>
+) {
+  const lines = rows
+    .map(
+      (r) => `
+  <inventory>
+    <sku>${esc(r.sku)}</sku>
+    <quantity>
+      <unit>${esc(r.unit || 'EACH')}</unit>
+      <amount>${esc(r.quantity)}</amount>
+    </quantity>
+  </inventory>`
+    )
+    .join('\n')
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<InventoryFeed xmlns="http://walmart.com/">
+  <InventoryHeader>
+    <version>1.4</version>
+  </InventoryHeader>
+  ${lines}
+</InventoryFeed>`
+}
+
+/* ------------------------ validators ------------------------ */
+function pickRequiredFields(attrs: Record<string, any>) {
+  const brand = attrs.brand ?? attrs.Brand ?? attrs.manufacturerBrand
+  const title =
+    attrs.title ?? attrs.productName ?? attrs.name ?? attrs.ProductName
+  const shortDescription =
+    attrs.shortDescription ?? attrs.description ?? attrs.ShortDescription
+  const mainImageUrl =
+    attrs.mainImageUrl ?? attrs.MainImageUrl ?? attrs.mainImage ?? attrs.image
+  return { brand, title, shortDescription, mainImageUrl }
+}
+function validateRequired(r: {
+  brand?: string
+  title?: string
+  shortDescription?: string
+  mainImageUrl?: string
+}) {
+  const missing: string[] = []
+  if (!r.brand) missing.push('brand')
+  if (!r.title) missing.push('title')
+  if (!r.shortDescription) missing.push('shortDescription')
+  if (!r.mainImageUrl) missing.push('mainImageUrl')
+  return missing
+}
+
+/* ------------------------ handler ------------------------ */
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as PublishBody
@@ -49,35 +249,75 @@ export async function POST(req: NextRequest) {
         { ok: false, error: 'Missing sku' },
         { status: 400 }
       )
-    if (!Number.isFinite(price)) {
+    if (!Number.isFinite(price))
       return NextResponse.json(
         { ok: false, error: 'Invalid price' },
         { status: 400 }
       )
-    }
 
     // ─────────────────────────────────────────────────────────────────────
-    // A) identifiers present (and not explicitly "noBarcode") → Offer-Match
+    // A) BARCODE PRESENT → Offer-Match feed (MP_ITEM_MATCH) + PRICE + INVENTORY
     // ─────────────────────────────────────────────────────────────────────
     if (!noBarcode && identifiers.length > 0) {
-      const payload = { sku, identifiers, price: Number(price) }
-      const resp = await walmartPost(userId, '/v3/items/offer-match', payload)
+      const matchXml = buildMpItemMatchXml(
+        identifiers.map((id) => ({
+          sku,
+          condition,
+          price,
+          productIdType: id.productIdType,
+          productId: id.productId,
+        }))
+      )
+
+      // CORRECT ORDER: fileContents 4th, contentType 5th
+      const matchFeed = await walmartUploadFeed(
+        userId,
+        'MP_ITEM_MATCH',
+        'mp_item_match.xml',
+        matchXml,
+        'application/xml'
+      )
+
+      const priceXml = buildPriceFeedXml([{ sku, amount: price }])
+      const invXml = buildInventoryFeedXml([{ sku, quantity }])
+
+      const priceFeed = await walmartUploadFeed(
+        userId,
+        'PRICE',
+        'prices.xml',
+        priceXml,
+        'application/xml'
+      )
+      const invFeed = await walmartUploadFeed(
+        userId,
+        'INVENTORY',
+        'inventory.xml',
+        invXml,
+        'application/xml'
+      )
+
       return NextResponse.json({
         ok: true,
         method: 'offer-match',
-        feedId: resp?.feedId || resp?.id || null,
-        raw: resp,
+        itemMatchFeedId: matchFeed?.feedId || matchFeed?.id || null,
+        priceFeedId: priceFeed?.feedId || priceFeed?.id || null,
+        inventoryFeedId: invFeed?.feedId || invFeed?.id || null,
+        raw: { matchFeed, priceFeed, invFeed },
       })
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // B) no barcode → must be GTIN-exempt → upload MPItem XML + price + inventory
+    // B) NO BARCODE → GTIN-exempt content feed (MP_ITEM) + PRICE + INVENTORY
     // ─────────────────────────────────────────────────────────────────────
     const exemption = await hasGtinExemption(userId, productType || '')
     const isApproved =
       typeof exemption === 'boolean'
         ? exemption
-        : !!(exemption && (exemption as any).approved)
+        : !!(
+            exemption &&
+            ((exemption as any).approved ||
+              (exemption as any).status === 'approved')
+          )
 
     if (!isApproved) {
       return NextResponse.json(
@@ -92,9 +332,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Minimal content fields
-    const required = pickRequiredFields(attributes)
-    const missing = validateRequired(required)
+    const reqd = pickRequiredFields(attributes)
+    const missing = validateRequired(reqd)
     if (missing.length) {
       return NextResponse.json(
         {
@@ -108,38 +347,41 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build MPItem (v5.0 header) XML; includes footwear-friendly optional tags if present
-    const xml = buildMpItemXml({
-      sku: String(sku),
+    const itemXml = buildMpItemXml({
+      sku,
       productType: productType || 'Footwear',
-      brand: required.brand!,
-      title: required.title!,
-      shortDescription: required.shortDescription!,
-      mainImageUrl: required.mainImageUrl!,
-      attributes: attributes || {},
+      brand: reqd.brand!,
+      title: reqd.title!,
+      shortDescription: reqd.shortDescription!,
+      mainImageUrl: reqd.mainImageUrl!,
+      attributes,
     })
 
-    // IMPORTANT: For MPItem XML, feedType must be "item"
+    // CORRECT ORDER: fileContents 4th, contentType 5th
     const itemFeed = await walmartUploadFeed(
       userId,
-      'item',
+      'MP_ITEM',
       'mp_item.xml',
-      xml,
+      itemXml,
       'application/xml'
     )
 
-    // Price feed (same JSON flow you had)
-    const priceFeed = await walmartPost(
-      userId,
-      '/v3/feeds?feedType=PRICE_AND_PROMOTION',
-      { sku, price: Number(price) }
-    )
+    const priceXml = buildPriceFeedXml([{ sku, amount: price }])
+    const invXml = buildInventoryFeedXml([{ sku, quantity }])
 
-    // Inventory feed (same JSON flow you had)
-    const invFeed = await walmartPost(
+    const priceFeed = await walmartUploadFeed(
       userId,
-      '/v3/feeds?feedType=MP_INVENTORY',
-      { sku, quantity: Number(quantity || 1) }
+      'PRICE',
+      'prices.xml',
+      priceXml,
+      'application/xml'
+    )
+    const invFeed = await walmartUploadFeed(
+      userId,
+      'INVENTORY',
+      'inventory.xml',
+      invXml,
+      'application/xml'
     )
 
     return NextResponse.json({
@@ -156,112 +398,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-/* ───────────────────────── helpers ───────────────────────── */
-
-function pickRequiredFields(attrs: Record<string, any>) {
-  // Map common synonyms to the fields the XML builder expects
-  const brand = attrs.brand ?? attrs.Brand ?? attrs.manufacturerBrand
-  const title =
-    attrs.title ?? attrs.productName ?? attrs.name ?? attrs.ProductName
-  const shortDescription =
-    attrs.shortDescription ?? attrs.description ?? attrs.ShortDescription
-  const mainImageUrl =
-    attrs.mainImageUrl ?? attrs.MainImageUrl ?? attrs.mainImage ?? attrs.image
-
-  return { brand, title, shortDescription, mainImageUrl }
-}
-
-function validateRequired(r: {
-  brand: string | undefined
-  title: string | undefined
-  shortDescription: string | undefined
-  mainImageUrl: string | undefined
-}) {
-  const missing: string[] = []
-  if (!r.brand) missing.push('brand')
-  if (!r.title) missing.push('title')
-  if (!r.shortDescription) missing.push('shortDescription')
-  if (!r.mainImageUrl) missing.push('mainImageUrl')
-  return missing
-}
-
-function xmlEscape(s: string) {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-}
-
-/** Build minimal MPItem XML (v5.0 header) and include optional footwear fields if provided */
-function buildMpItemXml(input: {
-  sku: string
-  productType: string
-  brand: string
-  title: string
-  shortDescription: string
-  mainImageUrl: string
-  attributes: any
-}) {
-  const {
-    sku,
-    productType,
-    brand,
-    title,
-    shortDescription,
-    mainImageUrl,
-    attributes = {},
-  } = input
-
-  const x = (v: any) => xmlEscape(String(v ?? ''))
-
-  // Optional footwear-ish fields
-  const gender = attributes.gender || attributes.Gender
-  const color = attributes.color || attributes.Color
-  const size = attributes.size || attributes.ShoeSize || attributes.shoeSize
-  const ageGroup = attributes.ageGroup || attributes.AgeGroup
-  const shoeWidth = attributes.shoeWidth || attributes.ShoeWidth
-  const additionalImg =
-    attributes.additionalImageUrls ||
-    attributes.AdditionalImageUrls ||
-    attributes.additionalImages
-
-  const extraLines: string[] = []
-  if (gender) extraLines.push(`    <Gender>${x(gender)}</Gender>`)
-  if (color) extraLines.push(`    <Color>${x(color)}</Color>`)
-  if (size) extraLines.push(`    <ShoeSize>${x(size)}</ShoeSize>`)
-  if (ageGroup) extraLines.push(`    <AgeGroup>${x(ageGroup)}</AgeGroup>`)
-  if (shoeWidth) extraLines.push(`    <ShoeWidth>${x(shoeWidth)}</ShoeWidth>`)
-
-  if (Array.isArray(additionalImg)) {
-    for (const u of additionalImg) {
-      if (u)
-        extraLines.push(`    <AdditionalImageUrl>${x(u)}</AdditionalImageUrl>`)
-    }
-  } else if (additionalImg) {
-    extraLines.push(
-      `    <AdditionalImageUrl>${x(additionalImg)}</AdditionalImageUrl>`
-    )
-  }
-
-  // Keep MPItemFeed + v5.0 header; Walmart accepts as long as feedType=item
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<MPItemFeed xmlns="http://walmart.com/">
-  <MPItemFeedHeader>
-    <version>5.0</version>
-    <mart>WALMART_US</mart>
-  </MPItemFeedHeader>
-  <MPItem>
-    <sku>${x(sku)}</sku>
-    <ProductIdentifiers/>
-    <ProductCategory>${x(productType)}</ProductCategory>
-    <Brand>${x(brand)}</Brand>
-    <ProductName>${x(title)}</ProductName>
-    <ShortDescription>${x(shortDescription)}</ShortDescription>
-    <MainImageUrl>${x(mainImageUrl)}</MainImageUrl>
-${extraLines.length ? extraLines.join('\n') + '\n' : ''}  </MPItem>
-</MPItemFeed>`
 }
