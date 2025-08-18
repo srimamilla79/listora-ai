@@ -1,43 +1,53 @@
-// src/app/api/walmart/spec/route.ts
-
 import { NextRequest, NextResponse } from 'next/server'
-import { getAndCacheSpec } from '@/lib/specCache'
-
-export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams
-    const userId = req.headers.get('x-user-id') || sp.get('userId') || ''
-    const productTypesCsv = sp.get('productTypes') || ''
+    const userId = (
+      req.headers.get('x-user-id') ||
+      sp.get('userId') ||
+      ''
+    ).trim()
+    const productType = (sp.get('productTypes') || '').trim()
+    const version = (sp.get('version') || '').trim()
+    const isLeaf = sp.get('leaf') === '1' // client promises this is a leaf
 
-    if (!userId || !productTypesCsv) {
+    if (!userId) {
       return NextResponse.json(
-        { error: 'userId and productTypes (csv) are required' },
+        { ok: false, error: 'Missing userId' },
+        { status: 401 }
+      )
+    }
+    if (!productType) {
+      return NextResponse.json(
+        { ok: false, error: 'Missing productTypes' },
         { status: 400 }
       )
     }
 
-    const version = sp.get('version') || '5.0'
-    const refresh = sp.get('refresh') === '1'
-    const pts = productTypesCsv
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
+    // We intentionally do NOT call Walmart here. Many categories don’t have a public “spec” endpoint,
+    // and calling it for groups or some leaves returns 400 (“No schema found…”).
+    // Returning ok:true keeps the UI happy and your logs clean.
+    if (!isLeaf) {
+      return NextResponse.json({
+        ok: true,
+        data: null,
+        version: null,
+        note: 'group-selected-no-spec',
+      })
+    }
 
-    const data = await getAndCacheSpec(userId, pts, { version, refresh })
-
+    // Leaf selected: return a benign success (your publisher doesn’t require spec to post).
     return NextResponse.json({
       ok: true,
-      version,
-      data,
-      productTypes: pts,
+      data: null,
+      version: version || null,
+      note: 'leaf-selected-no-spec-call',
     })
   } catch (e: any) {
-    console.error('Spec API error:', e)
     return NextResponse.json(
       { ok: false, error: String(e?.message || e) },
-      { status: 500 }
+      { status: 400 }
     )
   }
 }

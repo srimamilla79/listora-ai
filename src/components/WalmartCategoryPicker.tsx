@@ -146,7 +146,7 @@ export default function WalmartCategoryPicker({
       const pt = encodeURIComponent(node.name)
 
       const v5 = await fetchJsonSafe(
-        `/api/walmart/spec?productTypes=${pt}&version=5.0`,
+        `/api/walmart/spec?productTypes=${pt}&version=5.0&leaf=1`,
         { 'x-user-id': String(userId) }
       )
 
@@ -157,9 +157,10 @@ export default function WalmartCategoryPicker({
           onLeafSelect({ category: node, spec, version: '5.0' })
       } else {
         const v42 = await fetchJsonSafe(
-          `/api/walmart/spec?productTypes=${pt}&version=4.2`,
+          `/api/walmart/spec?productTypes=${pt}&version=4.2&leaf=1`,
           { 'x-user-id': String(userId) }
         )
+
         if (v42?.ok && v42?.data) {
           const spec = unwrapSpec(v42.data, node.name)
           if (onCategorySelect) onCategorySelect(node, spec)
