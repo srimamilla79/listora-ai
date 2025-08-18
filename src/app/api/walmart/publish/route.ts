@@ -1,3 +1,4 @@
+// src/app/api/walmart/publish/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { walmartPost, walmartUploadFeed } from '@/lib/walmart'
 import { hasGtinExemption } from '@/lib/exemptions'
@@ -19,9 +20,10 @@ type PublishBody = {
   noBarcode?: boolean
 }
 
-/** POST /api/walmart/publish
- *  A) has identifiers & not "noBarcode" → Offer-Match
- *  B) no identifiers & "noBarcode" → require GTIN exemption → MP_ITEM XML → price & inventory feeds
+/**
+ * POST /api/walmart/publish
+ * A) With identifiers & not noBarcode → Offer-Match (JSON)
+ * B) Without identifiers but GTIN-exempt → Upload MPItem XML feed (feedType=item) + price + inventory
  */
 export async function POST(req: NextRequest) {
   try {
@@ -54,9 +56,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // A) identifiers present (and not explicitly "noBarcode") → Offer Match
-    // ──────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // A) identifiers present (and not explicitly "noBarcode") → Offer-Match
+    // ─────────────────────────────────────────────────────────────────────
     if (!noBarcode && identifiers.length > 0) {
       const payload = { sku, identifiers, price: Number(price) }
       const resp = await walmartPost(userId, '/v3/items/offer-match', payload)
@@ -68,9 +70,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // B) no barcode → must be GTIN-exempt → upload MP_ITEM XML + price + inventory
-    // ──────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // B) no barcode → must be GTIN-exempt → upload MPItem XML + price + inventory
+    // ─────────────────────────────────────────────────────────────────────
     const exemption = await hasGtinExemption(userId, productType || '')
     const isApproved =
       typeof exemption === 'boolean'
@@ -90,7 +92,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Minimal required content fields for a Walmart item
+    // Minimal content fields
     const required = pickRequiredFields(attributes)
     const missing = validateRequired(required)
     if (missing.length) {
@@ -106,7 +108,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build MP_ITEM v5 XML (with optional footwear fields if provided)
+    // Build MPItem (v5.0 header) XML; includes footwear-friendly optional tags if present
     const xml = buildMpItemXml({
       sku: String(sku),
       productType: productType || 'Footwear',
@@ -117,22 +119,23 @@ export async function POST(req: NextRequest) {
       attributes: attributes || {},
     })
 
-    // Upload content as MP_ITEM (multipart). Your helper expects: userId, feedType, fileName, fileContents, [contentType]
+    // IMPORTANT: For MPItem XML, feedType must be "item"
     const itemFeed = await walmartUploadFeed(
       userId,
-      'MP_ITEM',
+      'item',
       'mp_item.xml',
       xml,
       'application/xml'
     )
 
-    // Post price & inventory as JSON feeds (works with your existing walmartPost)
+    // Price feed (same JSON flow you had)
     const priceFeed = await walmartPost(
       userId,
       '/v3/feeds?feedType=PRICE_AND_PROMOTION',
       { sku, price: Number(price) }
     )
 
+    // Inventory feed (same JSON flow you had)
     const invFeed = await walmartPost(
       userId,
       '/v3/feeds?feedType=MP_INVENTORY',
@@ -158,7 +161,7 @@ export async function POST(req: NextRequest) {
 /* ───────────────────────── helpers ───────────────────────── */
 
 function pickRequiredFields(attrs: Record<string, any>) {
-  // map common synonyms into the fields our XML builder expects
+  // Map common synonyms to the fields the XML builder expects
   const brand = attrs.brand ?? attrs.Brand ?? attrs.manufacturerBrand
   const title =
     attrs.title ?? attrs.productName ?? attrs.name ?? attrs.ProductName
@@ -193,7 +196,7 @@ function xmlEscape(s: string) {
     .replace(/'/g, '&apos;')
 }
 
-/** Build minimal MP_ITEM v5 XML and include optional footwear fields when provided */
+/** Build minimal MPItem XML (v5.0 header) and include optional footwear fields if provided */
 function buildMpItemXml(input: {
   sku: string
   productType: string
@@ -215,7 +218,7 @@ function buildMpItemXml(input: {
 
   const x = (v: any) => xmlEscape(String(v ?? ''))
 
-  // Optional, common Footwear fields
+  // Optional footwear-ish fields
   const gender = attributes.gender || attributes.Gender
   const color = attributes.color || attributes.Color
   const size = attributes.size || attributes.ShoeSize || attributes.shoeSize
@@ -244,6 +247,7 @@ function buildMpItemXml(input: {
     )
   }
 
+  // Keep MPItemFeed + v5.0 header; Walmart accepts as long as feedType=item
   return `<?xml version="1.0" encoding="UTF-8"?>
 <MPItemFeed xmlns="http://walmart.com/">
   <MPItemFeedHeader>
