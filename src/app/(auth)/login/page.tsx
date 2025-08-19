@@ -43,20 +43,23 @@ export default function OptimizedLoginPage() {
         data: { session },
       } = await supabaseClient.auth.getSession()
       if (session) {
-        // ✅ Check for redirect parameter before going to /generate
-        const urlParams = new URLSearchParams(window.location.search)
-        const redirect = urlParams.get('redirect')
         // Check for pending Walmart OAuth first
-        // Check for pending Walmart OAuth
         const pendingOAuth = localStorage.getItem('walmart_oauth_pending')
         if (pendingOAuth) {
-          const { oauthId, sellerId } = JSON.parse(pendingOAuth)
+          const { oauthId, redirect } = JSON.parse(pendingOAuth)
           localStorage.removeItem('walmart_oauth_pending')
-          // Redirect back through OAuth initiate to complete the flow properly
-          window.location.href = `/api/walmart/oauth/initiate?state=${oauthId}&resume=true`
-          return
+          sessionStorage.removeItem('walmart_oauth_pending')
+
+          // Use the stored redirect URL
+          if (redirect) {
+            window.location.href = redirect
+            return
+          }
         }
 
+        // Then check for regular redirect
+        const urlParams = new URLSearchParams(window.location.search)
+        const redirect = urlParams.get('redirect')
         if (redirect) {
           window.location.href = decodeURIComponent(redirect)
         } else {
@@ -66,13 +69,19 @@ export default function OptimizedLoginPage() {
     }
     checkUser()
   }, [])
-  // NEW: capture walmart_oauth params when landing on /login from Walmart
+
+  // NEW: Updated to capture walmart_oauth params with redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const walmartOAuthId = params.get('walmart_oauth')
-    const sellerId = params.get('seller_id')
+    const redirect = params.get('redirect')
+
     if (walmartOAuthId) {
-      const payload = JSON.stringify({ oauthId: walmartOAuthId, sellerId })
+      // Store BOTH the OAuth ID and the redirect URL
+      const payload = JSON.stringify({
+        oauthId: walmartOAuthId,
+        redirect: redirect, // This will contain the full resume URL
+      })
       sessionStorage.setItem('walmart_oauth_pending', payload)
       localStorage.setItem('walmart_oauth_pending', payload)
     }
@@ -105,13 +114,18 @@ export default function OptimizedLoginPage() {
         // Check for pending Walmart OAuth
         const pendingOAuth = localStorage.getItem('walmart_oauth_pending')
         if (pendingOAuth) {
-          const { oauthId, sellerId } = JSON.parse(pendingOAuth)
+          const { oauthId, redirect } = JSON.parse(pendingOAuth)
           localStorage.removeItem('walmart_oauth_pending')
-          window.location.href = `/api/walmart/oauth/initiate?state=${oauthId}&resume=true`
-          return
+          sessionStorage.removeItem('walmart_oauth_pending')
+
+          // Use the stored redirect URL which includes the resume parameter
+          if (redirect) {
+            window.location.href = redirect
+            return
+          }
         }
 
-        // Check for redirect parameter in URL
+        // Check for regular redirect parameter in URL
         const urlParams = new URLSearchParams(window.location.search)
         const redirect = urlParams.get('redirect')
 
@@ -133,16 +147,28 @@ export default function OptimizedLoginPage() {
     setMessage('')
 
     try {
-      // ✅ Check for redirect parameter in URL
-      const urlParams = new URLSearchParams(window.location.search)
-      const redirect = urlParams.get('redirect')
+      // Check for Walmart OAuth first
+      const pendingOAuth = localStorage.getItem('walmart_oauth_pending')
+      let redirectTo = `${window.location.origin}/generate`
+
+      if (pendingOAuth) {
+        const { redirect } = JSON.parse(pendingOAuth)
+        if (redirect) {
+          redirectTo = `${window.location.origin}${redirect}`
+        }
+      } else {
+        // Check for regular redirect parameter
+        const urlParams = new URLSearchParams(window.location.search)
+        const redirect = urlParams.get('redirect')
+        if (redirect) {
+          redirectTo = `${window.location.origin}${decodeURIComponent(redirect)}`
+        }
+      }
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirect
-            ? `${window.location.origin}${decodeURIComponent(redirect)}` // ✅ Use redirect param
-            : `${window.location.origin}/generate`,
+          redirectTo: redirectTo,
         },
       })
 
