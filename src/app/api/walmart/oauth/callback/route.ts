@@ -45,124 +45,88 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(loginUrl.toString())
     }
 
-    // Token exchange with Walmart - Try different approaches
+    // Token exchange with Walmart following their exact documentation
     const tokenUrl = 'https://marketplace.walmartapis.com/v3/token'
 
+    // Get credentials
     const clientIdToUse = process.env.WALMART_CLIENT_ID!
     const clientSecret = process.env.WALMART_CLIENT_SECRET!
 
-    // Approach 1: Try with client credentials in the body (not in Authorization header)
+    // Create Basic auth header as per Walmart docs
+    const authString = `${clientIdToUse}:${clientSecret}`
+    const base64Auth = Buffer.from(authString).toString('base64')
+
+    // Prepare form data exactly as documented
     const formData = new URLSearchParams()
     formData.append('grant_type', 'authorization_code')
     formData.append('code', code)
     formData.append('redirect_uri', process.env.WALMART_REDIRECT_URI!)
-    formData.append('client_id', clientIdToUse)
-    formData.append('client_secret', clientSecret)
 
-    console.log('Token exchange request (credentials in body):', {
+    // Generate correlation ID
+    const correlationId = generateCorrelationId()
+
+    console.log('Token exchange request:', {
       url: tokenUrl,
-      clientId: clientIdToUse,
-      redirectUri: process.env.WALMART_REDIRECT_URI,
       grant_type: 'authorization_code',
+      redirect_uri: process.env.WALMART_REDIRECT_URI,
+      sellerId: sellerId,
+      correlationId: correlationId,
     })
 
-    let tokenResponse = await fetch(tokenUrl, {
+    // Make the request with exact headers from documentation
+    const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
+        Authorization: `Basic ${base64Auth}`,
         'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
+        'WM_QOS.CORRELATION_ID': correlationId,
         'WM_SVC.NAME': 'Walmart Marketplace',
-        'WM_QOS.CORRELATION_ID': generateCorrelationId(),
-        'WM_SVC.VERSION': '1.0.0',
+        // WM_PARTNER.ID is required for authorization_code grant type
+        'WM_PARTNER.ID': sellerId || process.env.WALMART_PARTNER_ID || '',
+        // Only include WM_CONSUMER.CHANNEL.TYPE if we have it
+        ...(process.env.WALMART_CHANNEL_TYPE
+          ? { 'WM_CONSUMER.CHANNEL.TYPE': process.env.WALMART_CHANNEL_TYPE }
+          : {}),
       },
       body: formData.toString(),
     })
 
-    let responseText = await tokenResponse.text()
-    console.log(
-      'Token response (credentials in body):',
-      tokenResponse.status,
-      responseText
-    )
-
-    // If first approach fails, try with Basic auth but different format
-    if (!tokenResponse.ok && responseText.includes('INVALID_REQUEST_HEADER')) {
-      console.log('First approach failed, trying with Basic auth...')
-
-      // Remove client credentials from body
-      const formData2 = new URLSearchParams()
-      formData2.append('grant_type', 'authorization_code')
-      formData2.append('code', code)
-      formData2.append('redirect_uri', process.env.WALMART_REDIRECT_URI!)
-
-      // Try with space after Basic
-      const credentials = `${clientIdToUse}:${clientSecret}`
-      const encodedCredentials = Buffer.from(credentials).toString('base64')
-
-      tokenResponse = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${encodedCredentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json',
-          'WM_SVC.NAME': 'Walmart Marketplace',
-          'WM_QOS.CORRELATION_ID': generateCorrelationId(),
-          'WM_SVC.VERSION': '1.0.0',
-        },
-        body: formData2.toString(),
-      })
-
-      responseText = await tokenResponse.text()
-      console.log(
-        'Token response (Basic auth):',
-        tokenResponse.status,
-        responseText
-      )
-    }
-
-    // If still failing, try with just WM_SEC.ACCESS_TOKEN header (for authorization_code flow)
-    if (!tokenResponse.ok && responseText.includes('INVALID_REQUEST_HEADER')) {
-      console.log('Basic auth failed, trying without Authorization header...')
-
-      // Just send the form data with no auth header
-      const formData3 = new URLSearchParams()
-      formData3.append('grant_type', 'authorization_code')
-      formData3.append('code', code)
-      formData3.append('redirect_uri', process.env.WALMART_REDIRECT_URI!)
-      formData3.append('client_id', clientIdToUse)
-      formData3.append('client_secret', clientSecret)
-
-      tokenResponse = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json',
-        },
-        body: formData3.toString(),
-      })
-
-      responseText = await tokenResponse.text()
-      console.log(
-        'Token response (no auth header):',
-        tokenResponse.status,
-        responseText
-      )
-    }
+    const responseText = await tokenResponse.text()
+    console.log('Token response:', {
+      status: tokenResponse.status,
+      body: responseText,
+    })
 
     if (!tokenResponse.ok) {
-      console.error('All token exchange attempts failed:', responseText)
+      console.error('Token exchange failed:', responseText)
+
+      // Special handling for 401 errors
+      if (tokenResponse.status === 401) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: 'Authentication failed',
+            details: responseText,
+            troubleshooting: {
+              1: 'Verify WALMART_CLIENT_ID and WALMART_CLIENT_SECRET in Vercel',
+              2: 'Ensure redirect_uri matches exactly what is registered with Walmart',
+              3:
+                'Check if WM_PARTNER.ID (sellerId) is required: ' +
+                (sellerId || 'NOT PROVIDED'),
+              4: 'You may need to set WALMART_PARTNER_ID in Vercel if sellerId is not provided',
+            },
+          },
+          { status: 401 }
+        )
+      }
+
       return NextResponse.json(
         {
           ok: false,
           error: `Token exchange failed (${tokenResponse.status})`,
           details: responseText,
-          attempts: [
-            'credentials in body with WM headers',
-            'Basic auth with WM headers',
-            'credentials in body without auth header',
-          ],
         },
-        { status: 400 }
+        { status: tokenResponse.status }
       )
     }
 
@@ -194,6 +158,8 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    console.log('Token exchange successful, storing connection...')
 
     // Store the connection
     const admin = createClient(
@@ -259,7 +225,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Generate correlation ID in format Walmart expects
+// Generate correlation ID as per Walmart docs - a random GUID
 function generateCorrelationId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0
