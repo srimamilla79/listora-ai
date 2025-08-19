@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   u.searchParams.set('redirectUri', process.env.WALMART_REDIRECT_URI!)
   u.searchParams.set('responseType', 'code')
   u.searchParams.set('state', state)
-  u.searchParams.set('clientType', 'seller')
+  //u.searchParams.set('clientType', 'seller')
 
   const res = NextResponse.redirect(u.toString())
   res.cookies.set('wm_oauth_user', user.id, {
