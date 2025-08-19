@@ -45,33 +45,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(loginUrl.toString())
     }
 
-    // Token exchange with Walmart
+    // Token exchange with Walmart - Try different approaches
     const tokenUrl = 'https://marketplace.walmartapis.com/v3/token'
 
-    // IMPORTANT: Walmart expects exact format with no spaces or extra characters
     const clientIdToUse = process.env.WALMART_CLIENT_ID!
     const clientSecret = process.env.WALMART_CLIENT_SECRET!
 
-    // Create base64 encoded credentials
-    const credentials = `${clientIdToUse}:${clientSecret}`
-    const encodedCredentials = Buffer.from(credentials).toString('base64')
-
-    // Form data for token exchange
+    // Approach 1: Try with client credentials in the body (not in Authorization header)
     const formData = new URLSearchParams()
     formData.append('grant_type', 'authorization_code')
     formData.append('code', code)
     formData.append('redirect_uri', process.env.WALMART_REDIRECT_URI!)
+    formData.append('client_id', clientIdToUse)
+    formData.append('client_secret', clientSecret)
 
-    console.log('Token exchange request:', {
+    console.log('Token exchange request (credentials in body):', {
       url: tokenUrl,
       clientId: clientIdToUse,
       redirectUri: process.env.WALMART_REDIRECT_URI,
+      grant_type: 'authorization_code',
     })
 
-    const tokenResponse = await fetch(tokenUrl, {
+    let tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Basic ${encodedCredentials}`,
         'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
         'WM_SVC.NAME': 'Walmart Marketplace',
@@ -81,16 +78,89 @@ export async function GET(req: NextRequest) {
       body: formData.toString(),
     })
 
-    const responseText = await tokenResponse.text()
-    console.log('Token response:', tokenResponse.status, responseText)
+    let responseText = await tokenResponse.text()
+    console.log(
+      'Token response (credentials in body):',
+      tokenResponse.status,
+      responseText
+    )
+
+    // If first approach fails, try with Basic auth but different format
+    if (!tokenResponse.ok && responseText.includes('INVALID_REQUEST_HEADER')) {
+      console.log('First approach failed, trying with Basic auth...')
+
+      // Remove client credentials from body
+      const formData2 = new URLSearchParams()
+      formData2.append('grant_type', 'authorization_code')
+      formData2.append('code', code)
+      formData2.append('redirect_uri', process.env.WALMART_REDIRECT_URI!)
+
+      // Try with space after Basic
+      const credentials = `${clientIdToUse}:${clientSecret}`
+      const encodedCredentials = Buffer.from(credentials).toString('base64')
+
+      tokenResponse = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${encodedCredentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+          'WM_SVC.NAME': 'Walmart Marketplace',
+          'WM_QOS.CORRELATION_ID': generateCorrelationId(),
+          'WM_SVC.VERSION': '1.0.0',
+        },
+        body: formData2.toString(),
+      })
+
+      responseText = await tokenResponse.text()
+      console.log(
+        'Token response (Basic auth):',
+        tokenResponse.status,
+        responseText
+      )
+    }
+
+    // If still failing, try with just WM_SEC.ACCESS_TOKEN header (for authorization_code flow)
+    if (!tokenResponse.ok && responseText.includes('INVALID_REQUEST_HEADER')) {
+      console.log('Basic auth failed, trying without Authorization header...')
+
+      // Just send the form data with no auth header
+      const formData3 = new URLSearchParams()
+      formData3.append('grant_type', 'authorization_code')
+      formData3.append('code', code)
+      formData3.append('redirect_uri', process.env.WALMART_REDIRECT_URI!)
+      formData3.append('client_id', clientIdToUse)
+      formData3.append('client_secret', clientSecret)
+
+      tokenResponse = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+        body: formData3.toString(),
+      })
+
+      responseText = await tokenResponse.text()
+      console.log(
+        'Token response (no auth header):',
+        tokenResponse.status,
+        responseText
+      )
+    }
 
     if (!tokenResponse.ok) {
-      console.error('Token exchange failed:', responseText)
+      console.error('All token exchange attempts failed:', responseText)
       return NextResponse.json(
         {
           ok: false,
           error: `Token exchange failed (${tokenResponse.status})`,
           details: responseText,
+          attempts: [
+            'credentials in body with WM headers',
+            'Basic auth with WM headers',
+            'credentials in body without auth header',
+          ],
         },
         { status: 400 }
       )
