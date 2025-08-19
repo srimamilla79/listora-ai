@@ -14,7 +14,6 @@ export async function GET(req: NextRequest) {
     const sellerId = url.searchParams.get('sellerId')
     const type = url.searchParams.get('type')
     const clientId = url.searchParams.get('clientId')
-    // Note: partnerType is NOT expected according to Walmart
 
     console.log('Walmart OAuth callback received:', {
       code: code ? 'present' : 'missing',
@@ -49,35 +48,44 @@ export async function GET(req: NextRequest) {
     // Token exchange with Walmart
     const tokenUrl = 'https://marketplace.walmartapis.com/v3/token'
 
-    const authHeader = `Basic ${Buffer.from(
-      `${process.env.WALMART_CLIENT_ID!}:${process.env.WALMART_CLIENT_SECRET!}`
-    ).toString('base64')}`
+    // IMPORTANT: Walmart expects exact format with no spaces or extra characters
+    const clientIdToUse = process.env.WALMART_CLIENT_ID!
+    const clientSecret = process.env.WALMART_CLIENT_SECRET!
 
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: process.env.WALMART_REDIRECT_URI!,
+    // Create base64 encoded credentials
+    const credentials = `${clientIdToUse}:${clientSecret}`
+    const encodedCredentials = Buffer.from(credentials).toString('base64')
+
+    // Form data for token exchange
+    const formData = new URLSearchParams()
+    formData.append('grant_type', 'authorization_code')
+    formData.append('code', code)
+    formData.append('redirect_uri', process.env.WALMART_REDIRECT_URI!)
+
+    console.log('Token exchange request:', {
+      url: tokenUrl,
+      clientId: clientIdToUse,
+      redirectUri: process.env.WALMART_REDIRECT_URI,
     })
-
-    console.log('Exchanging token at:', tokenUrl)
 
     const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
-        Authorization: authHeader,
+        Authorization: `Basic ${encodedCredentials}`,
         'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
-        'WM_SVC.NAME': 'Listora',
-        'WM_QOS.CORRELATION_ID': state, // Use state as correlation ID
+        'WM_SVC.NAME': 'Walmart Marketplace',
+        'WM_QOS.CORRELATION_ID': generateCorrelationId(),
         'WM_SVC.VERSION': '1.0.0',
       },
-      body,
+      body: formData.toString(),
     })
 
     const responseText = await tokenResponse.text()
     console.log('Token response:', tokenResponse.status, responseText)
 
     if (!tokenResponse.ok) {
+      console.error('Token exchange failed:', responseText)
       return NextResponse.json(
         {
           ok: false,
@@ -88,7 +96,20 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const tokenData = JSON.parse(responseText)
+    let tokenData
+    try {
+      tokenData = JSON.parse(responseText)
+    } catch (e) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Invalid JSON response from token endpoint',
+          response: responseText,
+        },
+        { status: 400 }
+      )
+    }
+
     const accessToken = tokenData.access_token
     const refreshToken = tokenData.refresh_token
     const expiresIn = Number(tokenData.expires_in || 3600)
@@ -166,4 +187,13 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// Generate correlation ID in format Walmart expects
+function generateCorrelationId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
