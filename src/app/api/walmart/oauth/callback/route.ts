@@ -6,42 +6,22 @@ import { createServerSideClient } from '@/lib/supabase'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function envName() {
-  return (process.env.WALMART_ENVIRONMENT || 'production').toLowerCase()
-}
-
-function tokenEndpoint() {
-  // Check if we're using Walmart SSO or Marketplace API
-  const isSSO = process.env.WALMART_USE_SSO === 'true'
-
-  if (isSSO) {
-    return 'https://login.account.wal-mart.com/token'
-  }
-
-  return envName() === 'sandbox'
-    ? 'https://sandbox.walmartapis.com/v3/token'
-    : 'https://marketplace.walmartapis.com/v3/token'
-}
-
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url)
     const code = url.searchParams.get('code')
-    const returnedState = url.searchParams.get('state') || ''
+    const state = url.searchParams.get('state') || ''
     const sellerId = url.searchParams.get('sellerId')
     const type = url.searchParams.get('type')
-    const partnerType = url.searchParams.get('partnerType')
     const clientId = url.searchParams.get('clientId')
-    const nonce = url.searchParams.get('nonce') || ''
+    // Note: partnerType is NOT expected according to Walmart
 
     console.log('Walmart OAuth callback received:', {
       code: code ? 'present' : 'missing',
-      state: returnedState,
+      state,
       sellerId,
       type,
-      partnerType,
       clientId,
-      nonce: nonce ? 'present' : 'missing',
     })
 
     if (!code) {
@@ -51,25 +31,27 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // First check if user is logged in using server-side client
+    // Check if user is logged in
     const supabase = await createServerSideClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
     if (!user) {
-      // User not logged in - redirect to login with OAuth data preserved
+      // Redirect to login preserving all callback params
       const loginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
-      loginUrl.searchParams.set('walmart_oauth', returnedState)
-      loginUrl.searchParams.set('redirect', req.url) // Pass the full callback URL with all params
+      loginUrl.searchParams.set('walmart_oauth', state)
+      loginUrl.searchParams.set('redirect', req.url)
 
       return NextResponse.redirect(loginUrl.toString())
     }
 
-    // User is logged in, proceed with token exchange
-    const basic = Buffer.from(
+    // Token exchange with Walmart
+    const tokenUrl = 'https://marketplace.walmartapis.com/v3/token'
+
+    const authHeader = `Basic ${Buffer.from(
       `${process.env.WALMART_CLIENT_ID!}:${process.env.WALMART_CLIENT_SECRET!}`
-    ).toString('base64')
+    ).toString('base64')}`
 
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -77,50 +59,46 @@ export async function GET(req: NextRequest) {
       redirect_uri: process.env.WALMART_REDIRECT_URI!,
     })
 
-    // Add nonce if present (for SSO flow)
-    if (nonce) {
-      body.append('nonce', nonce)
-    }
+    console.log('Exchanging token at:', tokenUrl)
 
-    // Add client_id for SSO flow
-    if (process.env.WALMART_USE_SSO === 'true') {
-      body.append('client_id', process.env.WALMART_CLIENT_ID!)
-    }
-
-    console.log('Token exchange request to:', tokenEndpoint())
-
-    const r = await fetch(tokenEndpoint(), {
+    const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Basic ${basic}`,
+        Authorization: authHeader,
         'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
+        'WM_SVC.NAME': 'Listora',
+        'WM_QOS.CORRELATION_ID': state, // Use state as correlation ID
+        'WM_SVC.VERSION': '1.0.0',
       },
       body,
     })
 
-    const text = await r.text()
-    console.log('Token exchange response status:', r.status)
+    const responseText = await tokenResponse.text()
+    console.log('Token response:', tokenResponse.status, responseText)
 
-    if (!r.ok) {
-      console.error('Token exchange failed:', text)
+    if (!tokenResponse.ok) {
       return NextResponse.json(
-        { ok: false, error: `Token exchange failed (${r.status}): ${text}` },
+        {
+          ok: false,
+          error: `Token exchange failed (${tokenResponse.status})`,
+          details: responseText,
+        },
         { status: 400 }
       )
     }
 
-    const json = text ? JSON.parse(text) : {}
-    const accessToken = json.access_token as string | undefined
-    const refreshToken = json.refresh_token as string | undefined
-    const expiresIn = Number(json.expires_in || 3600)
+    const tokenData = JSON.parse(responseText)
+    const accessToken = tokenData.access_token
+    const refreshToken = tokenData.refresh_token
+    const expiresIn = Number(tokenData.expires_in || 3600)
 
     if (!accessToken) {
       return NextResponse.json(
         {
           ok: false,
-          error: 'Token response missing access_token',
-          raw: json,
+          error: 'No access token in response',
+          data: tokenData,
         },
         { status: 400 }
       )
@@ -132,86 +110,59 @@ export async function GET(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const tokenExpiresAt = new Date(
-      Date.now() + (expiresIn - 300) * 1000
-    ).toISOString()
-    const environment = envName()
+    const connectionData = {
+      user_id: user.id,
+      environment: 'production',
+      access_token: accessToken,
+      refresh_token: refreshToken || null,
+      token_expires_at: new Date(
+        Date.now() + (expiresIn - 300) * 1000
+      ).toISOString(),
+      status: 'active',
+      updated_at: new Date().toISOString(),
+      seller_id: sellerId || process.env.WALMART_PARTNER_ID || null,
+      partner_id: process.env.WALMART_PARTNER_ID || null,
+      seller_info: {
+        sellerId,
+        type,
+        clientId,
+      },
+    }
 
-    // Check for existing connection
     const { data: existing } = await admin
       .from('walmart_connections')
       .select('*')
       .eq('user_id', user.id)
-      .eq('environment', environment)
+      .eq('environment', 'production')
       .maybeSingle()
 
-    const connectionData = {
-      user_id: user.id,
-      environment,
-      access_token: accessToken,
-      refresh_token: refreshToken || existing?.refresh_token || null,
-      token_expires_at: tokenExpiresAt,
-      status: 'active',
-      updated_at: new Date().toISOString(),
-      // Use sellerId from callback params if provided, otherwise use existing or env default
-      seller_id:
-        sellerId ||
-        json.seller_id ||
-        existing?.seller_id ||
-        process.env.WALMART_PARTNER_ID ||
-        null,
-      partner_id:
-        json.partner_id ||
-        existing?.partner_id ||
-        process.env.WALMART_PARTNER_ID ||
-        null,
-      // Store additional metadata from callback
-      seller_info: {
-        sellerId: sellerId || null,
-        partnerType: partnerType || null,
-        type: type || null,
-        clientId: clientId || null,
-      },
-    }
-
     if (existing) {
-      const { error } = await admin
+      await admin
         .from('walmart_connections')
         .update(connectionData)
         .eq('id', existing.id)
-
-      if (error) {
-        return NextResponse.json(
-          { ok: false, error: `DB update error: ${error.message}` },
-          { status: 500 }
-        )
-      }
     } else {
-      const { error } = await admin.from('walmart_connections').insert({
+      await admin.from('walmart_connections').insert({
         ...connectionData,
         created_at: new Date().toISOString(),
       })
-
-      if (error) {
-        return NextResponse.json(
-          { ok: false, error: `DB insert error: ${error.message}` },
-          { status: 500 }
-        )
-      }
     }
 
-    // Clear any OAuth cookies
+    // Success redirect
     const res = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_SITE_URL}/integrations?connected=walmart&sellerId=${sellerId || ''}`
     )
+
+    // Clear cookies
     res.cookies.set('wm_oauth_state', '', { maxAge: 0, path: '/' })
     res.cookies.set('wm_oauth_user', '', { maxAge: 0, path: '/' })
+    res.cookies.set('wm_oauth_nonce', '', { maxAge: 0, path: '/' })
 
     return res
   } catch (e: any) {
-    console.error('Walmart OAuth callback error:', e)
+    console.error('Walmart OAuth error:', e)
     return NextResponse.json(
-      { ok: false, error: String(e?.message || e) },
+      { ok: false, error: e.message || 'Internal error' },
       { status: 500 }
     )
   }
