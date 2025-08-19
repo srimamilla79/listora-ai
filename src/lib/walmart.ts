@@ -70,11 +70,10 @@ export async function getWalmartConnection(
 // ─────────────────────────────────────────────────────────────
 // Token refresh (uses Basic auth, x-www-form-urlencoded)
 // ─────────────────────────────────────────────────────────────
+
 async function refreshAccessToken(
   conn: WalmartConnection
 ): Promise<WalmartConnection> {
-  if (!conn.refresh_token)
-    throw new Error('No refresh_token on Walmart connection')
   const clientId = process.env.WALMART_CLIENT_ID!
   const clientSecret = process.env.WALMART_CLIENT_SECRET!
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
@@ -82,13 +81,17 @@ async function refreshAccessToken(
   const r = await fetch(`${resolveBaseUrl(conn.environment)}/v3/token`, {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${basic}`,
+      Authorization: `Basic ${basic}`, // Basic for token API
       'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'application/json',
+      'WM_PARTNER.ID': process.env.WALMART_PARTNER_ID!, // ✅ NEW
+      'WM_CONSUMER.CHANNEL.TYPE': process.env.WALMART_CHANNEL_TYPE!, // ✅ NEW
+      'WM_QOS.CORRELATION_ID': randomUUID(), // ✅ NEW
+      'WM_SVC.NAME': 'Walmart Marketplace', // ✅ NEW
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: conn.refresh_token,
+      refresh_token: conn.refresh_token!,
     }),
   })
 
