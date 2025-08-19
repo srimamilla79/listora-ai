@@ -8,6 +8,14 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 function authBase() {
+  // Check if we're using SSO
+  const useSSO = process.env.WALMART_USE_SSO === 'true'
+
+  if (useSSO) {
+    return 'https://login.account.wal-mart.com/authorize'
+  }
+
+  // Fallback to marketplace API URLs
   const env = (process.env.WALMART_ENVIRONMENT || 'production').toLowerCase()
   return env === 'sandbox'
     ? 'https://sandbox.walmart.com/v3/mp/auth/authorize'
@@ -84,10 +92,27 @@ export async function GET(req: NextRequest) {
   }
 
   const u = new URL(authBase())
-  u.searchParams.set('clientId', process.env.WALMART_CLIENT_ID!)
-  u.searchParams.set('redirectUri', process.env.WALMART_REDIRECT_URI!)
-  u.searchParams.set('responseType', 'code')
-  u.searchParams.set('state', state)
+
+  // Check if using SSO - parameter names are different
+  const useSSO = process.env.WALMART_USE_SSO === 'true'
+
+  if (useSSO) {
+    // SSO uses different parameter names
+    u.searchParams.set('clientId', process.env.WALMART_CLIENT_ID!)
+    u.searchParams.set('redirectUri', process.env.WALMART_REDIRECT_URI!)
+    u.searchParams.set('responseType', 'code')
+    u.searchParams.set('state', state)
+    u.searchParams.set('clientType', 'seller')
+    // Generate a nonce for SSO
+    const nonce = randomUUID().replace(/-/g, '').substring(0, 10).toUpperCase()
+    u.searchParams.set('nonce', nonce)
+  } else {
+    // Marketplace API uses camelCase
+    u.searchParams.set('clientId', process.env.WALMART_CLIENT_ID!)
+    u.searchParams.set('redirectUri', process.env.WALMART_REDIRECT_URI!)
+    u.searchParams.set('responseType', 'code')
+    u.searchParams.set('state', state)
+  }
 
   const res = NextResponse.redirect(u.toString())
   res.cookies.set('wm_oauth_user', user.id, {

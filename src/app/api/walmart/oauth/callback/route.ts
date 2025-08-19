@@ -28,7 +28,21 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url)
     const code = url.searchParams.get('code')
     const returnedState = url.searchParams.get('state') || ''
+    const sellerId = url.searchParams.get('sellerId')
+    const type = url.searchParams.get('type')
+    const partnerType = url.searchParams.get('partnerType')
+    const clientId = url.searchParams.get('clientId')
     const nonce = url.searchParams.get('nonce') || ''
+
+    console.log('Walmart OAuth callback received:', {
+      code: code ? 'present' : 'missing',
+      state: returnedState,
+      sellerId,
+      type,
+      partnerType,
+      clientId,
+      nonce: nonce ? 'present' : 'missing',
+    })
 
     if (!code) {
       return NextResponse.json(
@@ -47,7 +61,7 @@ export async function GET(req: NextRequest) {
       // User not logged in - redirect to login with OAuth data preserved
       const loginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
       loginUrl.searchParams.set('walmart_oauth', returnedState)
-      loginUrl.searchParams.set('redirect', req.url) // Pass the full callback URL
+      loginUrl.searchParams.set('redirect', req.url) // Pass the full callback URL with all params
 
       return NextResponse.redirect(loginUrl.toString())
     }
@@ -73,6 +87,8 @@ export async function GET(req: NextRequest) {
       body.append('client_id', process.env.WALMART_CLIENT_ID!)
     }
 
+    console.log('Token exchange request to:', tokenEndpoint())
+
     const r = await fetch(tokenEndpoint(), {
       method: 'POST',
       headers: {
@@ -84,7 +100,10 @@ export async function GET(req: NextRequest) {
     })
 
     const text = await r.text()
+    console.log('Token exchange response status:', r.status)
+
     if (!r.ok) {
+      console.error('Token exchange failed:', text)
       return NextResponse.json(
         { ok: false, error: `Token exchange failed (${r.status}): ${text}` },
         { status: 400 }
@@ -134,7 +153,9 @@ export async function GET(req: NextRequest) {
       token_expires_at: tokenExpiresAt,
       status: 'active',
       updated_at: new Date().toISOString(),
+      // Use sellerId from callback params if provided, otherwise use existing or env default
       seller_id:
+        sellerId ||
         json.seller_id ||
         existing?.seller_id ||
         process.env.WALMART_PARTNER_ID ||
@@ -144,6 +165,13 @@ export async function GET(req: NextRequest) {
         existing?.partner_id ||
         process.env.WALMART_PARTNER_ID ||
         null,
+      // Store additional metadata from callback
+      seller_info: {
+        sellerId: sellerId || null,
+        partnerType: partnerType || null,
+        type: type || null,
+        clientId: clientId || null,
+      },
     }
 
     if (existing) {
@@ -162,7 +190,6 @@ export async function GET(req: NextRequest) {
       const { error } = await admin.from('walmart_connections').insert({
         ...connectionData,
         created_at: new Date().toISOString(),
-        seller_info: null,
       })
 
       if (error) {
@@ -175,7 +202,7 @@ export async function GET(req: NextRequest) {
 
     // Clear any OAuth cookies
     const res = NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_SITE_URL}/integrations?connected=walmart`
+      `${process.env.NEXT_PUBLIC_SITE_URL}/integrations?connected=walmart&sellerId=${sellerId || ''}`
     )
     res.cookies.set('wm_oauth_state', '', { maxAge: 0, path: '/' })
     res.cookies.set('wm_oauth_user', '', { maxAge: 0, path: '/' })
