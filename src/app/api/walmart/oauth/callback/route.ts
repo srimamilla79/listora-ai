@@ -48,13 +48,13 @@ export async function GET(req: NextRequest) {
     // Token exchange with Walmart
     const tokenUrl = 'https://marketplace.walmartapis.com/v3/token'
 
-    // Get credentials
-    const clientIdToUse = process.env.WALMART_CLIENT_ID!
-    const clientSecret = process.env.WALMART_CLIENT_SECRET!
+    // Get credentials (trim to avoid invisible whitespace breaking Basic auth)
+    const clientIdToUse = (process.env.WALMART_CLIENT_ID || '').trim()
+    const clientSecret = (process.env.WALMART_CLIENT_SECRET || '').trim()
 
     // Create Basic auth header
     const authString = `${clientIdToUse}:${clientSecret}`
-    const base64Auth = Buffer.from(authString).toString('base64')
+    const base64Auth = Buffer.from(authString, 'utf8').toString('base64')
 
     // Prepare form data
     const formData = new URLSearchParams()

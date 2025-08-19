@@ -74,9 +74,11 @@ export async function getWalmartConnection(
 async function refreshAccessToken(
   conn: WalmartConnection
 ): Promise<WalmartConnection> {
-  const clientId = process.env.WALMART_CLIENT_ID!
-  const clientSecret = process.env.WALMART_CLIENT_SECRET!
-  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
+  const clientId = (process.env.WALMART_CLIENT_ID || '').trim()
+  const clientSecret = (process.env.WALMART_CLIENT_SECRET || '').trim()
+  const basic = Buffer.from(`${clientId}:${clientSecret}`, 'utf8').toString(
+    'base64'
+  )
 
   const r = await fetch(`${resolveBaseUrl(conn.environment)}/v3/token`, {
     method: 'POST',
