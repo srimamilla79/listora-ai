@@ -22,6 +22,9 @@ import {
   Send,
   Loader,
   PlayCircle,
+  Play, // Add this
+  Clock, // Add this
+  X, // Add this
 } from 'lucide-react'
 
 interface FAQItem {
@@ -35,6 +38,7 @@ export default function SupportPage() {
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState('all')
   const [showVideos, setShowVideos] = useState(false)
+  const [showVideoModal, setShowVideoModal] = useState(false)
 
   // Contact form states
   const [name, setName] = useState('')
@@ -553,21 +557,64 @@ Once your accounts are properly set up:
           </div>
         </button>
 
-        {/* Video Section - Coming Soon */}
+        {/* Video Section - With Product Demo */}
         {showVideos && (
-          <div className="mt-4 bg-white/80 backdrop-blur-xl rounded-xl shadow-lg border border-white/50 p-12">
+          <div className="mt-4 bg-white/80 backdrop-blur-xl rounded-xl shadow-lg border border-white/50 p-8">
             <div className="text-center">
-              <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <PlayCircle className="h-10 w-10 text-purple-600" />
+              <div className="inline-flex items-center space-x-2 bg-purple-100 rounded-full px-4 py-2 mb-6">
+                <PlayCircle className="h-4 w-4 text-purple-600" />
+                <span className="text-sm font-semibold text-purple-900">
+                  Product Demo Available
+                </span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Video Tutorials Coming Soon
+
+              <h3 className="text-2xl font-semibold text-gray-900 mb-4">
+                Watch Our 3-Minute Product Demo
               </h3>
-              <p className="text-gray-600 max-w-md mx-auto">
-                We're creating comprehensive video guides to help you get the
-                most out of Listora AI. Check back soon for step-by-step
-                tutorials on all features.
+
+              <p className="text-gray-600 max-w-2xl mx-auto mb-8">
+                See how Listora AI transforms your voice in 99+ languages into
+                professional content for Amazon, Shopify, and eBay. Learn the
+                basics before diving into detailed tutorials.
               </p>
+
+              <button
+                onClick={() => setShowVideoModal(true)}
+                className="group relative bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-4 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-xl flex items-center mx-auto mb-8"
+              >
+                <div className="absolute inset-0 bg-white/10 rounded-lg animate-pulse" />
+                <Play className="h-6 w-6 mr-3 relative z-10 group-hover:scale-110 transition-transform" />
+                <span className="relative z-10">Watch Product Demo</span>
+                <span className="ml-3 text-sm bg-white/20 px-3 py-1 rounded-full relative z-10">
+                  3 min
+                </span>
+              </button>
+
+              <div className="flex items-center justify-center space-x-6 text-sm text-gray-600 mb-8">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Quick overview</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  <span>3 minutes</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Video className="h-4 w-4 text-purple-600" />
+                  <span>HD quality</span>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 pt-8">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                  More Video Tutorials Coming Soon
+                </h4>
+                <p className="text-gray-600 max-w-md mx-auto">
+                  We're creating comprehensive step-by-step video guides
+                  covering all features including voice input, bulk upload,
+                  marketplace connections, and more. Check back soon!
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -947,6 +994,38 @@ Once your accounts are properly set up:
               animation-delay: 2s;
             }
           `}</style>
+        </div>
+      )}
+
+      {/* Video Modal */}
+      {showVideoModal && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowVideoModal(false)}
+        >
+          <div
+            className="relative bg-white rounded-xl p-2 max-w-4xl w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowVideoModal(false)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors p-2"
+            >
+              <X className="h-8 w-8" />
+            </button>
+            <div className="aspect-video">
+              <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube.com/embed/ylFBALC6vI4?autoplay=1"
+                title="Listora AI Demo"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="rounded-lg"
+              />
+            </div>
+          </div>
         </div>
       )}
     </>
