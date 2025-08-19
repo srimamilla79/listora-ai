@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Script from 'next/script'
 import {
   Wand2,
   Camera,
@@ -53,6 +54,31 @@ export default function HomePage() {
   const [showVideoModal, setShowVideoModal] = useState(false)
   const [showFloatingButton, setShowFloatingButton] = useState(false)
   const [isFloatingMinimized, setIsFloatingMinimized] = useState(false)
+
+  // LocalBusiness Schema Data
+  const localBusinessSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: 'Listora.AI',
+    description:
+      'AI Powered Product Content Generator for E-Commerce businesses.',
+    url: 'https://listora.ai',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: 'N/A',
+      addressLocality: 'N/A',
+      addressRegion: 'N/A',
+      postalCode: 'N/A',
+      addressCountry: 'USA',
+    },
+    openingHours: 'Mo-Su 00:00-23:59',
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'Customer Support',
+      telephone: '+1-571-600-9999',
+      email: 'support@listora.ai',
+    },
+  }
 
   // Enhanced typing effect
   const sampleContent =
@@ -233,10 +259,10 @@ export default function HomePage() {
               </span>
             </div>
             <div className="text-caption text-gray-600 space-y-1">
-              <p>✓ Detects: Wireless headphones, over-ear design</p>
-              <p>✓ Colors: Matte black with metallic accents</p>
-              <p>✓ Features: Cushioned ear cups, adjustable headband</p>
-              <p>✓ Keywords: Premium, wireless, comfort, audio</p>
+              <p>✔ Detects: Wireless headphones, over-ear design</p>
+              <p>✔ Colors: Matte black with metallic accents</p>
+              <p>✔ Features: Cushioned ear cups, adjustable headband</p>
+              <p>✔ Keywords: Premium, wireless, comfort, audio</p>
             </div>
           </div>
 
@@ -350,7 +376,7 @@ export default function HomePage() {
                             : 'bg-blue-100 text-blue-700'
                         }`}
                       >
-                        {item.status === 'complete' ? '✓' : '⚡'}
+                        {item.status === 'complete' ? '✔' : '⚡'}
                       </span>
                     </div>
                   </div>
@@ -440,7 +466,7 @@ export default function HomePage() {
                       {item.step}
                     </span>
                     <span className="text-caption bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium ml-2">
-                      ✓
+                      ✔
                     </span>
                   </div>
                 </div>
@@ -467,10 +493,10 @@ export default function HomePage() {
                 </span>
               </div>
               <div className="text-caption text-green-700 space-y-1">
-                <p>✓ Real eBay Taxonomy API integration</p>
-                <p>✓ Dual-token authentication system</p>
-                <p>✓ Auto category detection (27 aspects)</p>
-                <p>✓ Smart item specifics generation</p>
+                <p>✔ Real eBay Taxonomy API integration</p>
+                <p>✔ Dual-token authentication system</p>
+                <p>✔ Auto category detection (27 aspects)</p>
+                <p>✔ Smart item specifics generation</p>
               </div>
             </div>
           </div>
@@ -539,10 +565,10 @@ export default function HomePage() {
                 </span>
               </div>
               <div className="text-caption text-green-700 space-y-1">
-                <p>✓ Job continues even if you close browser</p>
-                <p>✓ Navigate freely - processing never stops</p>
-                <p>✓ Email notification when complete</p>
-                <p>✓ ETA: 4 minutes remaining</p>
+                <p>✔ Job continues even if you close browser</p>
+                <p>✔ Navigate freely - processing never stops</p>
+                <p>✔ Email notification when complete</p>
+                <p>✔ ETA: 4 minutes remaining</p>
               </div>
             </div>
           </div>
@@ -605,7 +631,7 @@ export default function HomePage() {
                     }`}
                   >
                     {item.status === 'complete'
-                      ? '✓ Complete'
+                      ? '✔ Complete'
                       : item.status === 'processing'
                         ? '⚡ Processing'
                         : '⏳ Pending'}
@@ -675,7 +701,7 @@ export default function HomePage() {
             </div>
             <div className="text-center pt-2">
               <span className="text-caption text-green-600 font-medium">
-                ✓ Auto-backup every 30 seconds
+                ✔ Auto-backup every 30 seconds
               </span>
             </div>
           </div>
@@ -709,6 +735,14 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen">
+      {/* LocalBusiness Schema Script - CHANGED FROM Script TO script */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(localBusinessSchema),
+        }}
+      />
+
       {/* Stripe-style dark gradient background - simplified approach */}
       <div
         className="fixed inset-0 -z-10"

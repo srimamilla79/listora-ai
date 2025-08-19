@@ -29,6 +29,7 @@ import {
   Award,
   Languages,
   Store,
+  X,
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 import MobileNav from '@/components/ui/MobileNav'
@@ -52,6 +53,7 @@ export default function BookDemoPage() {
   const [formErrors, setFormErrors] = useState<any>({})
   const [submitError, setSubmitError] = useState('')
   const [isClient, setIsClient] = useState(false)
+  const [showVideoModal, setShowVideoModal] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
@@ -178,11 +180,11 @@ This is a demo request - please follow up soon to schedule a personalized demons
     { value: '', label: "What's your primary use case?" },
     {
       value: 'multilingual-content',
-      label: '🌍 Multilingual Voice-to-Content (99+ Languages)',
+      label: '🌐 Multilingual Voice-to-Content (99+ Languages)',
     },
     { value: 'amazon-optimization', label: '📦 Amazon Listing Optimization' },
     { value: 'shopify-integration', label: '🛍️ Shopify Direct Publishing' },
-    { value: 'ebay-integration', label: '🏪 eBay Direct Publishing with AI' },
+    { value: 'ebay-integration', label: '🛒 eBay Direct Publishing with AI' },
     {
       value: 'bulk-processing',
       label: '📊 Bulk CSV Processing (500+ Products)',
@@ -190,7 +192,7 @@ This is a demo request - please follow up soon to schedule a personalized demons
     { value: 'ai-vision', label: '📷 AI Vision Product Analysis' },
     { value: 'multi-platform', label: '🌐 All Platforms Combined' },
     { value: 'enterprise-scale', label: '🚀 Enterprise Content Operations' },
-    { value: 'other', label: '🔍 Other (please specify in message)' },
+    { value: 'other', label: '📝 Other (please specify in message)' },
   ]
 
   const countries = [
@@ -399,6 +401,59 @@ This is a demo request - please follow up soon to schedule a personalized demons
               Watch your voice in any of 99+ languages transform into optimized
               content for Amazon, Shopify, and eBay—all in real-time.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Video Preview Section */}
+      <section className="relative py-16 bg-white/50 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-8 border border-indigo-200 shadow-lg">
+            <div className="text-center">
+              <div className="inline-flex items-center space-x-2 bg-indigo-100 rounded-full px-4 py-2 mb-6">
+                <Play className="h-4 w-4 text-indigo-600" />
+                <span className="text-sm font-semibold text-indigo-900">
+                  See Listora AI in Action
+                </span>
+              </div>
+
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+                Watch a 3-Minute Product Demo
+              </h2>
+
+              <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+                See how businesses transform their product content with our
+                multilingual AI platform. From voice input in 99+ languages to
+                live publishing on Amazon, Shopify, and eBay.
+              </p>
+
+              <button
+                onClick={() => setShowVideoModal(true)}
+                className="group relative bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-lg font-semibold transition-all transform hover:scale-105 shadow-xl flex items-center mx-auto"
+              >
+                <div className="absolute inset-0 bg-white/10 rounded-lg animate-pulse" />
+                <Play className="h-6 w-6 mr-3 relative z-10 group-hover:scale-110 transition-transform" />
+                <span className="relative z-10">Watch Quick Demo</span>
+                <span className="ml-3 text-sm bg-white/20 px-3 py-1 rounded-full relative z-10">
+                  3 min
+                </span>
+              </button>
+
+              <div className="mt-6 flex items-center justify-center space-x-6 text-sm text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>No registration required</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  <span>3 minutes overview</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Globe className="h-4 w-4 text-purple-600" />
+                  <span>Real use cases</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -968,6 +1023,38 @@ This is a demo request - please follow up soon to schedule a personalized demons
           </div>
         </div>
       </main>
+
+      {/* Video Modal */}
+      {showVideoModal && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowVideoModal(false)}
+        >
+          <div
+            className="relative bg-white rounded-xl p-2 max-w-4xl w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowVideoModal(false)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors p-2"
+            >
+              <X className="h-8 w-8" />
+            </button>
+            <div className="aspect-video">
+              <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube.com/embed/ylFBALC6vI4?autoplay=1"
+                title="Listora AI Demo"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="relative bg-gradient-to-b from-gray-900 to-black text-white">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
+import Script from 'next/script'
 import DashboardPageWrapper from '@/components/layout/DashboardPageWrapper'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 import {
@@ -50,6 +51,134 @@ export default function SupportPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [authChecked, setAuthChecked] = useState(false)
   const [mounted, setMounted] = useState(false)
+
+  // FAQ Schema Data
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: 'How do I generate my first Product Listing?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "To generate your first product listing, go to the Generate page and enter your product details including title, description, and key features. Select the content sections you want to generate such as Product Title, Key Selling Points, Product Description, Instagram Caption, Blog Introduction, and Call to Action. Upload a product image for better context. Select your target platforms (Amazon, Shopify, eBay, or Etsy) and click 'Generate Content'. Our AI will create optimized listings for each platform and display the content in the Complete Content Package section.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'What information do I need to provide for content generation?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "You'll need: Product name, key features or specifications, target audience, and any unique selling points. The more detailed information you provide, the better the AI-generated content will be. You can also upload product images for more contextual generation.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How long does content generation take?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "Content generation typically takes 30-60 seconds depending on the complexity and number of platforms selected. For single product generation on the Generate page, you'll need to wait for completion. However, with Bulk Upload (available on Business plans and above), you can upload multiple products and continue working on other tasks while they generate in the background. You'll see a real-time progress indicator during generation for bulk processing.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'What E-Commerce Platforms does LISTORA Support?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "Listora AI generates comprehensive content for all types of products including Product Titles, Key Selling Points, Product Descriptions, Instagram Captions, Blog Introductions, and Call to Actions. For e-commerce platforms, we specifically support Amazon, Shopify, eBay, and Etsy. Each platform receives customized content that follows their specific guidelines and best practices, ensuring your listings are optimized for maximum visibility and conversion. We're continuously working on adding more platforms.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Can I publish directly to my E-Commerce platforms?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "Yes! You can publish directly to eBay and Shopify using your store credentials. Simply connect your accounts and publish with one click. For Amazon, we provide optimized content that you can easily copy and paste into your Seller Central account, ensuring compliance with Amazon's listing requirements.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How do I connect my Shopify Store?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "To connect your Shopify store for the first time, start by generating content for at least one product on the Generate page. Once you have generated content, the marketplace connections will appear. Look for the Shopify option and click 'Connect'. You'll be redirected to Shopify's secure login page where you'll need to enter your store URL and credentials. After authenticating, Shopify will ask you to authorize Listora AI to access your store. Once approved, you'll be redirected back to Listora with your store successfully connected, ready to publish products directly.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How do I connect Facebook and Instagram to Listora AI?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "To publish content through Listora AI to Facebook and Instagram, you'll need to set up your accounts properly. Before You Start: A Facebook Page (not a personal profile), An Instagram Business or Creator account (optional, for Instagram publishing), Admin access to both accounts. Step 1: Set Up Your Facebook Page. Step 2: Convert Your Instagram to a Business Account. Step 3: Link Instagram to Your Facebook Page. Step 4: Connect to Listora AI. Troubleshooting Common Issues: 'No Facebook Pages found' - Ensure you have at least one Facebook Page and you're an admin. Instagram account not showing - Confirm it's converted to Business/Creator and linked to your Facebook Page. 'Feature Unavailable' error - Clear browser cache and ensure you're accessing from the same domain.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: "What's included in the free Starter Plan?",
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "The Starter plan includes 10 free content generations per month, access to all four platforms (Amazon, Shopify, eBay, Etsy), basic AI optimization, and email support. It's perfect for small sellers just getting started.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How do I upgrade my plan?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "Visit the Pricing page to see all available plans. Click 'Upgrade' on your desired plan, enter your payment information, and your new limits will be available immediately. You can change or cancel your plan anytime.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'When does my usage reset?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "Usage resets on the first day of each calendar month at 12:00 AM UTC. Any unused generations don't carry over to the next month. You can view your current usage on the Generate page.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'What is Bulk Upload and How does it work?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Bulk Upload allows you to generate content for multiple products at once using a CSV file. Prepare your product data in our template format, upload the file, and our AI will generate optimized listings for all products. This feature is available on Business and higher plans.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Can I Edit AI Generated Content?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Absolutely! All generated content is fully editable. You can modify titles, descriptions, bullet points, and any other fields directly on the Generate page before publishing. We recommend reviewing and personalizing the content to match your brand voice.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How does the AI Optimization Work?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Our AI analyzes successful listings, platform-specific SEO requirements, and current market trends to create optimized content. It considers keyword density, readability, platform guidelines, and conversion-focused copywriting principles.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Why is my content generation failing?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Common causes include: insufficient product information, special characters in input fields, or temporary server issues. Try providing more detailed information and avoiding special symbols. If issues persist, contact support.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: "My published products aren't showing up on the platform?",
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: "With our direct integration for eBay and Shopify, products are published instantly if there are no errors. Check your platform dashboard for any error messages or validation issues. Ensure your account credentials are correct and you have the necessary permissions to create listings. If you're still experiencing issues, verify your product data meets the platform's requirements.",
+        },
+      },
+    ],
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -711,111 +840,115 @@ Once your accounts are properly set up:
     </header>
   )
 
-  // Show loading only while checking auth
-  if (!mounted || isLoading || !authChecked || !supabase) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    )
-  }
+  // Wrap EVERYTHING in a fragment and put schema first
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(faqSchema),
+        }}
+      />
 
-  // If user is logged in, show dashboard version
-  if (user) {
-    return (
-      <DashboardPageWrapper title="Help & Support">
+      {/* Show loading only while checking auth */}
+      {!mounted || isLoading || !authChecked || !supabase ? (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      ) : user ? (
+        // If user is logged in, show dashboard version
+        <DashboardPageWrapper title="Help & Support">
+          <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob" />
+              <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000" />
+            </div>
+
+            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <SupportContent />
+            </div>
+          </div>
+
+          <style jsx>{`
+            @keyframes blob {
+              0% {
+                transform: translate(0px, 0px) scale(1);
+              }
+              33% {
+                transform: translate(30px, -50px) scale(1.1);
+              }
+              66% {
+                transform: translate(-20px, 20px) scale(0.9);
+              }
+              100% {
+                transform: translate(0px, 0px) scale(1);
+              }
+            }
+            .animate-blob {
+              animation: blob 7s infinite;
+            }
+            .animation-delay-2000 {
+              animation-delay: 2s;
+            }
+          `}</style>
+        </DashboardPageWrapper>
+      ) : (
+        // If user is NOT logged in, show public version
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+          <PublicHeader />
+
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-0 right-0 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob" />
             <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000" />
           </div>
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Page Title for public users */}
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                Help & Support
+              </h1>
+              <p className="text-xl text-gray-600">
+                Find answers to common questions or contact our support team
+              </p>
+            </div>
+
             <SupportContent />
           </div>
+
+          {/* Simple Footer for public version */}
+          <footer className="bg-white border-t border-gray-200 mt-16">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <div className="text-center text-sm text-gray-500">
+                <p>&copy; 2025 Listora AI. All rights reserved.</p>
+              </div>
+            </div>
+          </footer>
+
+          <style jsx>{`
+            @keyframes blob {
+              0% {
+                transform: translate(0px, 0px) scale(1);
+              }
+              33% {
+                transform: translate(30px, -50px) scale(1.1);
+              }
+              66% {
+                transform: translate(-20px, 20px) scale(0.9);
+              }
+              100% {
+                transform: translate(0px, 0px) scale(1);
+              }
+            }
+            .animate-blob {
+              animation: blob 7s infinite;
+            }
+            .animation-delay-2000 {
+              animation-delay: 2s;
+            }
+          `}</style>
         </div>
-
-        <style jsx>{`
-          @keyframes blob {
-            0% {
-              transform: translate(0px, 0px) scale(1);
-            }
-            33% {
-              transform: translate(30px, -50px) scale(1.1);
-            }
-            66% {
-              transform: translate(-20px, 20px) scale(0.9);
-            }
-            100% {
-              transform: translate(0px, 0px) scale(1);
-            }
-          }
-          .animate-blob {
-            animation: blob 7s infinite;
-          }
-          .animation-delay-2000 {
-            animation-delay: 2s;
-          }
-        `}</style>
-      </DashboardPageWrapper>
-    )
-  }
-
-  // If user is NOT logged in, show public version
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      <PublicHeader />
-
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000" />
-      </div>
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Page Title for public users */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Help & Support
-          </h1>
-          <p className="text-xl text-gray-600">
-            Find answers to common questions or contact our support team
-          </p>
-        </div>
-
-        <SupportContent />
-      </div>
-
-      {/* Simple Footer for public version */}
-      <footer className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-sm text-gray-500">
-            <p>&copy; 2025 Listora AI. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-
-      <style jsx>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-      `}</style>
-    </div>
+      )}
+    </>
   )
 }

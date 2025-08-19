@@ -1,0 +1,15 @@
+# Robots.txt for Listora.ai
+# Allow all web crawlers
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_next/
+Disallow: /private/
+
+# Sitemap location
+Sitemap: https://www.listora.ai/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
