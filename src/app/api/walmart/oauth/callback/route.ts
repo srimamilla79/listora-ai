@@ -45,18 +45,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(loginUrl.toString())
     }
 
-    // Token exchange with Walmart following their exact documentation
+    // Token exchange with Walmart
     const tokenUrl = 'https://marketplace.walmartapis.com/v3/token'
 
     // Get credentials
     const clientIdToUse = process.env.WALMART_CLIENT_ID!
     const clientSecret = process.env.WALMART_CLIENT_SECRET!
 
-    // Create Basic auth header as per Walmart docs
+    // Create Basic auth header
     const authString = `${clientIdToUse}:${clientSecret}`
     const base64Auth = Buffer.from(authString).toString('base64')
 
-    // Prepare form data exactly as documented
+    // Prepare form data
     const formData = new URLSearchParams()
     formData.append('grant_type', 'authorization_code')
     formData.append('code', code)
@@ -73,17 +73,16 @@ export async function GET(req: NextRequest) {
       correlationId: correlationId,
     })
 
-    // Make the request with exact headers from documentation
+    // Make the request
     const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${base64Auth}`,
         'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json', // Request JSON response
         'WM_QOS.CORRELATION_ID': correlationId,
         'WM_SVC.NAME': 'Walmart Marketplace',
-        // WM_PARTNER.ID is required for authorization_code grant type
         'WM_PARTNER.ID': sellerId || process.env.WALMART_PARTNER_ID || '',
-        // Only include WM_CONSUMER.CHANNEL.TYPE if we have it
         ...(process.env.WALMART_CHANNEL_TYPE
           ? { 'WM_CONSUMER.CHANNEL.TYPE': process.env.WALMART_CHANNEL_TYPE }
           : {}),
@@ -99,27 +98,6 @@ export async function GET(req: NextRequest) {
 
     if (!tokenResponse.ok) {
       console.error('Token exchange failed:', responseText)
-
-      // Special handling for 401 errors
-      if (tokenResponse.status === 401) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: 'Authentication failed',
-            details: responseText,
-            troubleshooting: {
-              1: 'Verify WALMART_CLIENT_ID and WALMART_CLIENT_SECRET in Vercel',
-              2: 'Ensure redirect_uri matches exactly what is registered with Walmart',
-              3:
-                'Check if WM_PARTNER.ID (sellerId) is required: ' +
-                (sellerId || 'NOT PROVIDED'),
-              4: 'You may need to set WALMART_PARTNER_ID in Vercel if sellerId is not provided',
-            },
-          },
-          { status: 401 }
-        )
-      }
-
       return NextResponse.json(
         {
           ok: false,
@@ -130,36 +108,62 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    let tokenData
-    try {
-      tokenData = JSON.parse(responseText)
-    } catch (e) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'Invalid JSON response from token endpoint',
-          response: responseText,
-        },
-        { status: 400 }
-      )
-    }
+    // Parse the response - handle both JSON and XML
+    let accessToken, refreshToken, expiresIn
 
-    const accessToken = tokenData.access_token
-    const refreshToken = tokenData.refresh_token
-    const expiresIn = Number(tokenData.expires_in || 3600)
+    if (responseText.startsWith('<')) {
+      // XML response - parse it
+      console.log('Parsing XML response...')
+
+      // Simple XML parsing for the token response
+      const accessTokenMatch = responseText.match(
+        /<accessToken>([^<]+)<\/accessToken>/
+      )
+      const refreshTokenMatch = responseText.match(
+        /<refreshToken>([^<]+)<\/refreshToken>/
+      )
+      const expiresInMatch = responseText.match(
+        /<expiresIn>([^<]+)<\/expiresIn>/
+      )
+
+      accessToken = accessTokenMatch ? accessTokenMatch[1] : null
+      refreshToken = refreshTokenMatch ? refreshTokenMatch[1] : null
+      expiresIn = expiresInMatch ? parseInt(expiresInMatch[1]) : 1800
+    } else {
+      // JSON response
+      try {
+        const tokenData = JSON.parse(responseText)
+        accessToken = tokenData.access_token
+        refreshToken = tokenData.refresh_token
+        expiresIn = tokenData.expires_in || 1800
+      } catch (e) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: 'Failed to parse token response',
+            response: responseText,
+          },
+          { status: 400 }
+        )
+      }
+    }
 
     if (!accessToken) {
       return NextResponse.json(
         {
           ok: false,
           error: 'No access token in response',
-          data: tokenData,
+          response: responseText,
         },
         { status: 400 }
       )
     }
 
-    console.log('Token exchange successful, storing connection...')
+    console.log('Token exchange successful!', {
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      expiresIn,
+    })
 
     // Store the connection
     const admin = createClient(
@@ -193,17 +197,32 @@ export async function GET(req: NextRequest) {
       .eq('environment', 'production')
       .maybeSingle()
 
+    let dbResult
     if (existing) {
-      await admin
+      dbResult = await admin
         .from('walmart_connections')
         .update(connectionData)
         .eq('id', existing.id)
     } else {
-      await admin.from('walmart_connections').insert({
+      dbResult = await admin.from('walmart_connections').insert({
         ...connectionData,
         created_at: new Date().toISOString(),
       })
     }
+
+    if (dbResult.error) {
+      console.error('Database error:', dbResult.error)
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Failed to store connection',
+          details: dbResult.error,
+        },
+        { status: 500 }
+      )
+    }
+
+    console.log('Connection stored successfully!')
 
     // Success redirect
     const res = NextResponse.redirect(
