@@ -1,59 +1,67 @@
+// app/api/walmart/oauth/initiate/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSideClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'crypto'
 
-const CLIENT_ID = process.env.WALMART_CLIENT_ID!
-const REDIRECT_URI = process.env.WALMART_REDIRECT_URI!
-const ENV = (process.env.WALMART_ENVIRONMENT || 'production').toLowerCase()
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-function getAuthBase() {
-  // ✅ CORRECTED Walmart authorize endpoints
-  return ENV === 'sandbox'
+function authBase() {
+  const env = (process.env.WALMART_ENVIRONMENT || 'production').toLowerCase()
+  return env === 'sandbox'
     ? 'https://sandbox.walmart.com/v3/mp/auth/authorize'
     : 'https://seller.walmart.com/v3/mp/auth/authorize'
 }
 
-function buildAuthUrl(state: string) {
-  const u = new URL(getAuthBase())
-  // ✅ CORRECTED parameter names for Walmart
-  u.searchParams.set('clientId', CLIENT_ID) // Changed from 'client_id'
-  u.searchParams.set('redirectUri', REDIRECT_URI) // Changed from 'redirect_uri'
-  u.searchParams.set('responseType', 'code') // Changed from 'response_type'
-  u.searchParams.set('state', state)
-  return u.toString()
-}
-
 export async function GET(req: NextRequest) {
-  const sp = req.nextUrl.searchParams
-  const userId = (sp.get('user_id') || '').trim()
-  const state = (sp.get('state') || crypto.randomUUID()).trim()
-
-  // If not logged in, send to login with a simple walmart_oauth marker.
-  if (!userId) {
-    const res = NextResponse.redirect(
-      new URL(
-        `/login?walmart_oauth=${encodeURIComponent(state)}`,
-        req.nextUrl.origin
-      )
-    )
-    res.cookies.set('wm_oauth_state', state, {
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 10 * 60,
-    })
-    return res
+  const supabase = await createServerSideClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    const login = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
+    login.searchParams.set('redirect', '/api/walmart/oauth/initiate')
+    return NextResponse.redirect(login.toString())
   }
 
-  // Logged-in path: set short-lived cookies to tie the flow to this user and state
-  const authUrl = buildAuthUrl(state)
-  const res = NextResponse.redirect(authUrl)
-  res.cookies.set('wm_oauth_user', userId, {
+  const state = randomUUID()
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  await admin.from('oauth_states').insert({
+    state,
+    user_id: user.id,
+    platform: 'walmart',
+    environment: (
+      process.env.WALMART_ENVIRONMENT || 'production'
+    ).toLowerCase(),
+    created_at: new Date().toISOString(),
+  })
+
+  const u = new URL(authBase())
+  // Seller Center authorize expects camelCase params
+  u.searchParams.set('clientId', process.env.WALMART_CLIENT_ID!)
+  u.searchParams.set('redirectUri', process.env.WALMART_REDIRECT_URI!)
+  u.searchParams.set('responseType', 'code')
+  u.searchParams.set('state', state)
+  u.searchParams.set('clientType', 'seller')
+
+  const res = NextResponse.redirect(u.toString())
+  res.cookies.set('wm_oauth_user', user.id, {
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 10 * 60,
+    secure: true,
+    maxAge: 600,
+    path: '/',
   })
   res.cookies.set('wm_oauth_state', state, {
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 10 * 60,
+    secure: true,
+    maxAge: 600,
+    path: '/',
   })
   return res
 }

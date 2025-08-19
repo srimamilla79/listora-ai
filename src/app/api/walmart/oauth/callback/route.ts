@@ -1,170 +1,121 @@
+// app/api/walmart/oauth/callback/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-/**
- * IMPORTANT:
- * - WALMART_REDIRECT_URI must EXACTLY match the URI registered in Walmart Dev Portal for this environment.
- * - We expect `state` to carry at least { userId, environment }.
- *   Environment may be 'production' or 'sandbox'. If absent, we fall back to WALMART_ENVIRONMENT or 'production'.
- */
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-type StatePayload = {
-  userId?: string
-  environment?: 'production' | 'sandbox'
+function envName() {
+  return (process.env.WALMART_ENVIRONMENT || 'production').toLowerCase()
 }
-
-function parseState(rawState: string | null): StatePayload {
-  if (!rawState) return {}
-  try {
-    // 1) direct JSON
-    return JSON.parse(rawState)
-  } catch {
-    try {
-      // 2) URL-decoded JSON
-      const d = decodeURIComponent(rawState)
-      try {
-        return JSON.parse(d)
-      } catch {}
-      // 3) base64(JSON)
-      const b = Buffer.from(d, 'base64').toString('utf8')
-      return JSON.parse(b)
-    } catch {
-      return {}
-    }
-  }
+function tokenEndpoint() {
+  return envName() === 'sandbox'
+    ? 'https://sandbox.walmartapis.com/v3/token'
+    : 'https://marketplace.walmartapis.com/v3/token'
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const sp = req.nextUrl.searchParams
-    const code = sp.get('code')
-    const stateObj = parseState(sp.get('state'))
-
-    if (!code) {
+    const url = new URL(req.url)
+    const code = url.searchParams.get('code')
+    const returnedState = url.searchParams.get('state') || ''
+    if (!code)
       return NextResponse.json(
-        { ok: false, error: 'Missing authorization code' },
+        { ok: false, error: "Missing 'code' in callback" },
+        { status: 400 }
+      )
+
+    // Resolve user: cookie -> oauth_states lookup
+    let userId = req.cookies.get('wm_oauth_user')?.value || ''
+    const stateCookie = req.cookies.get('wm_oauth_state')?.value || ''
+
+    if (!userId && returnedState) {
+      const adminLookup = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: row } = await adminLookup
+        .from('oauth_states')
+        .select('user_id')
+        .eq('state', returnedState)
+        .maybeSingle()
+      userId = row?.user_id || ''
+    }
+    if (!userId)
+      return NextResponse.json(
+        { ok: false, error: 'Unable to resolve user for Walmart OAuth' },
+        { status: 400 }
+      )
+    if (stateCookie && returnedState && stateCookie !== returnedState) {
+      return NextResponse.json(
+        { ok: false, error: 'OAuth state mismatch' },
         { status: 400 }
       )
     }
 
-    // Identify user & environment
-    const userId =
-      stateObj.userId ||
-      req.headers.get('x-user-id') || // fallback for manual testing
-      ''
+    // Exchange code for tokens
+    const basic = Buffer.from(
+      `${process.env.WALMART_CLIENT_ID!}:${process.env.WALMART_CLIENT_SECRET!}`
+    ).toString('base64')
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: process.env.WALMART_REDIRECT_URI!,
+    })
 
-    if (!userId) {
-      return NextResponse.json(
-        { ok: false, error: 'Missing userId in state/header' },
-        { status: 400 }
-      )
-    }
-
-    const environment: 'production' | 'sandbox' =
-      stateObj.environment ||
-      (process.env.WALMART_ENVIRONMENT as
-        | 'production'
-        | 'sandbox'
-        | undefined) ||
-      'production'
-
-    const clientId = process.env.WALMART_CLIENT_ID!
-    const clientSecret = process.env.WALMART_CLIENT_SECRET!
-    const redirectUri = process.env.WALMART_REDIRECT_URI! // MUST match Walmart’s configured redirect
-    if (!clientId || !clientSecret || !redirectUri) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            'Missing WALMART_CLIENT_ID / WALMART_CLIENT_SECRET / WALMART_REDIRECT_URI envs',
-        },
-        { status: 500 }
-      )
-    }
-
-    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
-
-    const tokenUrl =
-      environment === 'sandbox'
-        ? 'https://sandbox.walmartapis.com/v3/token'
-        : 'https://marketplace.walmartapis.com/v3/token'
-
-    // Exchange authorization code for access + refresh tokens
-    const tokenRes = await fetch(tokenUrl, {
+    const r = await fetch(tokenEndpoint(), {
       method: 'POST',
       headers: {
         Authorization: `Basic ${basic}`,
         'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
-        'WM_QOS.CORRELATION_ID': crypto.randomUUID(),
-        'WM_SVC.NAME': 'Walmart Marketplace',
       },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirectUri,
-      }).toString(),
-      cache: 'no-store',
+      body,
     })
-
-    const tokenText = await tokenRes.text()
-    if (!tokenRes.ok) {
+    const text = await r.text()
+    if (!r.ok)
       return NextResponse.json(
-        {
-          ok: false,
-          error: `Token exchange failed: ${tokenRes.status} - ${tokenText}`,
-        },
+        { ok: false, error: `Token exchange failed (${r.status}): ${text}` },
         { status: 400 }
       )
-    }
 
-    const tokenJson: any = tokenText ? JSON.parse(tokenText) : {}
-    const accessToken: string | undefined = tokenJson.access_token
-    const refreshToken: string | undefined = tokenJson.refresh_token
-    const expiresIn: number = Number(tokenJson.expires_in || 3600)
-
+    const json = text ? JSON.parse(text) : {}
+    const accessToken = json.access_token as string | undefined
+    const refreshToken = json.refresh_token as string | undefined
+    const expiresIn = Number(json.expires_in || 3600)
     if (!accessToken || !refreshToken) {
       return NextResponse.json(
         {
           ok: false,
-          error: 'Token exchange did not return access_token and refresh_token',
-          raw: tokenJson,
+          error: 'Token response missing access_token or refresh_token',
+          raw: json,
         },
         { status: 400 }
       )
     }
 
-    // Compute expiry (5 min early refresh buffer)
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     const tokenExpiresAt = new Date(
       Date.now() + (expiresIn - 300) * 1000
     ).toISOString()
+    const environment = envName()
 
-    // Upsert walmart_connections
-    const { data: existing, error: selErr } = await supabase
+    const { data: existing } = await admin
       .from('walmart_connections')
       .select('*')
       .eq('user_id', userId)
       .eq('environment', environment)
       .maybeSingle()
 
-    if (selErr) {
-      return NextResponse.json(
-        { ok: false, error: `DB select error: ${selErr.message}` },
-        { status: 500 }
-      )
-    }
-
-    const defaultPartner = process.env.WALMART_PARTNER_ID || null
-    const sellerId = existing?.seller_id ?? defaultPartner
-    const partnerId = existing?.partner_id ?? defaultPartner
+    const defaults = process.env.WALMART_PARTNER_ID || null
+    const sellerId = existing?.seller_id ?? defaults
+    const partnerId = existing?.partner_id ?? defaults
 
     if (existing) {
-      const { error: updErr } = await supabase
+      const { error } = await admin
         .from('walmart_connections')
         .update({
           access_token: accessToken,
@@ -176,60 +127,37 @@ export async function GET(req: NextRequest) {
           partner_id: partnerId,
         })
         .eq('id', existing.id)
-
-      if (updErr) {
+      if (error)
         return NextResponse.json(
-          { ok: false, error: `DB update error: ${updErr.message}` },
+          { ok: false, error: `DB update error: ${error.message}` },
           { status: 500 }
         )
-      }
     } else {
-      const { error: insErr } = await supabase
-        .from('walmart_connections')
-        .insert({
-          user_id: userId,
-          environment,
-          status: 'active',
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          token_expires_at: tokenExpiresAt,
-          seller_id: sellerId,
-          partner_id: partnerId,
-          seller_info: null,
-        })
-      if (insErr) {
+      const { error } = await admin.from('walmart_connections').insert({
+        user_id: userId,
+        environment,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_expires_at: tokenExpiresAt,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        seller_id: sellerId,
+        partner_id: partnerId,
+        seller_info: null,
+      })
+      if (error)
         return NextResponse.json(
-          { ok: false, error: `DB insert error: ${insErr.message}` },
+          { ok: false, error: `DB insert error: ${error.message}` },
           { status: 500 }
         )
-      }
     }
 
-    // Minimal success page (so the user doesn't land on a blank screen)
-    return new NextResponse(
-      `
-      <!doctype html>
-      <html><head><meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Walmart Connected</title>
-        <style>
-          body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 32px; }
-          .box { max-width: 560px; margin: 40px auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
-          h2 { margin: 0 0 8px; }
-          p { margin: 8px 0; color: #374151; }
-          .small { color: #6b7280; font-size: 14px; }
-        </style>
-      </head>
-      <body>
-        <div class="box">
-          <h2>Walmart connected ✅</h2>
-          <p>You can close this window and return to Listora.</p>
-          <p class="small">Environment: ${environment}</p>
-        </div>
-      </body></html>
-      `,
-      { status: 200, headers: { 'Content-Type': 'text/html' } }
+    const res = NextResponse.redirect(
+      `${process.env.NEXT_PUBLIC_SITE_URL}/integrations?connected=walmart`
     )
+    res.cookies.set('wm_oauth_state', '', { maxAge: 0, path: '/' })
+    return res
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: String(e?.message || e) },

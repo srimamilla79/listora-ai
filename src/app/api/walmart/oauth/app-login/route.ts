@@ -1,86 +1,78 @@
-// src/app/api/walmart/oauth/app-login/route.ts
+// app/api/walmart/oauth/app-login/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSideClient } from '@/lib/supabase'
 import { createClient } from '@supabase/supabase-js'
-import crypto from 'crypto'
+import { randomUUID } from 'crypto'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+function defaultAuthBase() {
+  const env = (process.env.WALMART_ENVIRONMENT || 'production').toLowerCase()
+  return env === 'sandbox'
+    ? 'https://sandbox.walmart.com/v3/mp/auth/authorize'
+    : 'https://seller.walmart.com/v3/mp/auth/authorize'
+}
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const state = searchParams.get('state')
-    const walmartCallbackUri = searchParams.get('walmartCallbackUri')
+  const { searchParams } = new URL(request.url)
+  const incomingState = searchParams.get('state') || undefined
+  const walmartCallbackUri =
+    searchParams.get('walmartCallbackUri') || defaultAuthBase()
 
-    if (!state || !walmartCallbackUri) {
-      return NextResponse.json(
-        { error: 'Missing required parameters' },
-        { status: 400 }
-      )
-    }
-
-    // Use your existing server-side client
-    const supabase = await createServerSideClient()
-
-    // Get the authenticated user
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error || !user) {
-      console.log('❌ No authenticated user found, redirecting to login')
-      // No authenticated user, redirect to login
-      const loginUrl = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
-      loginUrl.searchParams.set(
-        'redirect',
-        `/api/walmart/oauth/app-login?state=${state}&walmartCallbackUri=${encodeURIComponent(walmartCallbackUri)}`
-      )
-      return NextResponse.redirect(loginUrl.toString())
-    }
-
-    console.log('✅ User authenticated:', user.id)
-
-    // User is authenticated, update the state with user ID
-    // Use service role client for admin operations
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+  const supabase = await createServerSideClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    const login = new URL(`${process.env.NEXT_PUBLIC_SITE_URL}/login`)
+    login.searchParams.set(
+      'redirect',
+      `/api/walmart/oauth/app-login${incomingState ? `?state=${encodeURIComponent(incomingState)}` : ''}`
     )
-
-    const { error: updateError } = await supabaseAdmin
-      .from('oauth_states')
-      .update({
-        user_id: user.id,
-        platform: 'walmart', // Ensure platform is set
-      })
-      .eq('state', state)
-
-    if (updateError) {
-      console.error('❌ Failed to update oauth state:', updateError)
-    }
-
-    // Now redirect to Walmart with all required parameters
-    const clientId = process.env.WALMART_CLIENT_ID!
-    const redirectUri = process.env.WALMART_REDIRECT_URI!
-    const nonce = crypto.randomBytes(8).toString('hex')
-
-    const walmartAuthUrl = new URL(walmartCallbackUri)
-    walmartAuthUrl.searchParams.set('responseType', 'code')
-    walmartAuthUrl.searchParams.set('clientId', clientId)
-    walmartAuthUrl.searchParams.set('redirectUri', redirectUri)
-    walmartAuthUrl.searchParams.set('clientType', 'seller')
-    walmartAuthUrl.searchParams.set('nonce', nonce)
-    walmartAuthUrl.searchParams.set('state', state)
-
-    console.log(
-      '🔐 User authenticated, redirecting to Walmart:',
-      walmartAuthUrl.toString()
-    )
-
-    return NextResponse.redirect(walmartAuthUrl.toString())
-  } catch (error) {
-    console.error('❌ App login error:', error)
-
-    const errorUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/generate?error=walmart_oauth_failed&message=${encodeURIComponent('Failed during app login')}`
-    return NextResponse.redirect(errorUrl)
+    return NextResponse.redirect(login.toString())
   }
+
+  const state = incomingState || randomUUID()
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  await admin.from('oauth_states').upsert(
+    {
+      state,
+      user_id: user.id,
+      platform: 'walmart',
+      environment: (
+        process.env.WALMART_ENVIRONMENT || 'production'
+      ).toLowerCase(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'state' }
+  )
+
+  const u = new URL(walmartCallbackUri)
+  u.searchParams.set('clientId', process.env.WALMART_CLIENT_ID!)
+  u.searchParams.set('redirectUri', process.env.WALMART_REDIRECT_URI!)
+  u.searchParams.set('responseType', 'code')
+  u.searchParams.set('state', state)
+  u.searchParams.set('clientType', 'seller')
+
+  const res = NextResponse.redirect(u.toString())
+  res.cookies.set('wm_oauth_user', user.id, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: true,
+    maxAge: 600,
+    path: '/',
+  })
+  res.cookies.set('wm_oauth_state', state, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: true,
+    maxAge: 600,
+    path: '/',
+  })
+  return res
 }

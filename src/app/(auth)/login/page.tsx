@@ -66,6 +66,17 @@ export default function OptimizedLoginPage() {
     }
     checkUser()
   }, [])
+  // NEW: capture walmart_oauth params when landing on /login from Walmart
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const walmartOAuthId = params.get('walmart_oauth')
+    const sellerId = params.get('seller_id')
+    if (walmartOAuthId) {
+      const payload = JSON.stringify({ oauthId: walmartOAuthId, sellerId })
+      sessionStorage.setItem('walmart_oauth_pending', payload)
+      localStorage.setItem('walmart_oauth_pending', payload)
+    }
+  }, [])
 
   if (!mounted || !supabase) {
     return (
