@@ -1,38 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
+import { NextRequest } from 'next/server'
 
-export async function POST(request: NextRequest) {
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET ?? ''
+
+function verifyWebhook(rawBody: string, hmacHeader: string | null) {
+  if (!hmacHeader || !SHOPIFY_API_SECRET) return false
+  const digest = crypto
+    .createHmac('sha256', SHOPIFY_API_SECRET)
+    .update(rawBody, 'utf8')
+    .digest('base64')
   try {
-    const body = await request.json()
-
-    // Log the data request for compliance
-    console.log('Shopify customer data request received:', {
-      shop_id: body.shop_id,
-      shop_domain: body.shop_domain,
-      customer: body.customer
-        ? { id: body.customer.id, email: body.customer.email }
-        : null,
-      data_request: body.data_request,
-    })
-
-    // In production, you would:
-    // 1. Collect all customer data from your database
-    // 2. Format it according to GDPR requirements
-    // 3. Send it to the customer within 30 days
-
-    return NextResponse.json(
-      {
-        message:
-          'Customer data request received and will be processed within 30 days',
-      },
-      { status: 200 }
+    return crypto.timingSafeEqual(
+      Buffer.from(hmacHeader, 'base64'),
+      Buffer.from(digest, 'base64')
     )
-  } catch (error) {
-    console.error('Error processing customer data request:', error)
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-      },
-      { status: 500 }
-    )
+  } catch {
+    return false
   }
+}
+
+export async function POST(req: NextRequest) {
+  const raw = await req.text()
+  const hmac = req.headers.get('x-shopify-hmac-sha256')
+  if (!verifyWebhook(raw, hmac))
+    return new Response('Unauthorized', { status: 401 })
+
+  // (optional) enqueue your data request processing here…
+  return new Response('OK', { status: 200 })
 }

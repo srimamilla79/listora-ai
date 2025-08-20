@@ -1,61 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import crypto from 'crypto'
+import { NextRequest } from 'next/server'
 
-export async function POST(request: NextRequest) {
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET ?? ''
+
+function verifyWebhook(rawBody: string, hmacHeader: string | null) {
+  if (!hmacHeader || !SHOPIFY_API_SECRET) return false
+  const digest = crypto
+    .createHmac('sha256', SHOPIFY_API_SECRET)
+    .update(rawBody, 'utf8')
+    .digest('base64')
   try {
-    const body = await request.json()
-    const customerId = body.customer?.id
-    const shopDomain = body.shop_domain
-
-    console.log('Shopify customer redaction request:', {
-      customer_id: customerId,
-      shop_domain: shopDomain,
-    })
-
-    if (customerId && shopDomain) {
-      const supabase = createClient()
-
-      // Remove customer's platform connection
-      const { error: connectionError } = await supabase
-        .from('platform_connections')
-        .delete()
-        .eq('platform_user_id', customerId.toString())
-        .eq('platform', 'shopify')
-
-      if (connectionError) {
-        console.error('Error deleting platform connection:', connectionError)
-      }
-
-      // Remove customer's published products from this shop
-      const { error: productsError } = await supabase
-        .from('published_products')
-        .delete()
-        .eq('platform', 'shopify')
-        .like('platform_data->shop_domain', `%${shopDomain}%`)
-
-      if (productsError) {
-        console.error('Error deleting published products:', productsError)
-      }
-
-      console.log(
-        'Customer data redacted successfully for customer:',
-        customerId
-      )
-    }
-
-    return NextResponse.json(
-      {
-        message: 'Customer data redacted successfully',
-      },
-      { status: 200 }
+    return crypto.timingSafeEqual(
+      Buffer.from(hmacHeader, 'base64'),
+      Buffer.from(digest, 'base64')
     )
-  } catch (error) {
-    console.error('Error redacting customer data:', error)
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-      },
-      { status: 500 }
-    )
+  } catch {
+    return false
   }
+}
+
+export async function POST(req: NextRequest) {
+  const raw = await req.text()
+  const hmac = req.headers.get('x-shopify-hmac-sha256')
+  if (!verifyWebhook(raw, hmac))
+    return new Response('Unauthorized', { status: 401 })
+
+  // (optional) enqueue redaction here…
+  return new Response('OK', { status: 200 })
 }

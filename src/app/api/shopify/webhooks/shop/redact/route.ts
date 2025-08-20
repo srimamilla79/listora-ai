@@ -1,62 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import crypto from 'crypto'
+import { NextRequest } from 'next/server'
 
-export async function POST(request: NextRequest) {
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET ?? ''
+
+function verifyWebhook(rawBody: string, hmacHeader: string | null) {
+  if (!hmacHeader || !SHOPIFY_API_SECRET) return false
+  // For webhooks: HMAC is BASE64
+  const digest = crypto
+    .createHmac('sha256', SHOPIFY_API_SECRET)
+    .update(rawBody, 'utf8')
+    .digest('base64')
   try {
-    const body = await request.json()
-    const shopId = body.shop_id
-    const shopDomain = body.shop_domain
-
-    console.log('Shopify shop redaction request:', {
-      shop_id: shopId,
-      shop_domain: shopDomain,
-    })
-
-    if (shopId || shopDomain) {
-      const supabase = createClient()
-
-      // Remove all connections for this shop
-      const { error: connectionError } = await supabase
-        .from('platform_connections')
-        .delete()
-        .eq('platform', 'shopify')
-        .or(
-          `platform_store_info->shop_id.eq.${shopId},platform_store_info->shop_domain.eq.${shopDomain}`
-        )
-
-      if (connectionError) {
-        console.error('Error deleting shop connections:', connectionError)
-      }
-
-      // Remove all published products for this shop
-      const { error: productsError } = await supabase
-        .from('published_products')
-        .delete()
-        .eq('platform', 'shopify')
-        .or(
-          `platform_data->shop_id.eq.${shopId},platform_data->shop_domain.eq.${shopDomain}`
-        )
-
-      if (productsError) {
-        console.error('Error deleting shop products:', productsError)
-      }
-
-      console.log('Shop data redacted successfully for shop:', shopDomain)
-    }
-
-    return NextResponse.json(
-      {
-        message: 'Shop data redacted successfully',
-      },
-      { status: 200 }
+    return crypto.timingSafeEqual(
+      Buffer.from(hmacHeader, 'base64'),
+      Buffer.from(digest, 'base64')
     )
-  } catch (error) {
-    console.error('Error redacting shop data:', error)
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-      },
-      { status: 500 }
-    )
+  } catch {
+    return false
   }
+}
+
+export async function POST(req: NextRequest) {
+  const raw = await req.text()
+  const hmac = req.headers.get('x-shopify-hmac-sha256')
+  if (!verifyWebhook(raw, hmac)) {
+    return new Response('Unauthorized', { status: 401 })
+  }
+  // Handle redaction async if you store anything; Shopify only requires a 200 ACK.
+  return new Response('OK', { status: 200 })
 }
