@@ -56,6 +56,17 @@ export async function GET() {
       refresh_token: conn.refresh_token,
     })
 
+    console.log(
+      'WALMART_SUPPORT_AUTH_HEADER',
+      `Authorization: Basic ${basic}`, // Walmart asked for the FULL header
+      {
+        clientIdLen: clientId.length,
+        clientIdPreview: clientId.slice(0, 6) + '…' + clientId.slice(-6),
+        secretLen: clientSecret.length, // lengths help catch hidden whitespace
+        // do NOT log the raw secret; Walmart only needs the Base64 string above
+      }
+    )
+
     const r = await fetch(`${apiBase}/v3/token`, {
       method: 'POST',
       headers: {
