@@ -1,72 +1,90 @@
 import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 
-// Verify Shopify webhook authenticity
+// Verify Shopify webhook authenticity with proper HMAC
 async function verifyWebhook(
-  request: Request,
+  rawBody: string,
+  hmacHeader: string | null,
   shopifySecret: string
 ): Promise<boolean> {
-  const rawBody = await request.text()
-  const hmacHeader = request.headers.get('X-Shopify-Hmac-Sha256')
+  if (!hmacHeader || !shopifySecret) return false
 
-  if (!hmacHeader) return false
+  // Calculate HMAC
+  const hash = crypto
+    .createHmac('sha256', shopifySecret)
+    .update(rawBody, 'utf8')
+    .digest('base64')
 
-  // In production, implement proper HMAC verification
-  // For now, we'll accept all requests for App Review
-  return true
+  // Timing-safe comparison
+  const a = Buffer.from(hash)
+  const b = Buffer.from(hmacHeader)
+
+  if (a.length !== b.length) return false
+
+  return crypto.timingSafeEqual(a, b)
 }
 
 export async function POST(
   request: Request,
   { params }: { params: { webhook: string[] } }
 ) {
-  const webhookType = params.webhook.join('/')
+  const webhookType = params.webhook.join('-')
 
+  // Get raw body BEFORE any parsing - this is crucial
+  const rawBody = await request.text()
+  const hmacHeader = request.headers.get('X-Shopify-Hmac-Sha256')
+
+  // Get secret from environment
+  const shopifySecret = process.env.SHOPIFY_API_SECRET || ''
+
+  // Verify HMAC first - MUST return 401 if invalid
+  const isValid = await verifyWebhook(rawBody, hmacHeader, shopifySecret)
+
+  if (!isValid) {
+    console.log('Webhook rejected: Invalid HMAC', {
+      hasHeader: !!hmacHeader,
+      hasSecret: !!shopifySecret,
+      webhookType,
+    })
+    // Return 401 for invalid HMAC - this is what Shopify tests for
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Valid webhook - process it
   try {
-    // Clone request to read body
-    const body = await request.json()
+    const body = JSON.parse(rawBody)
+    const shopDomain = request.headers.get('X-Shopify-Shop-Domain')
 
-    console.log(`Received Shopify webhook: ${webhookType}`)
-    console.log('Webhook payload:', body)
+    console.log(`Valid Shopify webhook: ${webhookType}`)
+    console.log('Shop domain:', shopDomain)
 
     switch (webhookType) {
       case 'customers-data-request':
         // Customer requested their data
-        // Per your privacy policy: they should email privacy@listora.ai
         console.log('Customer data request received')
         console.log('Shop domain:', body.shop_domain)
         console.log('Customer email:', body.customer?.email)
-
-        // In production: Send notification to privacy@listora.ai
-        // For now: Just acknowledge
         break
 
       case 'customers-redact':
         // Customer wants data deleted
-        // Per your privacy policy: 30-day deletion process via email
         console.log('Customer redact request received')
         console.log('Shop domain:', body.shop_domain)
         console.log('Customer ID to redact:', body.customer?.id)
-
-        // In production: Queue deletion request
-        // For now: Just acknowledge
         break
 
       case 'shop-redact':
         // Shop uninstalled app - delete shop data
-        // This is when a Shopify store removes your app
         console.log('Shop redact request received')
         console.log('Shop domain:', body.shop_domain)
         console.log('Shop ID:', body.shop_id)
-
-        // In production: Delete all data for this shop
-        // For now: Just acknowledge
         break
 
       default:
         console.log('Unknown webhook type:', webhookType)
     }
 
-    // Shopify requires 200 OK response
+    // Shopify requires 200 OK response for valid webhooks
     return NextResponse.json(
       {
         success: true,
@@ -78,7 +96,7 @@ export async function POST(
   } catch (error) {
     console.error('Webhook processing error:', error)
 
-    // Still return 200 to prevent Shopify retries
+    // Still return 200 for valid HMAC but processing errors
     return NextResponse.json(
       {
         success: true,
@@ -89,12 +107,12 @@ export async function POST(
   }
 }
 
-// Also handle GET requests for testing
+// Handle GET requests for testing
 export async function GET(
   request: Request,
   { params }: { params: { webhook: string[] } }
 ) {
-  const webhookType = params.webhook.join('/')
+  const webhookType = params.webhook.join('-')
 
   return NextResponse.json({
     endpoint: `shopify/webhooks/${webhookType}`,
