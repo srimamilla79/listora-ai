@@ -63,7 +63,6 @@ export async function GET() {
         'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
         'WM_PARTNER.ID': process.env.WALMART_PARTNER_ID!,
-        'WM_CONSUMER.CHANNEL.TYPE': process.env.WALMART_CHANNEL_TYPE!,
         'WM_QOS.CORRELATION_ID': randomUUID(),
         'WM_SVC.NAME': 'Walmart Marketplace',
       },

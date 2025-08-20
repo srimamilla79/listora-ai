@@ -42,11 +42,11 @@ export async function GET() {
     const r = await fetch(`${apiBase}/v3/token/detail`, {
       headers: {
         'WM_SEC.ACCESS_TOKEN': conn.access_token,
-        'WM_CONSUMER.CHANNEL.TYPE': process.env.WALMART_CHANNEL_TYPE || '',
         'WM_QOS.CORRELATION_ID': randomUUID(),
         'WM_SVC.NAME': 'Walmart Marketplace',
         Accept: 'application/json',
       },
+
       cache: 'no-store',
     })
 
