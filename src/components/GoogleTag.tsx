@@ -17,12 +17,26 @@ export default function GoogleTag() {
         `}
       </Script>
 
+      {/* Google Analytics 4 (GA4) - New Addition */}
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-FCL4LR2QJG"
+        strategy="afterInteractive"
+      />
+      <Script id="google-analytics-ga4" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-FCL4LR2QJG');
+        `}
+      </Script>
+
       {/* Existing Google Ads tag (gtag.js) */}
       <Script
         src="https://www.googletagmanager.com/gtag/js?id=AW-17311261833"
         strategy="afterInteractive"
       />
-      <Script id="google-analytics" strategy="afterInteractive">
+      <Script id="google-ads" strategy="afterInteractive">
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
