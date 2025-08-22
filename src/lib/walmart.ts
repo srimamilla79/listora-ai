@@ -1,4 +1,4 @@
-// src/lib/walmart.ts
+// src/lib/walmart.ts — updated with WM_PARTNER.ID, WM_MARKET, WM_SVC.VERSION, and Basic auth on feeds
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
 
@@ -70,23 +70,24 @@ async function refreshAccessToken(
       Accept: 'application/json',
       'WM_QOS.CORRELATION_ID': randomUUID(),
       'WM_SVC.NAME': 'Walmart Marketplace',
-      'WM_PARTNER.ID': process.env.WALMART_PARTNER_ID || '',
-      // DO NOT send WM_CONSUMER.CHANNEL.TYPE per Walmart
+      'WM_PARTNER.ID': process.env.WALMART_PARTNER_ID || '10001127277',
+      WM_MARKET: 'US',
+      'WM_SVC.VERSION': '1.0.0',
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: conn.refresh_token,
+      refresh_token: conn.refresh_token!,
+      redirect_uri: process.env.WALMART_REDIRECT_URI!,
     }),
   })
 
   const text = await r.text()
   if (!r.ok) throw new Error(`Token refresh failed (${r.status}): ${text}`)
-
   const json: any = text ? JSON.parse(text) : {}
   const access_token = json.access_token as string
   const refresh_token =
     (json.refresh_token as string | undefined) ?? conn.refresh_token ?? null
-  const expires_in = Number(json.expires_in || 3600)
+  const expires_in = Number(json.expires_in || 1800)
   const token_expires_at = new Date(
     Date.now() + (expires_in - 300) * 1000
   ).toISOString()
@@ -130,13 +131,20 @@ export function buildWalmartHeaders(
   accessToken: string,
   extra: Record<string, string> = {}
 ) {
+  const clientId = (process.env.WALMART_CLIENT_ID || '').trim()
+  const clientSecret = (process.env.WALMART_CLIENT_SECRET || '').trim()
+  const basic = Buffer.from(`${clientId}:${clientSecret}`, 'utf8').toString(
+    'base64'
+  )
+
   return {
     'WM_SEC.ACCESS_TOKEN': accessToken,
+    Authorization: `Basic ${basic}`,
     'WM_QOS.CORRELATION_ID': randomUUID(),
     'WM_SVC.NAME': 'Walmart Marketplace',
     Accept: 'application/json',
     ...extra,
-  } as Record<string, string>
+  }
 }
 
 export async function walmartGet<T = any>(
@@ -156,7 +164,6 @@ export async function walmartGet<T = any>(
     headers: buildWalmartHeaders(token),
     cache: 'no-store',
   })
-
   const text = await r.text()
   if (!r.ok) throw new Error(`GET ${path} failed (${r.status}): ${text}`)
   return text ? (JSON.parse(text) as T) : ({} as T)
@@ -189,7 +196,6 @@ export async function walmartUploadFeed(
       body,
     }
   )
-
   const text = await r.text()
   if (!r.ok) throw new Error(`Feed upload failed (${r.status}): ${text}`)
   try {
@@ -199,7 +205,6 @@ export async function walmartUploadFeed(
   }
 }
 
-/** Convenience for your UI taxonomy picker */
 export async function getTaxonomy(userId: string) {
   return walmartGet(userId, '/v3/items/taxonomy')
 }

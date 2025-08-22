@@ -1,4 +1,4 @@
-// app/api/walmart/oauth/callback/route.ts — full updated file
+// app/api/walmart/oauth/callback/route.ts — updated with WM_PARTNER.ID, WM_MARKET, WM_SVC.VERSION
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
@@ -6,7 +6,6 @@ import { randomUUID } from 'crypto'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Helpers
 function apiBase() {
   const env = (process.env.WALMART_ENVIRONMENT || 'production').toLowerCase()
   return (
@@ -18,7 +17,6 @@ function apiBase() {
 }
 
 async function exchangeCodeForToken(code: string) {
-  // Trim/clean Client ID & Secret to avoid whitespace/quotes issues
   const clientIdToUse = (process.env.WALMART_CLIENT_ID || '')
     .trim()
     .replace(/^['"]|['"]$/g, '')
@@ -33,7 +31,7 @@ async function exchangeCodeForToken(code: string) {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
-    redirect_uri: process.env.WALMART_REDIRECT_URI!, // must exactly match Walmart app config
+    redirect_uri: process.env.WALMART_REDIRECT_URI!,
   })
 
   const r = await fetch(`${apiBase()}/v3/token`, {
@@ -44,8 +42,9 @@ async function exchangeCodeForToken(code: string) {
       Accept: 'application/json',
       'WM_QOS.CORRELATION_ID': randomUUID(),
       'WM_SVC.NAME': 'Walmart Marketplace',
-      'WM_PARTNER.ID': process.env.WALMART_PARTNER_ID || '',
-      // NOTE: Per Walmart guidance, DO NOT send WM_CONSUMER.CHANNEL.TYPE here
+      'WM_PARTNER.ID': process.env.WALMART_PARTNER_ID || '10001127277',
+      WM_MARKET: 'US',
+      'WM_SVC.VERSION': '1.0.0',
     },
     body,
   })
@@ -73,7 +72,6 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  // Resolve user via cookie or oauth_states table
   let userId = req.cookies.get('wm_oauth_user')?.value || ''
   if (!userId && state) {
     const adminLookup = createClient(
@@ -97,7 +95,7 @@ export async function GET(req: NextRequest) {
     const tokens = await exchangeCodeForToken(code)
     const accessToken = tokens.access_token as string | undefined
     const refreshToken = tokens.refresh_token as string | undefined
-    const expiresIn = Number(tokens.expires_in || 3600)
+    const expiresIn = Number(tokens.expires_in || 1800)
 
     if (!accessToken || !refreshToken) {
       return NextResponse.json(
