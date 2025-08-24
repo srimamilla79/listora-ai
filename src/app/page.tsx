@@ -38,6 +38,9 @@ import {
   Package,
   Languages,
   X,
+  Instagram,
+  Facebook,
+  Share2,
 } from 'lucide-react'
 import ListoraAILogo from '@/components/ui/ListoraAILogo'
 import Link from 'next/link'
@@ -102,16 +105,18 @@ export default function HomePage() {
     { flag: '🇨🇳', name: 'Chinese', text: '高级无线耳机...' },
   ]
 
-  // Platform showcase with eBay
+  // Updated Platform showcase with Amazon as optimization
   const platforms = [
     {
       name: 'Amazon',
       color: 'from-orange-50 to-red-50 border-orange-200',
       emoji: '📦',
-      text: 'Amazon Optimized!',
-      id: 'ASIN: B08XYZ123',
+      text: 'Optimization Ready!',
+      id: 'Step-by-step guide',
       textColor: 'text-orange-700',
       idColor: 'text-orange-600',
+      icon: Package,
+      gradient: 'from-orange-500 to-red-500',
     },
     {
       name: 'Shopify',
@@ -121,6 +126,8 @@ export default function HomePage() {
       id: 'Product ID: 789456',
       textColor: 'text-green-700',
       idColor: 'text-green-600',
+      icon: ShoppingCart,
+      gradient: 'from-green-500 to-emerald-500',
     },
     {
       name: 'eBay',
@@ -130,6 +137,30 @@ export default function HomePage() {
       id: 'Item ID: 306375092611',
       textColor: 'text-blue-700',
       idColor: 'text-blue-600',
+      icon: Store,
+      gradient: 'from-blue-500 to-indigo-500',
+    },
+    {
+      name: 'Instagram',
+      color: 'from-pink-50 to-purple-50 border-pink-200',
+      emoji: '📸',
+      text: 'Posted on Instagram!',
+      id: 'Reach: 2.5K+ followers',
+      textColor: 'text-pink-700',
+      idColor: 'text-purple-600',
+      icon: Instagram,
+      gradient: 'from-pink-500 to-purple-500',
+    },
+    {
+      name: 'Facebook',
+      color: 'from-blue-50 to-sky-50 border-blue-200',
+      emoji: '👍',
+      text: 'Shared on Facebook!',
+      id: 'Engagement: 150+ likes',
+      textColor: 'text-blue-700',
+      idColor: 'text-sky-600',
+      icon: Facebook,
+      gradient: 'from-blue-600 to-sky-500',
     },
   ]
 
@@ -146,7 +177,7 @@ export default function HomePage() {
   // Auto-rotate platform showcase
   useEffect(() => {
     const timer = setInterval(() => {
-      setActivePlatform((prev) => (prev + 1) % 3)
+      setActivePlatform((prev) => (prev + 1) % platforms.length)
     }, 3000)
     return () => clearInterval(timer)
   }, [])
@@ -234,7 +265,7 @@ export default function HomePage() {
       icon: Camera,
       title: 'AI Vision Analysis + Multi-Platform Images',
       description:
-        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions. Then automatically optimize for Amazon, Shopify, eBay, and other major platforms.',
+        'Upload one image and our OpenAI Vision AI analyzes the actual visual content to generate hyper-specific descriptions. Then automatically optimize for Amazon, Shopify, eBay, Instagram, and Facebook.',
       benefit:
         'AI sees your product and writes descriptions based on actual visual details',
 
@@ -267,29 +298,10 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            {[
-              {
-                name: 'Amazon',
-                color: 'from-orange-400 to-orange-500',
-                emoji: '📦',
-                status: 'optimized',
-              },
-              {
-                name: 'Shopify',
-                color: 'from-green-400 to-green-500',
-                emoji: '🛍️',
-                status: 'direct',
-              },
-              {
-                name: 'eBay',
-                color: 'from-blue-400 to-blue-500',
-                emoji: '🏪',
-                status: 'smart',
-              },
-            ].map((platform, i) => (
+            {platforms.slice(0, 3).map((platform, i) => (
               <div
                 key={platform.name}
-                className={`bg-gradient-to-br ${platform.color} rounded-lg p-3 text-white text-center transform transition-all duration-300 hover:scale-105`}
+                className={`bg-gradient-to-br ${platform.gradient} rounded-lg p-3 text-white text-center transform transition-all duration-300 hover:scale-105`}
                 style={{ animationDelay: `${i * 200}ms` }}
               >
                 <div className="text-lg mb-1">{platform.emoji}</div>
@@ -309,31 +321,32 @@ export default function HomePage() {
       ),
     },
     {
-      icon: ShoppingCart,
-      title:
-        'Triple Platform Power: Amazon Optimization + Shopify & eBay Direct Publishing',
+      icon: Share2,
+      title: '🚀 Multi-Platform Power: Amazon Optimization + Direct Publishing',
       description:
-        'Get professional Amazon listing optimization with step-by-step guidance, direct one-click publishing to Shopify with seamless seller account integration, and revolutionary eBay direct listing with AI-powered category detection.',
+        'Get professional Amazon listing optimization with step-by-step instructions, PLUS direct one-click publishing to Shopify with seamless integration, revolutionary eBay direct listing with AI-powered category detection, and automatic social media posting to Instagram and Facebook with AI-optimized captions.',
       benefit:
-        'From voice input to live on Amazon, Shopify AND eBay in under 2 minutes',
+        'From voice input to Amazon guide + live on multiple platforms in under 2 minutes',
 
       demo: (
         <div className="bg-gradient-to-br from-orange-50 to-blue-100 rounded-xl p-6 border border-orange-200">
           <div className="space-y-4">
             <div className="text-center">
               <div className="flex justify-center space-x-2 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                  <span className="text-white text-lg">📦</span>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                  <span className="text-white text-lg">🛍️</span>
-                </div>
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                  <span className="text-white text-lg">🏪</span>
-                </div>
+                {platforms.map((platform, idx) => {
+                  const Icon = platform.icon
+                  return (
+                    <div
+                      key={idx}
+                      className={`w-10 h-10 bg-gradient-to-r ${platform.gradient} rounded-xl flex items-center justify-center transform transition-all hover:scale-110`}
+                    >
+                      <Icon className="h-5 w-5 text-white" />
+                    </div>
+                  )
+                })}
               </div>
               <p className="text-form-label text-gray-700">
-                Voice → AI Content → Amazon + Shopify + eBay Live
+                Voice → AI Content → Multi-Platform Publishing
               </p>
             </div>
 
@@ -355,7 +368,7 @@ export default function HomePage() {
                   icon: '🔗',
                 },
                 {
-                  step: '4. Publishing to All 3 Platforms...',
+                  step: '4. Publishing to All Platforms...',
                   status: 'processing',
                   icon: '🚀',
                 },
@@ -385,29 +398,150 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
-                <div className="text-form-label text-orange-800">
-                  📦 Amazon Optimized!
+              <div
+                className={`bg-gradient-to-br ${platforms[0].color} rounded-lg p-3 text-center`}
+              >
+                <div className={`text-form-label ${platforms[0].textColor}`}>
+                  {platforms[0].emoji} {platforms[0].text}
                 </div>
-                <div className="text-caption text-orange-600 mt-1">
-                  Ready to list
-                </div>
-              </div>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                <div className="text-form-label text-green-800">
-                  🛍️ Shopify Live!
-                </div>
-                <div className="text-caption text-green-600 mt-1">
-                  Product ID: 789456
+                <div className={`text-caption ${platforms[0].idColor} mt-1`}>
+                  {platforms[0].id}
                 </div>
               </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                <div className="text-form-label text-blue-800">
-                  🏪 eBay Live!
+              {platforms.slice(1, 3).map((platform, idx) => (
+                <div
+                  key={idx}
+                  className={`bg-gradient-to-br ${platform.color} rounded-lg p-3 text-center`}
+                >
+                  <div className={`text-form-label ${platform.textColor}`}>
+                    {platform.emoji} {platform.text}
+                  </div>
+                  <div className={`text-caption ${platform.idColor} mt-1`}>
+                    {platform.id}
+                  </div>
                 </div>
-                <div className="text-caption text-blue-600 mt-1">
-                  Item ID: 306375092611
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {platforms.slice(3, 5).map((platform, idx) => (
+                <div
+                  key={idx}
+                  className={`bg-gradient-to-br ${platform.color} rounded-lg p-3 text-center`}
+                >
+                  <div className={`text-form-label ${platform.textColor}`}>
+                    {platform.emoji} {platform.text}
+                  </div>
+                  <div className={`text-caption ${platform.idColor} mt-1`}>
+                    {platform.id}
+                  </div>
                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      icon: Instagram,
+      title: '📸 Instagram & Facebook Social Commerce Integration',
+      description:
+        'Revolutionary social media integration with automatic caption generation, smart hashtag optimization, and direct posting to Instagram and Facebook. Our AI creates platform-specific content with engagement-driven captions, trending hashtags, and perfect formatting for maximum reach.',
+      benefit:
+        'AI-powered social posts that drive engagement and sales on Instagram & Facebook',
+
+      demo: (
+        <div className="bg-gradient-to-br from-pink-50 to-purple-100 rounded-xl p-6 border border-pink-200">
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="flex justify-center space-x-3 mb-2">
+                <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <Instagram className="h-6 w-6 text-white" />
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-sky-500 rounded-xl flex items-center justify-center">
+                  <Facebook className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              <p className="text-form-label text-purple-700">
+                AI Social Media Publishing + Optimization
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                {
+                  step: '1. AI Generates Social Content',
+                  status: 'complete',
+                  icon: '✨',
+                  detail: 'Platform-specific captions created',
+                },
+                {
+                  step: '2. Smart Hashtag Generation',
+                  status: 'complete',
+                  icon: '#️⃣',
+                  detail: '30 trending hashtags selected',
+                },
+                {
+                  step: '3. Engagement Optimization',
+                  status: 'complete',
+                  icon: '💬',
+                  detail: 'CTAs and emojis added',
+                },
+                {
+                  step: '4. Posted to Both Platforms!',
+                  status: 'complete',
+                  icon: '📱',
+                  detail: 'Live on Instagram & Facebook',
+                },
+              ].map((item, i) => (
+                <div key={item.step} className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-pink-200">
+                    <span className="text-sm">{item.icon}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-form-label text-gray-700">
+                          {item.step}
+                        </span>
+                        <div className="text-caption text-gray-500">
+                          {item.detail}
+                        </div>
+                      </div>
+                      <span className="text-caption bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                        ✔
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white border border-pink-200 rounded-lg p-4">
+              <div className="text-form-label text-gray-800 mb-2">
+                📱 Sample Instagram Caption:
+              </div>
+              <div className="text-caption text-gray-600 space-y-2">
+                <p>🌟 PREMIUM WIRELESS HEADPHONES 🌟</p>
+                <p>💰 Special Price: $149 💰</p>
+                <p>✨ Experience crystal-clear audio...</p>
+                <p className="text-blue-600">
+                  #wirelessheadphones #techdeals #audiolovers #musthave...
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-pink-50 to-purple-50 border border-purple-200 rounded-lg p-3">
+              <div className="flex items-center space-x-2 mb-2">
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                <span className="text-form-label text-purple-800">
+                  🌟 Social Media AI Features
+                </span>
+              </div>
+              <div className="text-caption text-purple-700 space-y-1">
+                <p>✔ Automatic caption generation with emojis</p>
+                <p>✔ 30 trending hashtags per post</p>
+                <p>✔ Platform-specific formatting</p>
+                <p>✔ Engagement-driven CTAs</p>
               </div>
             </div>
           </div>
@@ -579,7 +713,7 @@ export default function HomePage() {
       icon: Wand2,
       title: 'Advanced AI Engine',
       description:
-        'Powered by cutting-edge artificial intelligence that creates compelling product descriptions, catchy titles, and persuasive marketing copy optimized for Amazon, Shopify, and eBay simultaneously.',
+        'Powered by cutting-edge artificial intelligence that creates compelling product descriptions, catchy titles, and persuasive marketing copy optimized for Amazon, Shopify, eBay, Instagram, and Facebook simultaneously.',
       benefit: 'AI-generated content that outperforms traditional copywriting',
 
       demo: (
@@ -608,7 +742,8 @@ export default function HomePage() {
                 task: 'Platform Optimization',
                 status: 'pending',
                 progress: 30,
-                detail: 'Amazon, Shopify & eBay formatting',
+                detail:
+                  'Amazon, Shopify, eBay, Instagram & Facebook formatting',
               },
             ].map((item, i) => (
               <div key={item.task} className="space-y-2">
@@ -955,7 +1090,7 @@ export default function HomePage() {
                 className="text-section-title text-white drop-shadow-lg"
                 style={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
               >
-                🌍 Speak in 99+ Languages → Get Professional Content
+                🌍 Speak in 99+ Languages → Multi-Platform Publishing
               </span>
             </h1>
 
@@ -979,10 +1114,16 @@ export default function HomePage() {
                 {' '}
                 direct Shopify publishing
               </span>
-              , and
+              ,
               <span className="font-semibold text-blue-300">
                 {' '}
                 revolutionary eBay direct listing
+              </span>
+              , PLUS
+              <span className="font-semibold text-pink-300">
+                {' '}
+                direct Instagram & Facebook publishing with AI-optimized
+                captions
               </span>
               . Scale from 1 product to 500+ with background automation.
               <span className="font-semibold text-white">
@@ -1084,7 +1225,8 @@ export default function HomePage() {
                     Publish Everywhere
                   </h3>
                   <p className="text-body-md text-gray-300 mb-4">
-                    Amazon Optimization, Direct publishing to Shopify & eBay
+                    Amazon Optimization, Direct publishing to Shopify, eBay,
+                    Instagram & Facebook
                   </p>
                   <div className="inline-flex items-center bg-green-500/20 border border-green-400/30 rounded-lg px-3 py-1.5">
                     <span className="text-form-label text-white">
@@ -1131,7 +1273,7 @@ export default function HomePage() {
               </div>
               <div className="flex items-center space-x-2">
                 <Check className="h-4 w-4 text-green-400" />
-                <span>No credit card required</span>
+                <span>Multi-platform publishing</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Check className="h-4 w-4 text-green-400" />
@@ -1162,9 +1304,9 @@ export default function HomePage() {
                 icon: Upload,
               },
               {
-                number: 'Multi-Platforms',
-                label: 'Amazon Optimization +',
-                sublabel: 'Direct publishing to eBay & Shopify',
+                number: 'Multi-Platform',
+                label: 'Publishing',
+                sublabel: 'Amazon, Shopify, eBay & more',
                 icon: Store,
               },
             ].map((stat, index) => {
@@ -1209,8 +1351,9 @@ export default function HomePage() {
               Everything you need to scale globally
             </h2>
             <p className="text-body-comfortable text-gray-600 max-w-3xl mx-auto">
-              From voice input in any language to direct marketplace publishing,
-              our platform handles the entire content creation workflow.
+              From voice input in any language to direct marketplace and social
+              media publishing, our platform handles the entire content creation
+              workflow.
             </p>
           </div>
 
@@ -1338,15 +1481,11 @@ export default function HomePage() {
                   'Manual content generation (text input)',
                   'Voice-to-content generation (up to 1 minute)',
                   'AI Vision analysis (brands, colors, features)',
-                  'Amazon, Shopify & eBay optimized content format',
+                  'Amazon optimization guide + Direct publishing: Shopify, eBay, Instagram & Facebook with smart hashtags',
                   'Content library access',
                   'Email support',
                 ],
-                limitations: [
-                  'No bulk CSV upload',
-                  'No background processing',
-                  'No direct platform publishing',
-                ],
+                limitations: ['No bulk CSV upload', 'No background processing'],
                 cta: '🚀 Start Free',
                 popular: false,
                 borderColor: 'border-gray-300',
@@ -1368,12 +1507,12 @@ export default function HomePage() {
                   'Bulk CSV upload (up to 50 products)',
                   'Background job processing',
                   'Content library with organization',
-                  'Amazon optimization + Direct Shopify publishing + eBay direct listing integration',
+                  'Amazon optimization guide + Direct publishing: Shopify, eBay, Instagram & Facebook with smart hashtags',
                   'Priority email support',
                 ],
-                newCapabilities: [
+                newCapabilitis: [
                   'Global bulk workflow automation',
-                  'Background processing for any language',
+                  'Social media integration',
                   'Higher generation limits',
                 ],
                 cta: '🎯 Start Free Trial',
@@ -1386,7 +1525,7 @@ export default function HomePage() {
                 price: '$59',
                 period: 'per month',
                 description:
-                  'Professional global scale with marketplace integration',
+                  'Professional global scale with marketplace & social integration',
                 limit: '1,000 content generations/month',
                 badge: null,
                 topBorderColor: '',
@@ -1394,20 +1533,20 @@ export default function HomePage() {
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Business plan',
                   'Large bulk CSV upload (up to 200 products)',
-                  'Amazon optimization + Direct Shopify publishing + eBay direct listing (enhanced)',
+                  'Amazon optimization guide + Direct publishing: Shopify, eBay, Instagram & Facebook with smart hashtags',
                   'Enhanced voice processing (full 1-minute in any language)',
                   'Advanced AI Vision analysis',
                   'Bulk export options (CSV, Excel)',
                 ],
                 differentiators: [
-                  'Amazon optimization + Direct Shopify publishing + eBay direct listing (enhanced)',
-                  'Higher bulk limits for global markets',
-                  'Enhanced multilingual AI features',
+                  'Direct marketplace integration',
+                  'Advanced social media features',
+                  'Large-scale bulk processing',
                 ],
                 newCapabilities: [
-                  'Direct marketplace integration',
-                  'Advanced multilingual AI processing',
-                  'Large-scale bulk processing',
+                  'Instagram shopping tags support',
+                  'Facebook commerce integration',
+                  'Advanced multilingual AI features',
                 ],
                 cta: '💎 Start Free Trial',
                 popular: false,
@@ -1416,27 +1555,28 @@ export default function HomePage() {
               },
               {
                 name: 'Enterprise',
-                price: 'Custom', // Changed from '$99'
-                period: '', // Changed from 'per month' to empty string
+                price: 'Custom',
+                period: '',
                 description: 'Unlimited global scale for enterprise needs',
                 limit: 'Unlimited content generations',
-                badge: 'Contact Sales', // Changed from null
+                badge: 'Contact Sales',
                 topBorderColor: '',
                 features: [
                   '🌍 Multilingual voice processing (99+ languages) - ALL PLANS',
                   'Everything in Premium plan',
                   'Enterprise bulk processing (up to 1,000 products)',
-                  'Amazon optimization + Shopify publishing + eBay publishing (unlimited)',
+                  'Amazon optimization guide + Direct publishing: Shopify, eBay, Instagram & Facebook with smart hashtags (unlimited)',
                   'Priority support (faster response)',
                   'Large-scale background processing',
                   'Global marketplace optimization',
+                  'Social commerce analytics',
                 ],
                 futureFeatures: [
                   'Custom integrations (contact us)',
                   'White-label solutions (contact us)',
                   'Additional platform integrations',
                 ],
-                cta: '📞 Contact Sales', // Changed from '🚀 Start Free Trial'
+                cta: '📞 Contact Sales',
                 popular: false,
                 borderColor: 'border-gray-300',
                 buttonStyle: 'bg-gray-900 hover:bg-gray-800 text-white',
@@ -1543,8 +1683,9 @@ export default function HomePage() {
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 Revolutionizing global product marketing with advanced
                 multilingual AI technology. Transform your voice in 99+
-                languages into professional content and optimize images for
-                various e-commerce platforms worldwide.
+                languages into professional content and publish directly to
+                Shopify, eBay, Instagram, and Facebook plus Amazon
+                (Optimization).
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
@@ -1554,7 +1695,10 @@ export default function HomePage() {
                   <span className="text-sm font-bold">in</span>
                 </button>
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
-                  <span className="text-sm">@</span>
+                  <Instagram className="h-4 w-4" />
+                </button>
+                <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
+                  <Facebook className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -1582,7 +1726,12 @@ export default function HomePage() {
                   <span className="text-gray-500">99+ Languages Support</span>
                 </li>
                 <li>
-                  <span className="text-gray-500">Platform Integrations</span>
+                  <span className="text-gray-500">
+                    Multi-Platform Integration
+                  </span>
+                </li>
+                <li>
+                  <span className="text-gray-500">🆕 Social Commerce</span>
                 </li>
               </ul>
             </div>

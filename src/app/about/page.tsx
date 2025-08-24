@@ -32,6 +32,7 @@ import {
   Languages,
   Store,
   Check,
+  Share2,
 } from 'lucide-react'
 
 export default function EnhancedAboutUsPage() {
@@ -75,7 +76,7 @@ export default function EnhancedAboutUsPage() {
       label: 'Amazon Optimization + Direct Publishing',
       icon: Store,
       description:
-        'Professional Amazon listing optimization plus one-click direct publishing to Shopify & eBay with AI-powered category detection',
+        'Professional Amazon listing optimization plus one-click direct publishing to Shopify, eBay, Instagram & Facebook with AI-optimized captions',
     },
   ]
 
@@ -142,7 +143,7 @@ export default function EnhancedAboutUsPage() {
     },
     {
       phase: 'Integration',
-      title: 'Triple Platform Integration: Optimization & Direct Publishing',
+      title: 'Multi-Platform Integration: Optimization & Direct Publishing',
       description:
         'Launched comprehensive Amazon listing optimization with SEO best practices, plus groundbreaking one-click direct publishing to Shopify and eBay stores. Our eBay integration features real-time Taxonomy API category detection—a first in the industry.',
       icon: ShoppingCart,
@@ -157,10 +158,18 @@ export default function EnhancedAboutUsPage() {
       color: 'from-blue-400 to-cyan-500',
     },
     {
+      phase: 'Social Commerce',
+      title: '📱 Instagram & Facebook Direct Publishing Launch',
+      description:
+        'Revolutionary social media integration with direct Instagram & Facebook publishing featuring AI-optimized captions, smart hashtag generation, and engagement-driven content formatting for maximum reach and conversions.',
+      icon: Share2,
+      color: 'from-pink-400 to-purple-500',
+    },
+    {
       phase: 'Scale',
       title: 'Global Bulk Processing Revolution',
       description:
-        'Background job processing for hundreds of products simultaneously in multiple languages across Amazon, Shopify, and eBay - scale your global business while you sleep.',
+        'Background job processing for hundreds of products simultaneously in multiple languages across Amazon, Shopify, eBay, Instagram & Facebook - scale your global business while you sleep.',
       icon: Upload,
       color: 'from-cyan-400 to-blue-500',
     },
@@ -181,28 +190,28 @@ export default function EnhancedAboutUsPage() {
       icon: Languages,
       title: 'Multilingual AI & Machine Learning',
       description:
-        'Deep expertise in OpenAI Vision, multilingual voice recognition (99+ languages), natural language processing across cultures, and eBay Taxonomy API integration.',
+        'Deep expertise in OpenAI Vision, multilingual voice recognition (99+ languages), natural language processing across cultures, eBay Taxonomy API integration, and social media content optimization.',
       color: 'from-blue-400 to-indigo-500',
     },
     {
       icon: Rocket,
       title: 'Global Product Development',
       description:
-        'Full-stack development from concept to deployment, building scalable AI-powered platforms that serve entrepreneurs worldwide with Amazon, Shopify, and eBay integrations.',
+        'Full-stack development from concept to deployment, building scalable AI-powered platforms that serve entrepreneurs worldwide with Amazon, Shopify, eBay, Instagram & Facebook integrations.',
       color: 'from-green-400 to-emerald-500',
     },
     {
       icon: Globe,
       title: 'Global Entrepreneur Mindset',
       description:
-        'Understanding real business challenges across cultures and building solutions that actually solve problems for international entrepreneurs selling on multiple platforms.',
+        'Understanding real business challenges across cultures and building solutions that actually solve problems for international entrepreneurs selling on multiple platforms and social media.',
       color: 'from-purple-400 to-pink-500',
     },
     {
       icon: Code,
       title: 'Technical Architecture & Marketplace Integration',
       description:
-        "Engineering enterprise-grade systems for multilingual voice processing, AI vision analysis, and bulk operations at scale. Deep expertise in marketplace APIs including eBay's dual-token authentication and Shopify's GraphQL architecture.",
+        "Engineering enterprise-grade systems for multilingual voice processing, AI vision analysis, and bulk operations at scale. Deep expertise in marketplace APIs including eBay's dual-token authentication, Shopify's GraphQL architecture, and Meta's Graph API for Instagram & Facebook.",
       color: 'from-orange-400 to-red-500',
     },
   ]
@@ -213,7 +222,7 @@ export default function EnhancedAboutUsPage() {
       icon: Languages,
       title: 'Advanced Language Intelligence & Global Expansion',
       description:
-        'Next-gen dialect recognition, cultural context AI, and hyper-local market optimization. Expanding direct publishing to international eBay marketplaces and additional e-commerce platforms.',
+        'Next-gen dialect recognition, cultural context AI, and hyper-local market optimization. Expanding direct publishing to international eBay marketplaces, additional e-commerce platforms, and emerging social commerce channels.',
       timeline: 'Coming Soon',
       color: 'from-blue-500 to-cyan-500',
     },
@@ -221,7 +230,7 @@ export default function EnhancedAboutUsPage() {
       icon: TrendingUp,
       title: 'Global AI Analytics Dashboard with Multi-Platform Insights',
       description:
-        'Intelligent insights to optimize your content performance across Amazon, Shopify, and eBay in different markets and languages, with cultural sensitivity analysis and eBay category performance tracking.',
+        'Intelligent insights to optimize your content performance across Amazon, Shopify, eBay, Instagram & Facebook in different markets and languages, with cultural sensitivity analysis, eBay category performance tracking, and social media engagement metrics.',
       timeline: 'In Development',
       color: 'from-purple-500 to-pink-500',
     },
@@ -229,7 +238,7 @@ export default function EnhancedAboutUsPage() {
       icon: Users,
       title: 'Global Team Collaboration & Advanced Platform Features',
       description:
-        'Advanced team features for international agencies and larger businesses to collaborate on multilingual content creation seamlessly across all three platforms, with eBay bulk listing management.',
+        'Advanced team features for international agencies and larger businesses to collaborate on multilingual content creation seamlessly across all platforms, with eBay bulk listing management and social media campaign coordination.',
       timeline: 'Planned',
       color: 'from-green-500 to-emerald-500',
     },
@@ -421,13 +430,20 @@ export default function EnhancedAboutUsPage() {
                 <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-white">
                   <span className="text-white text-xs">🏪</span>
                 </div>
+                <div className="w-6 h-6 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center border-2 border-white">
+                  <span className="text-white text-xs">📸</span>
+                </div>
+                <div className="w-6 h-6 bg-gradient-to-r from-blue-600 to-sky-500 rounded-full flex items-center justify-center border-2 border-white">
+                  <span className="text-white text-xs">👍</span>
+                </div>
               </div>
               <div className="text-left">
                 <div className="text-lg font-bold text-white">
-                  Amazon Optimization | Shopify & eBay Direct Publishing
+                  Amazon Optimization | Direct Multi-Platform Publishing
                 </div>
                 <div className="text-sm text-white/80">
-                  The only platform with triple marketplace integration
+                  The only platform with multi-marketplace & social media
+                  integration
                 </div>
               </div>
             </div>
@@ -450,8 +466,8 @@ export default function EnhancedAboutUsPage() {
               enterprise-grade content creation tools in their native language.
               We're on a mission to democratize global e-commerce through
               cutting-edge multilingual AI—transforming your voice into
-              optimized Amazon listings and publishing directly to Shopify and
-              eBay stores,
+              optimized Amazon listings and publishing directly to Shopify,
+              eBay, Instagram & Facebook with AI-optimized captions,
               <span className="font-semibold text-white">
                 {' '}
                 one voice at a time, in any language.
@@ -594,11 +610,11 @@ export default function EnhancedAboutUsPage() {
                   Today, a solo entrepreneur in Spain can speak naturally in
                   Spanish and instantly receive professionally optimized English
                   content for Amazon US, while publishing directly to their
-                  Shopify and eBay stores with AI-powered category detection. An
-                  entrepreneur in India can speak in Hindi and generate German
-                  content for European markets—competing with multinational
-                  corporations without translation agencies or technical
-                  expertise.
+                  Shopify, eBay stores, and posting to Instagram & Facebook with
+                  AI-optimized captions. An entrepreneur in India can speak in
+                  Hindi and generate German content for European
+                  markets—competing with multinational corporations without
+                  translation agencies or technical expertise.
                 </p>
               </div>
 
@@ -616,8 +632,9 @@ export default function EnhancedAboutUsPage() {
                       powerful multilingual content creation tools as Fortune
                       500 companies—democratizing global e-commerce through
                       AI-powered Amazon optimization and seamless direct
-                      publishing to Shopify and eBay, eliminating language
-                      barriers forever.
+                      publishing to Shopify, eBay, Instagram & Facebook with
+                      AI-optimized captions, eliminating language barriers
+                      forever.
                     </p>
                   </div>
                 </div>
@@ -636,12 +653,13 @@ export default function EnhancedAboutUsPage() {
                     <Languages className="w-16 h-16 text-white animate-pulse" />
                   </div>
                   <h3 className="text-heading-md font-bold text-gray-900 mb-4">
-                    From Global Idea to Triple Platform Impact
+                    From Global Idea to Multi-Platform Impact
                   </h3>
                   <p className="text-body-md text-gray-700 max-w-sm">
                     Transforming the way businesses worldwide create and share
                     their stories across cultures through multilingual AI
-                    innovation and revolutionary multi-platform publishing.
+                    innovation and revolutionary multi-platform publishing
+                    including social media integration.
                   </p>
                 </div>
               </div>
@@ -669,7 +687,8 @@ export default function EnhancedAboutUsPage() {
             <p className="text-body-comfortable text-gray-600 max-w-3xl mx-auto">
               From a simple multilingual frustration to a revolutionary platform
               that's transforming how global entrepreneurs create content in any
-              language and publish across Amazon, Shopify, and eBay.
+              language and publish across Amazon, Shopify, eBay, Instagram &
+              Facebook.
             </p>
           </div>
 
@@ -917,8 +936,8 @@ export default function EnhancedAboutUsPage() {
                       "Every entrepreneur deserves the same powerful tools as
                       enterprise companies. Our formula is simple: Multilingual
                       Voice Recognition (99+ languages) + Advanced AI + Amazon
-                      Optimization + Direct Publishing to Shopify & eBay = The
-                      future of global e-commerce."
+                      Optimization + Direct Publishing to Shopify, eBay,
+                      Instagram & Facebook = The future of global e-commerce."
                     </p>
                   </div>
 
@@ -931,7 +950,7 @@ export default function EnhancedAboutUsPage() {
                       "Start with 10 free multilingual content generations every
                       month. No credit card, no risk - just experience the power
                       of AI-driven content creation in 99+ languages with direct
-                      publishing to all three major platforms."
+                      publishing to all major platforms and social media."
                     </p>
                   </div>
                 </div>
@@ -947,7 +966,7 @@ export default function EnhancedAboutUsPage() {
             <p className="text-body-md text-gray-600 max-w-2xl mx-auto">
               The diverse international background and skills that went into
               building Listora AI from the ground up for global entrepreneurs
-              across Amazon, Shopify, and eBay.
+              across Amazon, Shopify, eBay, Instagram & Facebook.
             </p>
           </div>
 
@@ -1022,7 +1041,8 @@ export default function EnhancedAboutUsPage() {
               We're just getting started globally. Here's what we're building
               next to make multilingual content creation even more powerful for
               entrepreneurs worldwide, breaking down more barriers and creating
-              more opportunities across Amazon, Shopify, eBay, and beyond.
+              more opportunities across Amazon, Shopify, eBay, Instagram,
+              Facebook, and beyond.
             </p>
           </div>
 
@@ -1070,8 +1090,8 @@ export default function EnhancedAboutUsPage() {
             Join the multilingual e-commerce revolution. Build your global
             business with enterprise-grade AI tools and join thousands of
             successful entrepreneurs who speak in 99+ languages, optimize for
-            Amazon, and publish directly to Shopify and eBay—all from a single
-            platform.
+            Amazon, and publish directly to Shopify, eBay, Instagram & Facebook
+            with AI-optimized captions—all from a single platform.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
@@ -1104,7 +1124,7 @@ export default function EnhancedAboutUsPage() {
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-green-400" />
               <span>
-                Amazon Optimization + Shopify & eBay Direct Publishing
+                Amazon Optimization + Direct Publishing to 4 Platforms
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -1135,7 +1155,7 @@ export default function EnhancedAboutUsPage() {
                 Revolutionizing global product marketing with advanced
                 multilingual AI technology. Transform your voice in 99+
                 languages into professional content and optimize images for
-                various e-commerce platforms worldwide.
+                various e-commerce platforms and social media worldwide.
               </p>
               <div className="flex space-x-4">
                 <button className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors">
